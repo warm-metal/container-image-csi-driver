@@ -14,7 +14,7 @@ type NodeServer struct {
     *csicommon.DefaultNodeServer
 }
 
-// FIXME options: forcePull
+// FIXME options: forcePull, credential
 
 func (n NodeServer) NodePublishVolume(ctx context.Context, req *csi.NodePublishVolumeRequest) (resp *csi.NodePublishVolumeResponse, err error) {
     if len(req.VolumeId)  == 0 {
