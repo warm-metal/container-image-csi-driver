@@ -4,6 +4,9 @@ metadata:
   name: libgitgo
 build:
   artifacts:
+    - image: warmmetal/csi-image
+      docker:
+        dockerfile: Dockerfile
     - image: warmmetal/csi-driver-image-test
       docker:
         dockerfile: "test.dockerfile"
@@ -17,3 +20,4 @@ deploy:
       apply: ["--force"]
     manifests:
       - "test/test-manifest.yaml"
+      - "deploy/cri-docker.yaml"

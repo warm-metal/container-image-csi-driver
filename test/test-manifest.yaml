@@ -10,6 +10,7 @@ spec:
       containers:
         - name: csi-driver-image-test
           image: warmmetal/csi-driver-image-test
+          imagePullPolicy: IfNotPresent
           env:
             - name: HTTP_PROXY
               value: http://192.168.64.1:1087

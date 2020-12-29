@@ -1,4 +1,4 @@
-apiVersion: storage.k8s.io/v1beta1
+apiVersion: storage.k8s.io/v1
 kind: CSIDriver
 metadata:
   name: csi-image.warm-metal.tech
@@ -11,15 +11,15 @@ spec:
 kind: DaemonSet
 apiVersion: apps/v1
 metadata:
-  name: csi-imageplugin
+  name: csi-image-warm-metal
 spec:
   selector:
     matchLabels:
-      app: csi-imageplugin
+      app: csi-image-warm-metal
   template:
     metadata:
       labels:
-        app: csi-imageplugin
+        app: csi-image-warm-metal
     spec:
       hostNetwork: true
       containers:
@@ -29,11 +29,11 @@ spec:
           lifecycle:
             preStop:
               exec:
-                command: ["/bin/sh", "-c", "rm -rf /registration/csi-image /registration/csi-image-reg.sock"]
+                command: ["/bin/sh", "-c", "rm -rf /registration/csi-image.warm-metal.tech /registration/csi-image.warm-metal.tech-reg.sock"]
           args:
             - --v=5
             - --csi-address=/csi/csi.sock
-            - --kubelet-registration-path=/var/lib/kubelet/plugins/csi-image/csi.sock
+            - --kubelet-registration-path=/var/lib/kubelet/plugins/csi-image.warm-metal.tech/csi.sock
           env:
             - name: KUBE_NODE_NAME
               valueFrom:
@@ -45,9 +45,9 @@ spec:
               name: socket-dir
             - mountPath: /registration
               name: registration-dir
-
-        - name: image
-          image: warmmetal/csi-image:latest
+        - name: plugin
+          image: warmmetal/csi-image
+          imagePullPolicy: IfNotPresent
           args:
             - "-endpoint=$(CSI_ENDPOINT)"
             - "-node=$(KUBE_NODE_NAME)"
@@ -59,7 +59,6 @@ spec:
                 fieldRef:
                   apiVersion: v1
                   fieldPath: spec.nodeName
-          imagePullPolicy: Always
           securityContext:
             privileged: true
           volumeMounts:
@@ -68,16 +67,13 @@ spec:
             - mountPath: /var/lib/kubelet/pods
               mountPropagation: Bidirectional
               name: mountpoint-dir
-            - mountPath: /var/lib/containers/storage
-              mountPropagation: Bidirectional
-              name: storageroot-dir
-            - mountPath: /var/run/containers/storage
-              mountPropagation: Bidirectional
-              name: storagerunroot-dir
-
+            - mountPath: /var/run/containerd/containerd.sock
+              name: containerd-socket
+            - mountPath: /var/lib/docker
+              name: docker
       volumes:
         - hostPath:
-            path: /var/lib/kubelet/plugins/csi-image
+            path: /var/lib/kubelet/plugins/csi-image.warm-metal.tech
             type: DirectoryOrCreate
           name: socket-dir
         - hostPath:
@@ -89,13 +85,9 @@ spec:
             type: Directory
           name: registration-dir
         - hostPath:
-            path: /var/lib/containers/storage
-            type: DirectoryOrCreate
-          name: storageroot-dir
-        - hostPath:
-            path: /var/run/containers/storage
-            type: DirectoryOrCreate
-          name: storagerunroot-dir
+            path: /var/lib/docker
+            type: Directory
+          name: docker
         - hostPath:
             path: /run/docker/containerd/containerd.sock
             type: Socket
