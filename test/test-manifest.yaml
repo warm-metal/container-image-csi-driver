@@ -1,0 +1,43 @@
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: csi-driver-image-test
+spec:
+  template:
+    metadata:
+      name: csi-driver-image-test
+    spec:
+      containers:
+        - name: csi-driver-image-test
+          image: warmmetal/csi-driver-image-test
+          env:
+            - name: HTTP_PROXY
+              value: http://192.168.64.1:1087
+            - name: HTTPS_PROXY
+              value: http://192.168.64.1:1087
+            - name: NO_PROXY
+              value: 192.168.64.3,localhost,127.0.0.1,192.168.99.*,192.168.39.*,192.168.49.*,10.96.0.0/12
+          volumeMounts:
+            - mountPath: /var/run/containerd/containerd.sock
+              name: containerd-socket
+            - mountPath: /var/lib/docker
+              name: docker
+            - mountPath: /tmp/image-mount-point
+              name: mount-point
+          securityContext:
+            privileged: true
+      restartPolicy: Never
+      volumes:
+        - name: containerd-socket
+          hostPath:
+            path: /var/run/docker/containerd/containerd.sock
+            type: Socket
+        - name: docker
+          hostPath:
+            path: /var/lib/docker
+            type: Directory
+        - name: mount-point
+          hostPath:
+            path: /tmp/image-mount-point
+            type: DirectoryOrCreate
+  backoffLimit: 0

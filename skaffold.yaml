@@ -1,0 +1,19 @@
+apiVersion: skaffold/v2beta9
+kind: Config
+metadata:
+  name: libgitgo
+build:
+  artifacts:
+    - image: warmmetal/csi-driver-image-test
+      docker:
+        dockerfile: "test.dockerfile"
+#      custom:
+#        buildCommand: buildctl --addr kube-pod://buildkitd build --frontend dockerfile.v0 --local context="$BUILD_CONTEXT" --local dockerfile="$BUILD_CONTEXT" --frontend-opt filename=test.dockerfile --output "type=image,name=$IMAGES"
+  local:
+    useDockerCLI: true
+deploy:
+  kubectl:
+    flags:
+      apply: ["--force"]
+    manifests:
+      - "test/test-manifest.yaml"
