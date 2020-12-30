@@ -3,20 +3,24 @@ package main
 import (
     "context"
     "github.com/container-storage-interface/spec/lib/go/csi"
+    "github.com/golang/glog"
     csicommon "github.com/kubernetes-csi/drivers/pkg/csi-common"
+    "github.com/warm-metal/csi-driver-image/pkg/backend"
     "google.golang.org/grpc/codes"
     "google.golang.org/grpc/status"
     k8smount "k8s.io/utils/mount"
     "os"
 )
 
-type NodeServer struct {
+type nodeServer struct {
     *csicommon.DefaultNodeServer
+    mounter backend.Mounter
 }
 
 // FIXME options: forcePull, credential
 
-func (n NodeServer) NodePublishVolume(ctx context.Context, req *csi.NodePublishVolumeRequest) (resp *csi.NodePublishVolumeResponse, err error) {
+func (n nodeServer) NodePublishVolume(ctx context.Context, req *csi.NodePublishVolumeRequest) (resp *csi.NodePublishVolumeResponse, err error) {
+    glog.Infof("request: %s", req.String())
     if len(req.VolumeId)  == 0 {
         err = status.Error(codes.InvalidArgument, "VolumeId is missing")
         return
@@ -27,10 +31,10 @@ func (n NodeServer) NodePublishVolume(ctx context.Context, req *csi.NodePublishV
         return
     }
 
-    if len(req.VolumeContext)  == 0 {
-        err = status.Error(codes.InvalidArgument, "VolumeContext.image is missing")
-        return
-    }
+    //if len(req.VolumeContext)  == 0 {
+    //    err = status.Error(codes.InvalidArgument, "VolumeContext.image is missing")
+    //    return
+    //}
 
     notMnt, err := k8smount.New("").IsLikelyNotMountPoint(req.TargetPath)
     if err != nil {
@@ -51,13 +55,7 @@ func (n NodeServer) NodePublishVolume(ctx context.Context, req *csi.NodePublishV
         return &csi.NodePublishVolumeResponse{}, nil
     }
 
-    image := req.VolumeContext["image"]
-    if len(image) == 0 {
-        err = status.Error(codes.InvalidArgument, "VolumeContext.image is missing")
-        return
-    }
-
-    if err = mountContainerdImage(ctx, req.VolumeId, image, req.TargetPath); err != nil {
+    if err = n.mounter.Mount(ctx, req.VolumeId, req.TargetPath); err != nil {
         err = status.Error(codes.Internal, err.Error())
         return
     }
@@ -65,7 +63,7 @@ func (n NodeServer) NodePublishVolume(ctx context.Context, req *csi.NodePublishV
     return &csi.NodePublishVolumeResponse{}, nil
 }
 
-func (n NodeServer) NodeUnpublishVolume(ctx context.Context, req *csi.NodeUnpublishVolumeRequest) (resp *csi.NodeUnpublishVolumeResponse, err error) {
+func (n nodeServer) NodeUnpublishVolume(ctx context.Context, req *csi.NodeUnpublishVolumeRequest) (resp *csi.NodeUnpublishVolumeResponse, err error) {
     if len(req.VolumeId)  == 0 {
         err = status.Error(codes.InvalidArgument, "VolumeId is missing")
         return
@@ -76,7 +74,7 @@ func (n NodeServer) NodeUnpublishVolume(ctx context.Context, req *csi.NodeUnpubl
         return
     }
 
-    if err = umountContainerdImage(ctx, req.VolumeId, req.TargetPath); err != nil {
+    if err = n.mounter.Unmount(ctx, req.VolumeId, req.TargetPath); err != nil {
         err = status.Error(codes.Internal, err.Error())
         return
     }
@@ -84,14 +82,14 @@ func (n NodeServer) NodeUnpublishVolume(ctx context.Context, req *csi.NodeUnpubl
     return &csi.NodeUnpublishVolumeResponse{}, nil
 }
 
-func (n NodeServer) NodeStageVolume(ctx context.Context, request *csi.NodeStageVolumeRequest) (*csi.NodeStageVolumeResponse, error) {
+func (n nodeServer) NodeStageVolume(ctx context.Context, request *csi.NodeStageVolumeRequest) (*csi.NodeStageVolumeResponse, error) {
     return nil, status.Error(codes.Unimplemented, "")
 }
 
-func (n NodeServer) NodeUnstageVolume(ctx context.Context, request *csi.NodeUnstageVolumeRequest) (*csi.NodeUnstageVolumeResponse, error) {
+func (n nodeServer) NodeUnstageVolume(ctx context.Context, request *csi.NodeUnstageVolumeRequest) (*csi.NodeUnstageVolumeResponse, error) {
     return nil, status.Error(codes.Unimplemented, "")
 }
 
-func (n NodeServer) NodeExpandVolume(ctx context.Context, request *csi.NodeExpandVolumeRequest) (*csi.NodeExpandVolumeResponse, error) {
+func (n nodeServer) NodeExpandVolume(ctx context.Context, request *csi.NodeExpandVolumeRequest) (*csi.NodeExpandVolumeResponse, error) {
     return nil, status.Error(codes.Unimplemented, "")
 }

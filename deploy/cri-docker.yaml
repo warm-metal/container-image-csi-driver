@@ -6,6 +6,7 @@ spec:
   attachRequired: false
   podInfoOnMount: false
   volumeLifecycleModes:
+    - Persistent
     - Ephemeral
 ---
 kind: DaemonSet

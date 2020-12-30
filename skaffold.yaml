@@ -21,3 +21,4 @@ deploy:
     manifests:
       - "test/test-manifest.yaml"
       - "deploy/cri-docker.yaml"
+      - "test/manifests/pre-provisioned-pv.yaml"
