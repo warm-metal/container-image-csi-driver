@@ -22,3 +22,4 @@ deploy:
       - "test/test-manifest.yaml"
       - "deploy/cri-docker.yaml"
       - "test/manifests/pre-provisioned-pv.yaml"
+      - "test/manifests/ephemeral-volume.yaml"

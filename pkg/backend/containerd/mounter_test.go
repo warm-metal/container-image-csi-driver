@@ -49,7 +49,7 @@ func removeImage(image string) error {
 	return c.ImageService().Delete(context.TODO(), namedRef.String(), images.SynchronousDelete())
 }
 
-func testMountAndUmount(t *testing.T, image, target string, unmount bool) {
+func testMountAndUmount(t *testing.T, volumeId, image, target string, unmount bool) {
 	if image != "warmmetal/csi-image-test:simple-fs" {
 		t.Fatalf(`"image" must be ""warmmetal/csi-image-test:simple-fs""`)
 	}
@@ -60,14 +60,14 @@ func testMountAndUmount(t *testing.T, image, target string, unmount bool) {
 	}
 
 	m := NewMounter(containerdSock, defaultContainerdNamespace)
-	if err := m.Mount(context.TODO(), image, target); err != nil {
+	if err := m.Mount(context.TODO(), volumeId, image, target); err != nil {
 		t.Error(err)
 		t.Fail()
 	}
 
 	if unmount {
 		defer func() {
-			if err := m.Unmount(context.TODO(), image, target); err != nil {
+			if err := m.Unmount(context.TODO(), volumeId, target); err != nil {
 				t.Error(err)
 				t.Fail()
 			}
@@ -90,38 +90,49 @@ func testMountAndUmount(t *testing.T, image, target string, unmount bool) {
 	}
 }
 
-func TestLocalMountAndUmount(t *testing.T) {
+func TestLocalMountAndUmountAsPV(t *testing.T) {
 	image := "warmmetal/csi-image-test:simple-fs"
+	volumeId := image
 	target := "/tmp/image-mount-point/simple-fs"
 
 	if err := pullImage(image); err != nil {
 		t.Fatal(err)
 	}
 
-	testMountAndUmount(t, image, target, true)
+	testMountAndUmount(t, volumeId, image, target, true)
 }
 
-func TestRemoteMountAndUmount(t *testing.T) {
+func TestRemoteMountAndUmountAsPV(t *testing.T) {
 	image := "warmmetal/csi-image-test:simple-fs"
+	volumeId := image
 	target := "/tmp/image-mount-point/simple-fs"
 
 	if err := removeImage(image); err != nil {
 		t.Fatal(err)
 	}
 
-	testMountAndUmount(t, image, target, true)
+	testMountAndUmount(t, volumeId, image, target, true)
 }
 
-func TestMountTheSameImage(t *testing.T) {
+func TestMountTheSameImageAsPV(t *testing.T) {
 	image := "warmmetal/csi-image-test:simple-fs"
+	volumeId := image
 	targetFoo := "/tmp/image-mount-point/foo"
 	targetBar := "/tmp/image-mount-point/bar"
-	testMountAndUmount(t, image, targetFoo, false)
-	testMountAndUmount(t, image, targetBar, true)
+	testMountAndUmount(t, volumeId, image, targetFoo, false)
+	testMountAndUmount(t, volumeId, image, targetBar, true)
 
 	m := NewMounter(containerdSock, defaultContainerdNamespace)
-	if err := m.Unmount(context.TODO(), image, targetFoo); err != nil {
+	if err := m.Unmount(context.TODO(), volumeId, targetFoo); err != nil {
 		t.Error(err)
 		t.Fail()
 	}
+}
+
+func TestMountAsEphemeralVolume(t *testing.T) {
+	image := "warmmetal/csi-image-test:simple-fs"
+	volumeId := "csi-f608d82983355e90fbed86a57381947c2e8b164bfc584297f1c7a2b69fa1b295"
+	target := "/tmp/image-mount-point/simple-fs"
+
+	testMountAndUmount(t, volumeId, image, target, true)
 }

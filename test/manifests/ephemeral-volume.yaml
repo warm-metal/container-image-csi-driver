@@ -1,20 +1,26 @@
-kind: Pod
-apiVersion: v1
+apiVersion: batch/v1
+kind: Job
 metadata:
   name: ephemeral-volume
 spec:
-  containers:
-    - name: ephemeral-volume
-      image: docker.io/warmmetal/csi-image-test:check-fs
-      env:
-        - name: TARGET
-          value: /target
-      volumeMounts:
-        - mountPath: /target
-          name: target
-  volumes:
-    - name: target
-      csi:
-        driver: csi-image.warm-metal.tech
-        volumeAttributes:
-          volumeHandle: "docker.io/warmmetal/csi-image-test:simple-fs"
+  template:
+    metadata:
+      name: ephemeral-volume
+    spec:
+      containers:
+        - name: ephemeral-volume
+          image: docker.io/warmmetal/csi-image-test:check-fs
+          env:
+            - name: TARGET
+              value: /target
+          volumeMounts:
+            - mountPath: /target
+              name: target
+      restartPolicy: Never
+      volumes:
+        - name: target
+          csi:
+            driver: csi-image.warm-metal.tech
+            volumeAttributes:
+              volumeHandle: "docker.io/warmmetal/csi-image-test:simple-fs"
+  backoffLimit: 0

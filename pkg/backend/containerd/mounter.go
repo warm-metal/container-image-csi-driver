@@ -37,12 +37,38 @@ func genSnapshotKey(parent string) string {
 }
 
 const (
-	targetLabel = "csi-image.warm-metal.tech/target"
-	imageLabel  = "csi-image.warm-metal.tech/image"
+	targetLabelPrefix   = "csi-image.warm-metal.tech/target"
+	imageLabelPrefix          = "csi-image.warm-metal.tech/image"
+	volumeIdLabelPrefix = "csi-image.warm-metal.tech/id"
 )
 
-func genTargetLabelKey(target string) string {
-	return fmt.Sprintf("%s/%s", targetLabel, target)
+func defaultSnapshotLabels() map[string]string {
+	return map[string]string{
+		"containerd.io/gc.root": time.Now().UTC().Format(time.RFC3339),
+	}
+}
+
+func genTargetLabel(target string) string {
+	return fmt.Sprintf("%s|%s", targetLabelPrefix, target)
+}
+
+func withTarget(labels map[string]string, target string) map[string]string {
+	labels[genTargetLabel(target)] = "√"
+	return labels
+}
+
+func genVolumeIdLabel(volumeId string) string {
+	return fmt.Sprintf("%s|%s", volumeIdLabelPrefix, volumeId)
+}
+
+func withVolumeId(labels map[string]string, volumeId string) map[string]string {
+	labels[genVolumeIdLabel(volumeId)] = "√"
+	return labels
+}
+
+func withImage(labels map[string]string, image string) map[string]string {
+	labels[fmt.Sprintf("%s|%s", imageLabelPrefix, image)] = "√"
+	return labels
 }
 
 func (m *mounter) getImageRootFSChainID(
@@ -87,19 +113,25 @@ func (m *mounter) getImageRootFSChainID(
 }
 
 func (m *mounter) refSnapshot(
-	ctx context.Context, c *containerd.Client, image, parent, target string,
+	ctx context.Context, c *containerd.Client, volumeId, image, target string,
 ) (mounts []mount.Mount, err error) {
+	parent, err := m.getImageRootFSChainID(ctx, c, image, true)
+	if err != nil {
+		glog.Errorf("fail to get rootfs of image %s: %s", image, err)
+		return
+	}
+
+	glog.Infof("prepare %s", parent)
+
 	snapshotter := c.SnapshotService(m.snapshotterName)
 	key := genSnapshotKey(parent)
-	targetLabelKey := genTargetLabelKey(target)
+
 	m.snapshotLock.Lock()
 	defer m.snapshotLock.Unlock()
-	mounts, err = snapshotter.View(ctx, key, parent, snapshots.WithLabels(map[string]string{
-		"containerd.io/gc.root": time.Now().UTC().Format(time.RFC3339),
-		imageLabel:              image,
-		targetLabelKey:          "√", // snapshotter ignores labels w/o values
-	}))
 
+	mounts, err = snapshotter.View(ctx, key, parent, snapshots.WithLabels(
+		withImage(withVolumeId(withTarget(defaultSnapshotLabels(), target), volumeId), image),
+	))
 	if err == nil {
 		return
 	}
@@ -113,7 +145,7 @@ func (m *mounter) refSnapshot(
 		return
 	}
 
-	info.Labels[targetLabelKey] = "√"
+	withImage(withVolumeId(withTarget(info.Labels, target), volumeId), image)
 	_, err = snapshotter.Update(ctx, info)
 	if err != nil {
 		return
@@ -124,17 +156,17 @@ func (m *mounter) refSnapshot(
 }
 
 func (m *mounter) unrefSnapshot(
-	ctx context.Context, c *containerd.Client, image, parent, target string,
+	ctx context.Context, c *containerd.Client, volumeId, target string,
 ) error {
 	snapshotter := c.SnapshotService(m.snapshotterName)
-	targetLabelKey := genTargetLabelKey(target)
+	targetLabel := genTargetLabel(target)
 
-	unref := func(info snapshots.Info, targetLabelKey string) error {
+	unref := func(info snapshots.Info, targetLabel string) error {
 		glog.Infof("unref snapshot %s, parent %s", info.Name, info.Parent)
-		delete(info.Labels, targetLabelKey)
+		delete(info.Labels, targetLabel)
 		referred := false
 		for label := range info.Labels {
-			if strings.HasPrefix(label, targetLabel) {
+			if strings.HasPrefix(label, targetLabelPrefix) {
 				glog.Infof("snapshot %s is also mounted to %s", info.Name, label)
 				referred = true
 				break
@@ -153,62 +185,50 @@ func (m *mounter) unrefSnapshot(
 	m.snapshotLock.Lock()
 	defer m.snapshotLock.Unlock()
 
-	if len(parent) > 0 {
-		key := genSnapshotKey(parent)
-		info, err := snapshotter.Stat(ctx, key)
-		if err != nil {
-			glog.Errorf(`snapshot "%s" not found: %s`, key, err)
-		} else {
-			if len(info.Labels) > 0 && info.Labels[imageLabel] == image {
-				glog.Infof(`found snapshot "%s" for image "%s": %#v`, key, image, info.Labels)
-				if _, found := info.Labels[targetLabelKey]; found {
-					return unref(info, targetLabelKey)
-				}
-			}
-		}
-	}
-
-	// fallback to walk all snapshots and find out the target snapshot
-	glog.Infof("no snapshot matches %s/%s. fallback to walk all snapshots", image, parent)
-	return snapshotter.Walk(ctx, func(ctx context.Context, info snapshots.Info) error{
+	matchCounter := 0
+	return snapshotter.Walk(ctx, func(ctx context.Context, info snapshots.Info) error {
 		if len(info.Labels) == 0 {
 			return nil
 		}
-		if _, found := info.Labels[targetLabelKey]; !found {
+
+		if _, found := info.Labels[targetLabel]; !found {
 			return nil
 		}
 
-		glog.Infof(`found snapshot %s for %s. prepare to unref it.`, info.Name, image)
-		return unref(info, targetLabelKey)
+		volumeIdLabel := genVolumeIdLabel(volumeId)
+		if _, found := info.Labels[volumeIdLabel]; !found {
+			panic(fmt.Sprintf("snapshot doesn't belong to volume %s: %#v", volumeId, info.Labels))
+		}
+
+		if matchCounter > 0 {
+			panic("at most 1 snapshot can match the condition")
+		}
+
+		matchCounter++
+
+		glog.Infof(`found snapshot %s for volume %s. prepare to unref it.`, info.Name, volumeId)
+		return unref(info, targetLabel)
 	},
-	`kind==view`, fmt.Sprintf(`labels."%s"==%s`, imageLabel, image))
+		`kind==view`, fmt.Sprintf(`labels."%s"==%s`, targetLabel, "√"))
 }
 
-func (m *mounter) Mount(ctx context.Context, image, target string) (err error) {
+func (m *mounter) Mount(ctx context.Context, volumeId, image, target string) (err error) {
 	c, err := containerd.New(m.containerdEndpoint, containerd.WithDefaultNamespace(m.namespace))
 	if err != nil {
 		glog.Errorf("fail to create containerd client: %s", err)
 		return
 	}
 
-	parent, err := m.getImageRootFSChainID(ctx, c, image, true)
+	mounts, err := m.refSnapshot(ctx, c, volumeId, image, target)
 	if err != nil {
-		glog.Errorf("fail to get rootfs of image %s: %s", image, err)
-		return
-	}
-
-	glog.Infof("prepare %s", parent)
-
-	mounts, err := m.refSnapshot(ctx, c, image, parent, target)
-	if err != nil {
-		glog.Errorf("fail to prepare image: %s, %s, %s, %s", image, parent, m.snapshotterName, err)
+		glog.Errorf("fail to prepare image %s: %s", image, err)
 		return
 	}
 
 	defer func() {
 		if err != nil {
 			glog.Errorf("found error %s. Prepare removing the snapshot just created", err)
-			if err := m.unrefSnapshot(ctx, c, image, parent, target); err != nil {
+			if err := m.unrefSnapshot(ctx, c, volumeId, target); err != nil {
 				glog.Errorf("fail to recycle snapshot: %s, %s", image, err)
 			}
 		}
@@ -224,16 +244,11 @@ func (m *mounter) Mount(ctx context.Context, image, target string) (err error) {
 	return err
 }
 
-func (m *mounter) Unmount(ctx context.Context, image, target string) (err error) {
+func (m *mounter) Unmount(ctx context.Context, volumeId, target string) (err error) {
 	c, err := containerd.New(m.containerdEndpoint, containerd.WithDefaultNamespace(m.namespace))
 	if err != nil {
 		glog.Errorf("fail to create containerd client: %s", err)
 		return
-	}
-
-	parent, err := m.getImageRootFSChainID(ctx, c, image, false)
-	if err != nil {
-		glog.Errorf("fail to get rootfs of image %s: %s", image, err)
 	}
 
 	if err = mount.UnmountAll(target, 0); err != nil {
@@ -243,9 +258,8 @@ func (m *mounter) Unmount(ctx context.Context, image, target string) (err error)
 
 	glog.Infof("%s unmounted", target)
 
-	err = m.unrefSnapshot(ctx, c, image, parent, target)
-	if err != nil {
-		glog.Errorf("fail to rm snapshot %s: %s", image, err)
+	if err = m.unrefSnapshot(ctx, c, volumeId, target); err != nil {
+		glog.Errorf("fail to unref snapshot of volume %s: %s", volumeId, err)
 		return
 	}
 

@@ -19,6 +19,11 @@ type nodeServer struct {
 
 // FIXME options: forcePull, credential
 
+const (
+    ctxKeyVolumeHandle = "volumeHandle"
+    ctxKeyImage = "image"
+)
+
 func (n nodeServer) NodePublishVolume(ctx context.Context, req *csi.NodePublishVolumeRequest) (resp *csi.NodePublishVolumeResponse, err error) {
     glog.Infof("request: %s", req.String())
     if len(req.VolumeId)  == 0 {
@@ -31,10 +36,15 @@ func (n nodeServer) NodePublishVolume(ctx context.Context, req *csi.NodePublishV
         return
     }
 
-    //if len(req.VolumeContext)  == 0 {
-    //    err = status.Error(codes.InvalidArgument, "VolumeContext.image is missing")
-    //    return
-    //}
+    // For PVs, VolumeId is the image. For ephemeral volumes, it is a string.
+    image := req.VolumeId
+    if len(req.VolumeContext) > 0 {
+        if len(req.VolumeContext[ctxKeyVolumeHandle]) > 0 {
+            image = req.VolumeContext[ctxKeyVolumeHandle]
+        } else if len(req.VolumeContext[ctxKeyImage]) > 0 {
+            image = req.VolumeContext[ctxKeyImage]
+        }
+    }
 
     notMnt, err := k8smount.New("").IsLikelyNotMountPoint(req.TargetPath)
     if err != nil {
@@ -55,7 +65,7 @@ func (n nodeServer) NodePublishVolume(ctx context.Context, req *csi.NodePublishV
         return &csi.NodePublishVolumeResponse{}, nil
     }
 
-    if err = n.mounter.Mount(ctx, req.VolumeId, req.TargetPath); err != nil {
+    if err = n.mounter.Mount(ctx, req.VolumeId, image, req.TargetPath); err != nil {
         err = status.Error(codes.Internal, err.Error())
         return
     }
