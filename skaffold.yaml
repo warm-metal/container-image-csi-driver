@@ -11,6 +11,8 @@ build:
       docker:
         dockerfile: "test.dockerfile"
 #      custom:
+#        buildkit doesn't share the same content store with its workers, such that we can't use images
+#        it built w/o introducing a remote registry.
 #        buildCommand: buildctl --addr kube-pod://buildkitd build --frontend dockerfile.v0 --local context="$BUILD_CONTEXT" --local dockerfile="$BUILD_CONTEXT" --frontend-opt filename=test.dockerfile --output "type=image,name=$IMAGES"
   local:
     useDockerCLI: true
@@ -20,6 +22,6 @@ deploy:
       apply: ["--force"]
     manifests:
       - "test/test-manifest.yaml"
-      - "deploy/cri-docker.yaml"
+      - "install/cri-docker.yaml"
       - "test/manifests/pre-provisioned-pv.yaml"
       - "test/manifests/ephemeral-volume.yaml"

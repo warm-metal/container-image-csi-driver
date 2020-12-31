@@ -14,8 +14,8 @@ var (
 	containerdSock = flag.String(
 		"containerd-addr", "unix:///var/run/containerd/containerd.sock", "endpoint of containerd")
 	defaultContainerdNamespace = flag.String(
-		"containerd-default-namespace", "k8s",
-		`the default namespace containerd used in the cluster. It usually is "docker" if docker is used as runtime, or "k8s" if CRI is used.`)
+		"containerd-default-namespace", "k8s.io",
+		`the default namespace containerd used in the cluster. It usually is "moby" if docker is used as runtime, or "k8s" if CRI is used.`)
 )
 
 const (

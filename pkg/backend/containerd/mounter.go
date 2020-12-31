@@ -88,6 +88,7 @@ func (m *mounter) getImageRootFSChainID(
 		}
 
 		glog.Infof("no local image found. Pull %s", namedRef)
+		// FIXME pull image matches the current platform
 		localImage, err = c.Pull(ctx, namedRef.String(), containerd.WithPullUnpack, containerd.WithSchema1Conversion)
 		if err != nil {
 			glog.Errorf("fail to pull image: %s, %s", namedRef, err)
@@ -212,6 +213,7 @@ func (m *mounter) unrefSnapshot(
 		`kind==view`, fmt.Sprintf(`labels."%s"==%s`, targetLabel, "√"))
 }
 
+// FIXME report verbose events
 func (m *mounter) Mount(ctx context.Context, volumeId, image, target string) (err error) {
 	c, err := containerd.New(m.containerdEndpoint, containerd.WithDefaultNamespace(m.namespace))
 	if err != nil {

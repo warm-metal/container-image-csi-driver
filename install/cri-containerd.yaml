@@ -32,7 +32,6 @@ spec:
               exec:
                 command: ["/bin/sh", "-c", "rm -rf /registration/csi-image.warm-metal.tech /registration/csi-image.warm-metal.tech-reg.sock"]
           args:
-            - --v=5
             - --csi-address=/csi/csi.sock
             - --kubelet-registration-path=/var/lib/kubelet/plugins/csi-image.warm-metal.tech/csi.sock
           env:
@@ -47,14 +46,20 @@ spec:
             - mountPath: /registration
               name: registration-dir
         - name: plugin
-          image: warmmetal/csi-image
+          image: warmmetal/csi-image:latest
           imagePullPolicy: IfNotPresent
           args:
             - "-endpoint=$(CSI_ENDPOINT)"
             - "-node=$(KUBE_NODE_NAME)"
+            - "-containerd-addr=$(CONTAINERD_ADDRESS)"
+            - "-containerd-default-namespace=$(CONTAINERD_NAMESPACE)"
           env:
             - name: CSI_ENDPOINT
               value: unix:///csi/csi.sock
+            - name: CONTAINERD_ADDRESS
+              value: unix:///var/run/containerd/containerd.sock
+            - name: CONTAINERD_NAMESPACE
+              value: k8s.io
             - name: KUBE_NODE_NAME
               valueFrom:
                 fieldRef:
@@ -68,10 +73,10 @@ spec:
             - mountPath: /var/lib/kubelet/pods
               mountPropagation: Bidirectional
               name: mountpoint-dir
-            - mountPath: /var/run/containerd/containerd.sock
-              name: containerd-socket
-            - mountPath: /var/lib/docker
-              name: docker
+            - mountPath: /run/containerd/containerd.sock
+              name: runtime-socket
+            - mountPath: /mnt/vda1/var/lib/containerd
+              name: snapshot-home
       volumes:
         - hostPath:
             path: /var/lib/kubelet/plugins/csi-image.warm-metal.tech
@@ -86,10 +91,10 @@ spec:
             type: Directory
           name: registration-dir
         - hostPath:
-            path: /var/lib/docker
+            path: /mnt/vda1/var/lib/containerd
             type: Directory
-          name: docker
+          name: snapshot-home
         - hostPath:
-            path: /run/docker/containerd/containerd.sock
+            path: /run/containerd/containerd.sock
             type: Socket
-          name: containerd-socket
+          name: runtime-socket
