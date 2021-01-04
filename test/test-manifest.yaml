@@ -2,22 +2,29 @@ apiVersion: batch/v1
 kind: Job
 metadata:
   name: csi-driver-image-test
+  namespace: kube-system
 spec:
   template:
     metadata:
       name: csi-driver-image-test
     spec:
+      serviceAccountName: csi-image-warm-metal
       containers:
         - name: csi-driver-image-test
           image: warmmetal/csi-driver-image-test
-          imagePullPolicy: IfNotPresent
           env:
             - name: HTTP_PROXY
               value: http://192.168.64.1:1087
+            - name: http_proxy
+              value: http://192.168.64.1:1087
             - name: HTTPS_PROXY
               value: http://192.168.64.1:1087
+            - name: https_proxy
+              value: http://192.168.64.1:1087
             - name: NO_PROXY
-              value: 192.168.64.3,localhost,127.0.0.1,192.168.99.*,192.168.39.*,192.168.49.*,10.96.0.0/12
+              value: 10.24.0.1,192.168.64.3,localhost,127.0.0.1,192.168.99.*,192.168.39.*,192.168.49.*,10.96.0.0/12
+            - name: no_proxy
+              value: 10.24.0.1,192.168.64.3,localhost,127.0.0.1,192.168.99.*,192.168.39.*,192.168.49.*,10.96.0.0/12
           volumeMounts:
             - mountPath: /var/run/containerd/containerd.sock
               name: containerd-socket

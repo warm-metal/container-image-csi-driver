@@ -2,10 +2,15 @@ package main
 
 import (
 	"flag"
+	"fmt"
 	"github.com/container-storage-interface/spec/lib/go/csi"
-	"github.com/golang/glog"
 	"github.com/kubernetes-csi/drivers/pkg/csi-common"
 	"github.com/warm-metal/csi-driver-image/pkg/backend/containerd"
+	"github.com/warm-metal/csi-driver-image/pkg/cri"
+	"k8s.io/klog/v2"
+
+	"os"
+	"time"
 )
 
 var (
@@ -13,9 +18,6 @@ var (
 	nodeID         = flag.String("node", "", "node ID")
 	containerdSock = flag.String(
 		"containerd-addr", "unix:///var/run/containerd/containerd.sock", "endpoint of containerd")
-	defaultContainerdNamespace = flag.String(
-		"containerd-default-namespace", "k8s.io",
-		`the default namespace containerd used in the cluster. It usually is "moby" if docker is used as runtime, or "k8s" if CRI is used.`)
 )
 
 const (
@@ -28,12 +30,18 @@ func main() {
 		panic(err)
 	}
 
-	defer glog.Flush()
+	defer klog.Flush()
 	flag.Parse()
 	driver := csicommon.NewCSIDriver(driverName, driverVersion, *nodeID)
 	driver.AddVolumeCapabilityAccessModes([]csi.VolumeCapability_AccessMode_Mode{
 		csi.VolumeCapability_AccessMode_MULTI_NODE_READER_ONLY,
 	})
+
+	criClient, err := cri.NewRemoteImageService(*containerdSock, time.Second)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, `fail to connect to cri daemon "%s": %s`, *endpoint, err)
+		os.Exit(1)
+	}
 
 	server := csicommon.NewNonBlockingGRPCServer()
 	server.Start(*endpoint,
@@ -42,8 +50,11 @@ func main() {
 		//&ControllerServer{csicommon.NewDefaultControllerServer(driver)},
 		&nodeServer{
 			DefaultNodeServer: csicommon.NewDefaultNodeServer(driver),
-			mounter: containerd.NewMounter(*containerdSock, *defaultContainerdNamespace),
+			mounter:           containerd.NewMounter(*containerdSock),
+			imageSvc:          criClient,
 		},
 	)
 	server.Wait()
 }
+
+

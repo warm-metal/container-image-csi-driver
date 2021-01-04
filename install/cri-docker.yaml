@@ -4,15 +4,47 @@ metadata:
   name: csi-image.warm-metal.tech
 spec:
   attachRequired: false
-  podInfoOnMount: false
+  podInfoOnMount: true
   volumeLifecycleModes:
     - Persistent
     - Ephemeral
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: csi-image-warm-metal
+  namespace: kube-system
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: csi-image-warm-metal
+rules:
+  - apiGroups:
+      - ""
+    resources:
+      - secrets
+    verbs:
+      - get
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: csi-image-warm-metal
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: csi-image-warm-metal
+subjects:
+  - kind: ServiceAccount
+    name: csi-image-warm-metal
+    namespace: kube-system
 ---
 kind: DaemonSet
 apiVersion: apps/v1
 metadata:
   name: csi-image-warm-metal
+  namespace: kube-system
 spec:
   selector:
     matchLabels:
@@ -23,6 +55,7 @@ spec:
         app: csi-image-warm-metal
     spec:
       hostNetwork: true
+      serviceAccountName: csi-image-warm-metal
       containers:
         - name: node-driver-registrar
           image: quay.io/k8scsi/csi-node-driver-registrar:v1.1.0
@@ -52,14 +85,11 @@ spec:
             - "-endpoint=$(CSI_ENDPOINT)"
             - "-node=$(KUBE_NODE_NAME)"
             - "-containerd-addr=$(CONTAINERD_ADDRESS)"
-            - "-containerd-default-namespace=$(CONTAINERD_NAMESPACE)"
           env:
             - name: CSI_ENDPOINT
               value: unix:///csi/csi.sock
             - name: CONTAINERD_ADDRESS
               value: unix:///var/run/containerd/containerd.sock
-            - name: CONTAINERD_NAMESPACE
-              value: moby
             - name: KUBE_NODE_NAME
               valueFrom:
                 fieldRef:

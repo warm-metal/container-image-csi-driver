@@ -6,9 +6,13 @@ import (
 	"github.com/containerd/containerd"
 	"github.com/containerd/containerd/images"
 	"github.com/containerd/containerd/reference/docker"
+	"github.com/warm-metal/csi-driver-image/pkg/backend"
+	"github.com/warm-metal/csi-driver-image/pkg/cri"
+	"github.com/warm-metal/csi-driver-image/pkg/remoteimage"
 	"os"
 	"path/filepath"
 	"testing"
+	"time"
 )
 
 func init() {
@@ -17,7 +21,7 @@ func init() {
 
 const (
 	containerdSock = "unix:///var/run/containerd/containerd.sock"
-	defaultContainerdNamespace = "buildkit"
+	defaultContainerdNamespace = "k8s.io"
 )
 
 func pullImage(image string) error {
@@ -49,9 +53,9 @@ func removeImage(image string) error {
 	return c.ImageService().Delete(context.TODO(), namedRef.String(), images.SynchronousDelete())
 }
 
-func testMountAndUmount(t *testing.T, volumeId, image, target string, unmount bool) {
-	if image != "warmmetal/csi-image-test:simple-fs" {
-		t.Fatalf(`"image" must be ""warmmetal/csi-image-test:simple-fs""`)
+func testMountAndUmount(t *testing.T, volumeId, image, target, secret string, unmount bool) {
+	if image != "warmmetal/csi-image-test:simple-fs" && image != "kitt0hsu/private-image:simple-fs" {
+		t.Fatalf(`"image" must be "warmmetal/csi-image-test:simple-fs" or "kitt0hsu/private-image:simple-fs"`)
 	}
 
 	if err := os.MkdirAll(target, 0750); err != nil {
@@ -59,8 +63,15 @@ func testMountAndUmount(t *testing.T, volumeId, image, target string, unmount bo
 		t.Fail()
 	}
 
-	m := NewMounter(containerdSock, defaultContainerdNamespace)
-	if err := m.Mount(context.TODO(), volumeId, image, target); err != nil {
+	criClient, err := cri.NewRemoteImageService(containerdSock, time.Second)
+	if err != nil {
+		t.Error(err)
+		t.Fail()
+	}
+
+	puller := remoteimage.NewPuller(criClient, image, secret, "default", "")
+	m := NewMounter(containerdSock)
+	if err := m.Mount(context.TODO(), puller, volumeId, image, target, &backend.MountOptions{}); err != nil {
 		t.Error(err)
 		t.Fail()
 	}
@@ -99,7 +110,7 @@ func TestLocalMountAndUmountAsPV(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	testMountAndUmount(t, volumeId, image, target, true)
+	testMountAndUmount(t, volumeId, image, target, "",true)
 }
 
 func TestRemoteMountAndUmountAsPV(t *testing.T) {
@@ -111,7 +122,7 @@ func TestRemoteMountAndUmountAsPV(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	testMountAndUmount(t, volumeId, image, target, true)
+	testMountAndUmount(t, volumeId, image, target, "",true)
 }
 
 func TestMountTheSameImageAsPV(t *testing.T) {
@@ -119,10 +130,10 @@ func TestMountTheSameImageAsPV(t *testing.T) {
 	volumeId := image
 	targetFoo := "/tmp/image-mount-point/foo"
 	targetBar := "/tmp/image-mount-point/bar"
-	testMountAndUmount(t, volumeId, image, targetFoo, false)
-	testMountAndUmount(t, volumeId, image, targetBar, true)
+	testMountAndUmount(t, volumeId, image, targetFoo,"",false)
+	testMountAndUmount(t, volumeId, image, targetBar,"",true)
 
-	m := NewMounter(containerdSock, defaultContainerdNamespace)
+	m := NewMounter(containerdSock)
 	if err := m.Unmount(context.TODO(), volumeId, targetFoo); err != nil {
 		t.Error(err)
 		t.Fail()
@@ -134,5 +145,13 @@ func TestMountAsEphemeralVolume(t *testing.T) {
 	volumeId := "csi-f608d82983355e90fbed86a57381947c2e8b164bfc584297f1c7a2b69fa1b295"
 	target := "/tmp/image-mount-point/simple-fs"
 
-	testMountAndUmount(t, volumeId, image, target, true)
+	testMountAndUmount(t, volumeId, image, target, "",true)
+}
+
+func TestMountPrivateImages(t *testing.T) {
+	image := "kitt0hsu/private-image:simple-fs"
+	volumeId := "csi-f608d82983355e90fbed86a57381947c2e8b164bfc584297f1c7a2b69fa1b295"
+	target := "/tmp/image-mount-point/simple-fs"
+
+	testMountAndUmount(t, volumeId, image, target, "unit-test",true)
 }

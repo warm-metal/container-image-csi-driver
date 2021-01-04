@@ -8,10 +8,11 @@ import (
 	"github.com/containerd/containerd/mount"
 	"github.com/containerd/containerd/reference/docker"
 	"github.com/containerd/containerd/snapshots"
-	"github.com/golang/glog"
 	"github.com/opencontainers/image-spec/identity"
 	"github.com/pkg/errors"
 	"github.com/warm-metal/csi-driver-image/pkg/backend"
+	"github.com/warm-metal/csi-driver-image/pkg/remoteimage"
+	"k8s.io/klog/v2"
 	"strings"
 	"sync"
 	"time"
@@ -24,10 +25,10 @@ type mounter struct {
 	snapshotterName    string
 }
 
-func NewMounter(endpoint, namespace string) backend.Mounter {
+func NewMounter(endpoint string) backend.Mounter {
 	return &mounter{
 		containerdEndpoint: endpoint,
-		namespace:          namespace,
+		namespace:          "k8s.io",
 		snapshotterName:    containerd.DefaultSnapshotter,
 	}
 }
@@ -38,7 +39,7 @@ func genSnapshotKey(parent string) string {
 
 const (
 	targetLabelPrefix   = "csi-image.warm-metal.tech/target"
-	imageLabelPrefix          = "csi-image.warm-metal.tech/image"
+	imageLabelPrefix    = "csi-image.warm-metal.tech/image"
 	volumeIdLabelPrefix = "csi-image.warm-metal.tech/id"
 )
 
@@ -72,38 +73,48 @@ func withImage(labels map[string]string, image string) map[string]string {
 }
 
 func (m *mounter) getImageRootFSChainID(
-	ctx context.Context, c *containerd.Client, image string, pull bool,
+	ctx context.Context, c *containerd.Client, puller remoteimage.Puller, image string, pull, always bool,
 ) (parent string, err error) {
 	namedRef, err := docker.ParseDockerRef(image)
 	if err != nil {
-		glog.Errorf("fail to normalize image: %s, %s", image, err)
+		klog.Errorf("fail to normalize image: %s, %s", image, err)
 		return
+	}
+
+	if always {
+		klog.Infof(`Pull image "%s"`, namedRef)
+		if err = puller.Pull(ctx); err != nil {
+			klog.Errorf("fail to pull image: %s, %s", namedRef, err)
+			return
+		}
 	}
 
 	localImage, err := c.GetImage(ctx, namedRef.String())
 	if err != nil {
 		if errors.Cause(err) != errdefs.ErrNotFound && !pull {
-			glog.Errorf("fail to retrieve local image: %s, %s", namedRef, err)
+			klog.Errorf("fail to retrieve local image: %s, %s", namedRef, err)
 			return
 		}
 
-		glog.Infof("no local image found. Pull %s", namedRef)
-		// FIXME pull image matches the current platform
-		localImage, err = c.Pull(ctx, namedRef.String(), containerd.WithPullUnpack, containerd.WithSchema1Conversion)
-		if err != nil {
-			glog.Errorf("fail to pull image: %s, %s", namedRef, err)
+		klog.Infof(`no local image found. Pull image "%s"`, namedRef)
+
+		if err = puller.Pull(ctx); err != nil {
+			klog.Errorf("fail to pull image: %s, %s", namedRef, err)
 			return
 		}
-	} else {
-		glog.Infof("found local image %s", namedRef)
+
+		localImage, err = c.GetImage(ctx, namedRef.String())
+		if err != nil {
+			panic(err)
+		}
 	}
 
 	if err = localImage.Unpack(ctx, m.snapshotterName); err != nil {
-		glog.Errorf("fail to unpack image: %s, %s, %s", namedRef, m.snapshotterName, err)
+		klog.Errorf("fail to unpack image: %s, %s, %s", namedRef, m.snapshotterName, err)
 		return
 	}
 
-	glog.Infof("image %s unpacked", namedRef)
+	klog.Infof("image %s unpacked", namedRef)
 	diffIDs, err := localImage.RootFS(ctx)
 	if err != nil {
 		return
@@ -114,15 +125,15 @@ func (m *mounter) getImageRootFSChainID(
 }
 
 func (m *mounter) refSnapshot(
-	ctx context.Context, c *containerd.Client, volumeId, image, target string,
+	ctx context.Context, c *containerd.Client, puller remoteimage.Puller, volumeId, image, target string, pullAlways bool,
 ) (mounts []mount.Mount, err error) {
-	parent, err := m.getImageRootFSChainID(ctx, c, image, true)
+	parent, err := m.getImageRootFSChainID(ctx, c, puller, image, true, pullAlways)
 	if err != nil {
-		glog.Errorf("fail to get rootfs of image %s: %s", image, err)
+		klog.Errorf("fail to get rootfs of image %s: %s", image, err)
 		return
 	}
 
-	glog.Infof("prepare %s", parent)
+	klog.Infof("prepare %s", parent)
 
 	snapshotter := c.SnapshotService(m.snapshotterName)
 	key := genSnapshotKey(parent)
@@ -163,19 +174,19 @@ func (m *mounter) unrefSnapshot(
 	targetLabel := genTargetLabel(target)
 
 	unref := func(info snapshots.Info, targetLabel string) error {
-		glog.Infof("unref snapshot %s, parent %s", info.Name, info.Parent)
+		klog.Infof("unref snapshot %s, parent %s", info.Name, info.Parent)
 		delete(info.Labels, targetLabel)
 		referred := false
 		for label := range info.Labels {
 			if strings.HasPrefix(label, targetLabelPrefix) {
-				glog.Infof("snapshot %s is also mounted to %s", info.Name, label)
+				klog.Infof("snapshot %s is also mounted to %s", info.Name, label)
 				referred = true
 				break
 			}
 		}
 
 		if !referred {
-			glog.Infof("no other mount refs snapshot %s, remove it", info.Name)
+			klog.Infof("no other mount refs snapshot %s, remove it", info.Name)
 			return snapshotter.Remove(ctx, info.Name)
 		} else {
 			_, err := snapshotter.Update(ctx, info)
@@ -207,40 +218,41 @@ func (m *mounter) unrefSnapshot(
 
 		matchCounter++
 
-		glog.Infof(`found snapshot %s for volume %s. prepare to unref it.`, info.Name, volumeId)
+		klog.Infof(`found snapshot %s for volume %s. prepare to unref it.`, info.Name, volumeId)
 		return unref(info, targetLabel)
 	},
 		`kind==view`, fmt.Sprintf(`labels."%s"==%s`, targetLabel, "√"))
 }
 
 // FIXME report verbose events
-func (m *mounter) Mount(ctx context.Context, volumeId, image, target string) (err error) {
+func (m *mounter) Mount(ctx context.Context, puller remoteimage.Puller, volumeId, image, target string, opts *backend.MountOptions) (err error) {
+	// FIXME lease
 	c, err := containerd.New(m.containerdEndpoint, containerd.WithDefaultNamespace(m.namespace))
 	if err != nil {
-		glog.Errorf("fail to create containerd client: %s", err)
+		klog.Errorf("fail to create containerd client: %s", err)
 		return
 	}
 
-	mounts, err := m.refSnapshot(ctx, c, volumeId, image, target)
+	mounts, err := m.refSnapshot(ctx, c, puller, volumeId, image, target, opts.PullAlways)
 	if err != nil {
-		glog.Errorf("fail to prepare image %s: %s", image, err)
+		klog.Errorf("fail to prepare image %s: %s", image, err)
 		return
 	}
 
 	defer func() {
 		if err != nil {
-			glog.Errorf("found error %s. Prepare removing the snapshot just created", err)
+			klog.Errorf("found error %s. Prepare removing the snapshot just created", err)
 			if err := m.unrefSnapshot(ctx, c, volumeId, target); err != nil {
-				glog.Errorf("fail to recycle snapshot: %s, %s", image, err)
+				klog.Errorf("fail to recycle snapshot: %s, %s", image, err)
 			}
 		}
 	}()
 
 	err = mount.All(mounts, target)
 	if err != nil {
-		glog.Errorf("fail to mount image %s to %s: %s", image, target, err)
+		klog.Errorf("fail to mount image %s to %s: %s", image, target, err)
 	} else {
-		glog.Infof("image %s mounted", image)
+		klog.Infof("image %s mounted", image)
 	}
 
 	return err
@@ -249,19 +261,19 @@ func (m *mounter) Mount(ctx context.Context, volumeId, image, target string) (er
 func (m *mounter) Unmount(ctx context.Context, volumeId, target string) (err error) {
 	c, err := containerd.New(m.containerdEndpoint, containerd.WithDefaultNamespace(m.namespace))
 	if err != nil {
-		glog.Errorf("fail to create containerd client: %s", err)
+		klog.Errorf("fail to create containerd client: %s", err)
 		return
 	}
 
 	if err = mount.UnmountAll(target, 0); err != nil {
-		glog.Errorf("fail to unmount %s: %s", target, err)
+		klog.Errorf("fail to unmount %s: %s", target, err)
 		return err
 	}
 
-	glog.Infof("%s unmounted", target)
+	klog.Infof("%s unmounted", target)
 
 	if err = m.unrefSnapshot(ctx, c, volumeId, target); err != nil {
-		glog.Errorf("fail to unref snapshot of volume %s: %s", volumeId, err)
+		klog.Errorf("fail to unref snapshot of volume %s: %s", volumeId, err)
 		return
 	}
 

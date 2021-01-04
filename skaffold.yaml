@@ -15,6 +15,7 @@ build:
 #        it built w/o introducing a remote registry.
 #        buildCommand: buildctl --addr kube-pod://buildkitd build --frontend dockerfile.v0 --local context="$BUILD_CONTEXT" --local dockerfile="$BUILD_CONTEXT" --frontend-opt filename=test.dockerfile --output "type=image,name=$IMAGES"
   local:
+    push: false
     useDockerCLI: true
 deploy:
   kubectl:
