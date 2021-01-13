@@ -37,8 +37,8 @@ kubectl apply -f https://raw.githubusercontent.com/warm-metal/csi-driver-image/m
 As mentioned before, CRI is required to pull images.
 You can enable it by adding `--cri-containerd` for docker daemon or `--docker-opt="cri-containerd=true"` for minikube.
 
-We don't encourage this sort of usage because that Docker doesn't share  the same image store with its builtin
-containerd. It means that the driver can't use images managed by Docker daemon. 
+Until Docker supports [image sharing](https://github.com/moby/moby/issues/38043) with its builtin containerd, We don't encourage this sort of usage.
+It means that the driver can't use images managed by Docker daemon. 
 
 ```shell script
 kubectl apply -f https://raw.githubusercontent.com/warm-metal/csi-driver-image/master/install/cri-docker.yaml

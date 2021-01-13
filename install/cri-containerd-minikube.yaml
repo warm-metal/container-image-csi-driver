@@ -9,6 +9,12 @@ spec:
     - Persistent
     - Ephemeral
 ---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: csi-image-warm-metal
+  namespace: kube-system
+---
 kind: DaemonSet
 apiVersion: apps/v1
 metadata:
