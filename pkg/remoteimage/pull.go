@@ -3,13 +3,13 @@ package remoteimage
 import (
 	"context"
 	"github.com/containerd/containerd/reference/docker"
-	"github.com/golang/glog"
 	"k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
 	cri "k8s.io/cri-api/pkg/apis/runtime/v1alpha2"
+	"k8s.io/klog/v2"
 	"k8s.io/kubernetes/pkg/credentialprovider"
 	credential "k8s.io/kubernetes/pkg/credentialprovider/secrets"
 	"k8s.io/kubernetes/pkg/util/parsers"
@@ -40,7 +40,7 @@ type puller struct {
 func (p puller) Pull(ctx context.Context) (err error) {
 	namedRef, err := docker.ParseDockerRef(p.image)
 	if err != nil {
-		glog.Errorf("fail to normalize image: %s, %s", p.image, err)
+		klog.Errorf("fail to normalize image: %s, %s", p.image, err)
 		return
 	}
 
@@ -48,19 +48,19 @@ func (p puller) Pull(ctx context.Context) (err error) {
 	if len(p.secret) > 0 {
 		config, err := rest.InClusterConfig()
 		if err != nil {
-			glog.Errorf("can't get cluster config: %s", err)
+			klog.Errorf("can't get cluster config: %s", err)
 			return err
 		}
 
 		clientset, err := kubernetes.NewForConfig(config)
 		if err != nil {
-			glog.Errorf("can't get cluster client: %s", err)
+			klog.Errorf("can't get cluster client: %s", err)
 			return err
 		}
 
 		secret, err := clientset.CoreV1().Secrets(p.secretNamespace).Get(ctx, p.secret, metav1.GetOptions{})
 		if err != nil {
-			glog.Errorf(`can't get secret "%s/%s": %s`, p.secretNamespace, p.secret, err)
+			klog.Errorf(`can't get secret "%s/%s": %s`, p.secretNamespace, p.secret, err)
 			return err
 		}
 
@@ -69,13 +69,13 @@ func (p puller) Pull(ctx context.Context) (err error) {
 
 	keyRing, err := credential.MakeDockerKeyring(secrets, credentialprovider.NewDockerKeyring())
 	if err != nil {
-		glog.Errorf("keyring: %s", err)
+		klog.Errorf("keyring: %s", err)
 		return
 	}
 
 	repo, _, _, err := parsers.ParseImageName(namedRef.String())
 	if err != nil {
-		glog.Errorf(`fail to parse "%s": %s`, namedRef, err)
+		klog.Errorf(`fail to parse "%s": %s`, namedRef, err)
 		return
 	}
 

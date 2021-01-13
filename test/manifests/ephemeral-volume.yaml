@@ -22,5 +22,9 @@ spec:
           csi:
             driver: csi-image.warm-metal.tech
             volumeAttributes:
-              volumeHandle: "docker.io/warmmetal/csi-image-test:simple-fs"
+              image: "docker.io/warmmetal/csi-image-test:simple-fs"
+              # set pullAlways if you want to ignore local iamges
+              # pullAlways: "true"
+              # set secret if the image is private
+              # secret: "pull image secret name"
   backoffLimit: 0

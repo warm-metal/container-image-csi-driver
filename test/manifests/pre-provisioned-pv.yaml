@@ -18,6 +18,11 @@ spec:
   csi:
     driver: csi-image.warm-metal.tech
     volumeHandle: "docker.io/warmmetal/csi-image-test:simple-fs"
+    # volumeAttributes:
+      # set pullAlways if you want to ignore local iamges
+      # pullAlways: "true"
+      # set secret if the image is private
+      # secret: "pull image secret name"
 ---
 apiVersion: v1
 kind: PersistentVolumeClaim

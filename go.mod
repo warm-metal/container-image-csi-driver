@@ -11,7 +11,6 @@ require (
 	github.com/containerd/continuity v0.0.0-20201208142359-180525291bb7 // indirect
 	github.com/containerd/fifo v0.0.0-20201026212402-0724c46b320c // indirect
 	github.com/gogo/googleapis v1.4.0 // indirect
-	github.com/golang/glog v0.0.0-20160126235308-23def4e6c14b
 	github.com/imdario/mergo v0.3.11 // indirect
 	github.com/kubernetes-csi/csi-lib-utils v0.9.0 // indirect
 	github.com/kubernetes-csi/drivers v1.0.2
@@ -25,7 +24,6 @@ require (
 	k8s.io/apimachinery v0.20.1
 	k8s.io/client-go v0.20.1
 	k8s.io/cri-api v0.17.3
-	k8s.io/klog v1.0.0 // indirect
 	k8s.io/klog/v2 v2.4.0
 	k8s.io/kubernetes v1.20.1
 	k8s.io/utils v0.0.0-20201110183641-67b214c5f920
