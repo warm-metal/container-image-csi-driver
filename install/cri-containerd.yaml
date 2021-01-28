@@ -15,6 +15,31 @@ metadata:
   name: csi-image-warm-metal
   namespace: kube-system
 ---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: csi-image-warm-metal
+rules:
+  - apiGroups:
+      - ""
+    resources:
+      - secrets
+    verbs:
+      - get
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: csi-image-warm-metal
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: csi-image-warm-metal
+subjects:
+  - kind: ServiceAccount
+    name: csi-image-warm-metal
+    namespace: kube-system
+---
 kind: DaemonSet
 apiVersion: apps/v1
 metadata:
