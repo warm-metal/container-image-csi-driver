@@ -1,15 +1,16 @@
 FROM golang:1-buster as builder
 
-WORKDIR /go/src/git-go
+WORKDIR /go/src/csi-driver-image
 COPY go.mod go.sum ./
 
 RUN go mod download
 
-COPY . ./
+COPY cmd ./cmd
+COPY pkg ./pkg
 
 RUN CGO_ENABLED=0 go build -o csi-image-plugin ./cmd/plugin
 
-FROM alpine:3
+FROM scratch
 WORKDIR /
-COPY --from=builder /go/src/git-go/csi-image-plugin ./
+COPY --from=builder /go/src/csi-driver-image/csi-image-plugin ./
 ENTRYPOINT ["/csi-image-plugin"]

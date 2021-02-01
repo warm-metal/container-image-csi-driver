@@ -34,7 +34,7 @@ func main() {
 	flag.Parse()
 	driver := csicommon.NewCSIDriver(driverName, driverVersion, *nodeID)
 	driver.AddVolumeCapabilityAccessModes([]csi.VolumeCapability_AccessMode_Mode{
-		csi.VolumeCapability_AccessMode_MULTI_NODE_READER_ONLY,
+		csi.VolumeCapability_AccessMode_MULTI_NODE_SINGLE_WRITER,
 	})
 
 	criClient, err := cri.NewRemoteImageService(*containerdSock, time.Second)

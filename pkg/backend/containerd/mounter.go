@@ -125,9 +125,9 @@ func (m *mounter) getImageRootFSChainID(
 }
 
 func (m *mounter) refSnapshot(
-	ctx context.Context, c *containerd.Client, puller remoteimage.Puller, volumeId, image, target string, pullAlways bool,
+	ctx context.Context, c *containerd.Client, puller remoteimage.Puller, volumeId, image, target string, opts *backend.MountOptions,
 ) (mounts []mount.Mount, err error) {
-	parent, err := m.getImageRootFSChainID(ctx, c, puller, image, true, pullAlways)
+	parent, err := m.getImageRootFSChainID(ctx, c, puller, image, true, opts.PullAlways)
 	if err != nil {
 		klog.Errorf("fail to get rootfs of image %s: %s", image, err)
 		return
@@ -141,9 +141,10 @@ func (m *mounter) refSnapshot(
 	m.snapshotLock.Lock()
 	defer m.snapshotLock.Unlock()
 
-	mounts, err = snapshotter.View(ctx, key, parent, snapshots.WithLabels(
+	mounts, err = snapshotter.Prepare(ctx, key, parent, snapshots.WithLabels(
 		withImage(withVolumeId(withTarget(defaultSnapshotLabels(), target), volumeId), image),
 	))
+
 	if err == nil {
 		return
 	}
@@ -233,7 +234,7 @@ func (m *mounter) Mount(ctx context.Context, puller remoteimage.Puller, volumeId
 		return
 	}
 
-	mounts, err := m.refSnapshot(ctx, c, puller, volumeId, image, target, opts.PullAlways)
+	mounts, err := m.refSnapshot(ctx, c, puller, volumeId, image, target, opts)
 	if err != nil {
 		klog.Errorf("fail to prepare image %s: %s", image, err)
 		return

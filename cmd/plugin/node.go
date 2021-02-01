@@ -63,7 +63,9 @@ func (n nodeServer) NodePublishVolume(ctx context.Context, req *csi.NodePublishV
 
 	// For PVs, VolumeId is the image. For ephemeral volumes, it is a string.
 	image := req.VolumeId
-	opts := backend.MountOptions{}
+	opts := backend.MountOptions{
+		ReadOnly: req.Readonly,
+	}
 	secret := ""
 	namespace := ""
 	sa := ""
