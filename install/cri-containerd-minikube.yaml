@@ -89,7 +89,7 @@ spec:
             - name: CSI_ENDPOINT
               value: unix:///csi/csi.sock
             - name: CONTAINERD_ADDRESS
-              value: unix:///var/run/containerd/containerd.sock
+              value: unix:///run/containerd/containerd.sock
             - name: KUBE_NODE_NAME
               valueFrom:
                 fieldRef:

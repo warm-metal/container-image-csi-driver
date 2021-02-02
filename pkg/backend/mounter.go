@@ -1,15 +1,16 @@
 package backend
 
 import (
-    "context"
-    "github.com/warm-metal/csi-driver-image/pkg/remoteimage"
+	"context"
+	"github.com/warm-metal/csi-driver-image/pkg/remoteimage"
 )
 
 type MountOptions struct {
-    PullAlways bool
+	PullAlways bool
+	ReadOnly   bool
 }
 
 type Mounter interface {
-    Mount(ctx context.Context, puller remoteimage.Puller, volumeId, image, target string, opts *MountOptions) error
-    Unmount(ctx context.Context, volumeId, target string) error
+	Mount(ctx context.Context, puller remoteimage.Puller, volumeId, image, target string, opts *MountOptions) error
+	Unmount(ctx context.Context, volumeId, target string) error
 }
