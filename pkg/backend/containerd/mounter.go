@@ -13,6 +13,7 @@ import (
 	"github.com/warm-metal/csi-driver-image/pkg/backend"
 	"github.com/warm-metal/csi-driver-image/pkg/remoteimage"
 	"k8s.io/klog/v2"
+	"k8s.io/kubernetes/pkg/kubelet/util"
 	"strings"
 	"sync"
 	"time"
@@ -26,8 +27,13 @@ type mounter struct {
 }
 
 func NewMounter(endpoint string) backend.Mounter {
+	addr, _, err := util.GetAddressAndDialer(endpoint)
+	if err != nil {
+		klog.Fatalf("%s:%s", endpoint, err)
+	}
+
 	return &mounter{
-		containerdEndpoint: endpoint,
+		containerdEndpoint: addr,
 		namespace:          "k8s.io",
 		snapshotterName:    containerd.DefaultSnapshotter,
 	}

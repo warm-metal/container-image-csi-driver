@@ -77,7 +77,7 @@ spec:
             driver: csi-image.warm-metal.tech
             volumeAttributes:
               image: "docker.io/warmmetal/csi-image-test:simple-fs"
-              # set pullAlways if you want to ignore local iamges
+              # set pullAlways if you want to ignore local images
               # pullAlways: "true"
               # set secret if the image is private
               # secret: "pull image secret name"
@@ -102,7 +102,7 @@ spec:
     driver: csi-image.warm-metal.tech
     volumeHandle: "docker.io/warmmetal/csi-image-test:simple-fs"
     # volumeAttributes:
-      # set pullAlways if you want to ignore local iamges
+      # set pullAlways if you want to ignore local images
       # pullAlways: "true"
       # set secret if the image is private
       # secret: "pull image secret name"
