@@ -108,4 +108,4 @@ spec:
       # secret: "pull image secret name"
 ```
 
-See all [examples](https://github.com/warm-metal/csi-driver-image/tree/master/test/manifests).
+See all [examples](https://github.com/warm-metal/csi-driver-image/tree/master/test/integration/manifests).
