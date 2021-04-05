@@ -4,9 +4,9 @@ import (
 	"flag"
 	"fmt"
 	"github.com/container-storage-interface/spec/lib/go/csi"
-	"github.com/kubernetes-csi/drivers/pkg/csi-common"
 	"github.com/warm-metal/csi-driver-image/pkg/backend/containerd"
 	"github.com/warm-metal/csi-driver-image/pkg/cri"
+	"github.com/warm-metal/csi-drivers/pkg/csi-common"
 	"k8s.io/klog/v2"
 
 	"os"
@@ -26,6 +26,7 @@ const (
 )
 
 func main() {
+	klog.InitFlags(nil)
 	if err := flag.Set("logtostderr", "true"); err != nil {
 		panic(err)
 	}
@@ -35,6 +36,9 @@ func main() {
 	driver := csicommon.NewCSIDriver(driverName, driverVersion, *nodeID)
 	driver.AddVolumeCapabilityAccessModes([]csi.VolumeCapability_AccessMode_Mode{
 		csi.VolumeCapability_AccessMode_MULTI_NODE_SINGLE_WRITER,
+	})
+	driver.AddControllerServiceCapabilities([]csi.ControllerServiceCapability_RPC_Type{
+		csi.ControllerServiceCapability_RPC_UNKNOWN,
 	})
 
 	criClient, err := cri.NewRemoteImageService(*containerdSock, time.Second)
@@ -46,8 +50,7 @@ func main() {
 	server := csicommon.NewNonBlockingGRPCServer()
 	server.Start(*endpoint,
 		csicommon.NewDefaultIdentityServer(driver),
-		nil,
-		//&ControllerServer{csicommon.NewDefaultControllerServer(driver)},
+		&controllerServer{csicommon.NewDefaultControllerServer(driver)},
 		&nodeServer{
 			DefaultNodeServer: csicommon.NewDefaultNodeServer(driver),
 			mounter:           containerd.NewMounter(*containerdSock),
@@ -56,5 +59,3 @@ func main() {
 	)
 	server.Wait()
 }
-
-

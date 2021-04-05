@@ -3,9 +3,9 @@ package main
 import (
 	"context"
 	"github.com/container-storage-interface/spec/lib/go/csi"
-	csicommon "github.com/kubernetes-csi/drivers/pkg/csi-common"
 	"github.com/warm-metal/csi-driver-image/pkg/backend"
 	"github.com/warm-metal/csi-driver-image/pkg/remoteimage"
+	"github.com/warm-metal/csi-drivers/pkg/csi-common"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 	cri "k8s.io/cri-api/pkg/apis/runtime/v1alpha2"
@@ -42,6 +42,16 @@ func (n nodeServer) NodePublishVolume(ctx context.Context, req *csi.NodePublishV
 		return
 	}
 
+	if req.VolumeCapability == nil {
+		err = status.Error(codes.InvalidArgument, "VolumeCapability is missing")
+		return
+	}
+
+	if _, isBlock := req.VolumeCapability.AccessType.(*csi.VolumeCapability_Block); isBlock {
+		err = status.Error(codes.InvalidArgument, "unable to mount as a block device")
+		return
+	}
+
 	notMnt, err := k8smount.New("").IsLikelyNotMountPoint(req.TargetPath)
 	if err != nil {
 		if !os.IsNotExist(err) {
@@ -49,7 +59,7 @@ func (n nodeServer) NodePublishVolume(ctx context.Context, req *csi.NodePublishV
 			return
 		}
 
-		if err = os.MkdirAll(req.TargetPath, 0750); err != nil {
+		if err = os.MkdirAll(req.TargetPath, 0755); err != nil {
 			err = status.Error(codes.Internal, err.Error())
 			return
 		}

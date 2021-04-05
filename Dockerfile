@@ -1,4 +1,4 @@
-FROM golang:1-buster as builder
+FROM docker.io/library/golang:1.16 as builder
 
 WORKDIR /go/src/csi-driver-image
 COPY go.mod go.sum ./
