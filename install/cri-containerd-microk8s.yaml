@@ -100,12 +100,12 @@ spec:
           volumeMounts:
             - mountPath: /csi
               name: socket-dir
-            - mountPath: /var/lib/kubelet/pods
+            - mountPath: /var/snap/microk8s/common/var/lib/kubelet/pods
               mountPropagation: Bidirectional
               name: mountpoint-dir
             - mountPath: /run/containerd/containerd.sock
               name: runtime-socket
-            - mountPath: /var/lib/containerd
+            - mountPath: /var/snap/microk8s/common/var/lib/containerd
               name: snapshot-home
       volumes:
         - hostPath:
