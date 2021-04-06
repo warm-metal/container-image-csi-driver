@@ -12,8 +12,10 @@ import (
 	"github.com/pkg/errors"
 	"github.com/warm-metal/csi-driver-image/pkg/backend"
 	"github.com/warm-metal/csi-driver-image/pkg/remoteimage"
+	"golang.org/x/xerrors"
 	"k8s.io/klog/v2"
 	"k8s.io/kubernetes/pkg/kubelet/util"
+	"os"
 	"strings"
 	"sync"
 	"time"
@@ -231,7 +233,6 @@ func (m *mounter) unrefSnapshot(
 		`kind==view`, fmt.Sprintf(`labels."%s"==%s`, targetLabel, "√"))
 }
 
-// FIXME report verbose events
 func (m *mounter) Mount(ctx context.Context, puller remoteimage.Puller, volumeId, image, target string, opts *backend.MountOptions) (err error) {
 	// FIXME lease
 	c, err := containerd.New(m.containerdEndpoint, containerd.WithDefaultNamespace(m.namespace))
@@ -248,7 +249,7 @@ func (m *mounter) Mount(ctx context.Context, puller remoteimage.Puller, volumeId
 
 	defer func() {
 		if err != nil {
-			klog.Errorf("found error %s. Prepare removing the snapshot just created", err)
+			klog.Errorf("found error %s. Removing the snapshot just created", err)
 			if err := m.unrefSnapshot(ctx, c, volumeId, target); err != nil {
 				klog.Errorf("fail to recycle snapshot: %s, %s", image, err)
 			}
@@ -257,12 +258,76 @@ func (m *mounter) Mount(ctx context.Context, puller remoteimage.Puller, volumeId
 
 	err = mount.All(mounts, target)
 	if err != nil {
-		klog.Errorf("fail to mount image %s to %s: %s", image, target, err)
+		mountsErr := describeMounts(mounts, target)
+		if len(mountsErr) > 0 {
+			err = xerrors.New(mountsErr)
+		}
+
+		klog.Errorf("fail to mount image %s: %s", image, err)
 	} else {
 		klog.Infof("image %s mounted", image)
 	}
 
 	return err
+}
+
+func describeMounts(mounts []mount.Mount, target string) string {
+	prefixes := []string{
+		"lowerdir=",
+		"upperdir=",
+		"workdir=",
+	}
+
+	var err error
+	for _, m := range mounts {
+		if m.Type == "overlay" {
+			for _, opt := range m.Options {
+				if err != nil {
+					break
+				}
+
+				for _, prefix := range prefixes {
+					if strings.HasPrefix(opt, prefix) {
+						dirs := strings.Split(opt[len(prefix):], ":")
+						for _, dir := range dirs {
+							if _, err = os.Lstat(dir); err != nil {
+								break
+							}
+						}
+						break
+					}
+				}
+			}
+
+			if err != nil {
+				break
+			}
+
+			continue
+		}
+
+		if _, err = os.Lstat(m.Source); err != nil {
+			break
+		}
+	}
+
+	if err != nil {
+		var b strings.Builder
+		b.Grow(256)
+		b.WriteString("src:")
+		b.WriteString(err.Error())
+		return b.String()
+	}
+
+	if _, err = os.Lstat(target); err != nil {
+		var b strings.Builder
+		b.Grow(256)
+		b.WriteString("mountpoint:")
+		b.WriteString(err.Error())
+		return b.String()
+	}
+
+	return ""
 }
 
 func (m *mounter) Unmount(ctx context.Context, volumeId, target string) (err error) {
