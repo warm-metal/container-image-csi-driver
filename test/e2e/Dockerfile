@@ -1,10 +1,14 @@
-FROM ubuntu:16.04
+FROM docker.io/library/golang:1.16
 
-RUN apt-get update && apt-get install -y curl && rm -rf /var/lib/apt/lists/*
+WORKDIR /go/src/csi-driver-image
+COPY go.mod go.sum ./
 
-WORKDIR /root
-RUN curl --location https://storage.googleapis.com/kubernetes-release/release/v1.20.5/kubernetes-test-linux-amd64.tar.gz | \
-      tar --strip-components=3 -zxf - kubernetes/test/bin/e2e.test kubernetes/test/bin/ginkgo
+RUN go mod download
 
-COPY driver.yaml .
-ENTRYPOINT ./e2e.test -ginkgo.v -ginkgo.focus='External.Storage' -storage.testdriver=driver.yaml
+RUN curl -skL https://dl.k8s.io/v1.20.5/kubernetes-client-linux-amd64.tar.gz | \
+    tar -C /usr/bin --strip-components 3 -zxf - kubernetes/client/bin/kubectl
+COPY id_rsa* /root/.ssh/
+
+COPY *.go .
+
+ENTRYPOINT go run .
