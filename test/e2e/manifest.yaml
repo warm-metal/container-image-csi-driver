@@ -31,6 +31,9 @@ spec:
       containers:
         - name: csi-driver-image-e2e-test
           image: local.test/csi-driver-image-test:e2e
+          env:
+            - name: KUBE_SSH_USER
+              value: docker
           securityContext:
             privileged: true
       restartPolicy: Never
