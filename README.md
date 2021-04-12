@@ -18,15 +18,7 @@ Currently, a possible alternate is **buildkit**. It already has containerd as a 
 
 ### Containerd
 
-containerd is our recommend CRI. It is most compatible with the driver. 
-
-If you use a minikube cluster, run
-
-```shell script
-kubectl apply -f https://raw.githubusercontent.com/warm-metal/csi-driver-image/master/install/cri-containerd-minikube.yaml
-```
-
-Othterwise,
+Containerd is our recommend container runtime. It is the most compatible runtime to the driver. 
 
 ```shell script
 kubectl apply -f https://raw.githubusercontent.com/warm-metal/csi-driver-image/master/install/cri-containerd.yaml
@@ -42,6 +34,40 @@ It means that the driver can't use images managed by Docker daemon.
 
 ```shell script
 kubectl apply -f https://raw.githubusercontent.com/warm-metal/csi-driver-image/master/install/cri-docker.yaml
+```
+
+### Cluster with custom configuration
+
+Some K8s clusters installed with custom configurations, such as cluster installed via microk8s.
+For these clusters, provided manifests for both docker andcri are also available after modifying some hostpaths.
+
+In the `volumes` section of the manifest, 
+1. Replace `/var/lib/kubelet` with `root-dir` of kubelet,
+2. Replace `/run/containerd.sock` with your containerd socket path.
+
+```yaml
+      ...
+      volumes:
+        - hostPath:
+            path: /var/lib/kubelet/plugins/csi-image.warm-metal.tech
+            type: DirectoryOrCreate
+          name: socket-dir
+        - hostPath:
+            path: /var/lib/kubelet/pods
+            type: DirectoryOrCreate
+          name: mountpoint-dir
+        - hostPath:
+            path: /var/lib/kubelet/plugins_registry
+            type: Directory
+          name: registration-dir
+        - hostPath:
+            path: /
+            type: Directory
+            name: host-rootfs
+        - hostPath:
+            path: /run/containerd/containerd.sock
+            type: Socket
+          name: runtime-socket
 ```
 
 ## Usage

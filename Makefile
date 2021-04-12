@@ -15,5 +15,5 @@ e2e:
 
 .PHONY: image
 image:
-	kubectl dev build -t docker.io/warmmetal/csi-image:v0.1.1
+	kubectl dev build -t docker.io/warmmetal/csi-image:v0.2.0
 	kubectl dev build -t docker.io/warmmetal/csi-image:latest
