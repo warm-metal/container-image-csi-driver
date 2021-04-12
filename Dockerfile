@@ -10,7 +10,7 @@ COPY pkg ./pkg
 
 RUN CGO_ENABLED=0 go build -o csi-image-plugin ./cmd/plugin
 
-FROM scratch
+FROM docker.io/warmmetal/bind-host:v0.1.0
 WORKDIR /
-COPY --from=builder /go/src/csi-driver-image/csi-image-plugin ./
-ENTRYPOINT ["/csi-image-plugin"]
+COPY --from=builder /go/src/csi-driver-image/csi-image-plugin /usr/bin/
+ENTRYPOINT ["bind-host", "-v=1", "--", "csi-image-plugin"]

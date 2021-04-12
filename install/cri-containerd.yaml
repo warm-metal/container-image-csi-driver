@@ -79,16 +79,18 @@ spec:
             - mountPath: /registration
               name: registration-dir
         - name: plugin
-          image: warmmetal/csi-image:latest
+          image: docker.io/warmmetal/csi-image:latest
           imagePullPolicy: IfNotPresent
           args:
             - "-endpoint=$(CSI_ENDPOINT)"
             - "-node=$(KUBE_NODE_NAME)"
-            - "-containerd-addr=$(CONTAINERD_ADDRESS)"
+            - "-containerd-addr=$(CRI_ADDR)"
           env:
             - name: CSI_ENDPOINT
               value: unix:///csi/csi.sock
-            - name: CONTAINERD_ADDRESS
+            - name: HOST_ROOTFS
+              value: /host
+            - name: CRI_ADDR
               value: unix:///run/containerd/containerd.sock
             - name: KUBE_NODE_NAME
               valueFrom:
@@ -105,9 +107,14 @@ spec:
               name: mountpoint-dir
             - mountPath: /run/containerd/containerd.sock
               name: runtime-socket
-            - mountPath: /var/lib/containerd
-              name: snapshot-home
+            - mountPath: /host
+              mountPropagation: Bidirectional
+              name: host-rootfs
       volumes:
+        - hostPath:
+            path: /
+            type: Directory
+          name: host-rootfs
         - hostPath:
             path: /var/lib/kubelet/plugins/csi-image.warm-metal.tech
             type: DirectoryOrCreate
@@ -120,10 +127,6 @@ spec:
             path: /var/lib/kubelet/plugins_registry
             type: Directory
           name: registration-dir
-        - hostPath:
-            path: /var/lib/containerd
-            type: Directory
-          name: snapshot-home
         - hostPath:
             path: /run/containerd/containerd.sock
             type: Socket
