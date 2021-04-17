@@ -126,7 +126,7 @@ spec:
         - hostPath:
             path: /
             type: Directory
-            name: host-rootfs
+          name: host-rootfs
         - hostPath:
             path: /var/snap/microk8s/common/run/containerd.sock
             type: Socket
