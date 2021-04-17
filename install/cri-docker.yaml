@@ -126,7 +126,7 @@ spec:
         - hostPath:
             path: /
             type: Directory
-            name: host-rootfs
+          name: host-rootfs
         - hostPath:
             path: /run/docker/containerd/containerd.sock
             type: Socket
