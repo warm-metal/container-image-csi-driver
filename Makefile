@@ -17,3 +17,8 @@ e2e:
 image:
 	kubectl dev build -t docker.io/warmmetal/csi-image:v0.2.0
 	kubectl dev build -t docker.io/warmmetal/csi-image:latest
+
+.PHONY: smoke
+smoke:
+	./hack/test-in-minikube-containerd.sh
+	./hack/test-in-minikube-docker.sh
