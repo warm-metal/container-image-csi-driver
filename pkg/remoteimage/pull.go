@@ -108,6 +108,8 @@ func (p puller) Pull(ctx context.Context) (err error) {
 		if err == nil {
 			return
 		}
+
+		pullErrs = append(pullErrs, err)
 	}
 
 	return utilerrors.NewAggregate(pullErrs)

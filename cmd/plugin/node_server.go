@@ -75,6 +75,7 @@ func (n nodeServer) NodePublishVolume(ctx context.Context, req *csi.NodePublishV
 	image := req.VolumeId
 	opts := backend.MountOptions{
 		ReadOnly: req.Readonly,
+		VolumeId: req.VolumeId,
 	}
 	secret := ""
 	namespace := ""

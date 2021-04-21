@@ -8,6 +8,7 @@ import (
 type MountOptions struct {
 	PullAlways bool
 	ReadOnly   bool
+	VolumeId   string
 }
 
 type Mounter interface {

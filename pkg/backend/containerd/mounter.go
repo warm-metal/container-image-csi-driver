@@ -144,7 +144,12 @@ func (m *mounter) refSnapshot(
 	klog.Infof("prepare %s", parent)
 
 	snapshotter := c.SnapshotService(m.snapshotterName)
-	key := genSnapshotKey(parent)
+	keySuffix := opts.VolumeId
+	if opts.ReadOnly {
+		// ReadOnly volumes can share a single snapshot.
+		keySuffix = parent
+	}
+	key := genSnapshotKey(keySuffix)
 
 	m.snapshotLock.Lock()
 	defer m.snapshotLock.Unlock()
