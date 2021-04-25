@@ -23,7 +23,9 @@ func NewRemoteImageService(endpoint string, connectionTimeout time.Duration) (cr
 	conn, err := grpc.DialContext(
 		ctx, addr, grpc.WithInsecure(), grpc.WithContextDialer(dialer),
 		grpc.WithDefaultCallOptions(grpc.MaxCallRecvMsgSize(maxMsgSize)),
+		grpc.WithBlock(),
 	)
+
 	if err != nil {
 		klog.Errorf("Connect remote image service %s failed: %v", addr, err)
 		return nil, err
