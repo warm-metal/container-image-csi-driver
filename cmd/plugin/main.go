@@ -2,14 +2,12 @@ package main
 
 import (
 	"flag"
-	"fmt"
 	"github.com/container-storage-interface/spec/lib/go/csi"
 	"github.com/warm-metal/csi-driver-image/pkg/backend/containerd"
 	"github.com/warm-metal/csi-driver-image/pkg/cri"
 	"github.com/warm-metal/csi-drivers/pkg/csi-common"
 	"k8s.io/klog/v2"
 
-	"os"
 	"time"
 )
 
@@ -31,8 +29,9 @@ func main() {
 		panic(err)
 	}
 
-	defer klog.Flush()
 	flag.Parse()
+	defer klog.Flush()
+
 	driver := csicommon.NewCSIDriver(driverName, driverVersion, *nodeID)
 	driver.AddVolumeCapabilityAccessModes([]csi.VolumeCapability_AccessMode_Mode{
 		csi.VolumeCapability_AccessMode_MULTI_NODE_READER_ONLY,
@@ -43,8 +42,7 @@ func main() {
 
 	criClient, err := cri.NewRemoteImageService(*containerdSock, time.Second)
 	if err != nil {
-		fmt.Fprintf(os.Stderr, `fail to connect to cri daemon "%s": %s`, *endpoint, err)
-		os.Exit(1)
+		klog.Fatalf(`unable to connect to cri daemon "%s": %s`, *endpoint, err)
 	}
 
 	server := csicommon.NewNonBlockingGRPCServer()

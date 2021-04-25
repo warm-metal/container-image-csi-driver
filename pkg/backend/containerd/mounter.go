@@ -242,8 +242,8 @@ func (m *mounter) Mount(ctx context.Context, puller remoteimage.Puller, volumeId
 	// FIXME lease
 	c, err := containerd.New(m.containerdEndpoint, containerd.WithDefaultNamespace(m.namespace))
 	if err != nil {
-		klog.Errorf("fail to create containerd client: %s", err)
-		return
+		klog.Fatalf("containerd connection is broken because the mounted unix socket somehow dose not work,"+
+			"recreate the container may fix: %s", err)
 	}
 
 	mounts, err := m.refSnapshot(ctx, c, puller, volumeId, image, target, opts)
@@ -338,8 +338,8 @@ func describeMounts(mounts []mount.Mount, target string) string {
 func (m *mounter) Unmount(ctx context.Context, volumeId, target string) (err error) {
 	c, err := containerd.New(m.containerdEndpoint, containerd.WithDefaultNamespace(m.namespace))
 	if err != nil {
-		klog.Errorf("fail to create containerd client: %s", err)
-		return
+		klog.Fatalf("containerd connection is broken because the mounted unix socket somehow dose not work,"+
+			"recreate the container may fix: %s", err)
 	}
 
 	if err = mount.UnmountAll(target, 0); err != nil {

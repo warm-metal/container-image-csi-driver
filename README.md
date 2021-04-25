@@ -2,48 +2,35 @@
 
 This is a CSI driver for mounting images as PVs or ephemeral volumes.
 
-Our first aim is resource saving. No redundant image pull and store. No new containers. 
-The driver shares image store with container runtime. 
-It uses CRI to pull images, and mount images via snapshot service of runtime. 
-All requests to mount the same image also share the same snapshot.
+Our first aim is resource-saving. The driver shares the image store with the container runtime.
+It uses CRI to pull images, then mounts them via the snapshot service of the runtime.  
+Every **read-only** volume of the same image will share the same snapshot.
+It doesn't duplicate any images or containers already exist in the runtime.
 
-What we can do further may be building images via the snapshot capability of CSI.
-It assures that new created images also exist in the current runtime and can be run immediately,
-especially those images under developing, just like what Docker does.
-If Docker is replaced by some others, this driver can offer the same experience to Docker. 
+What we can do further may be building images through the snapshot capability of CSI.
+This allows users to quickly ship images after making minor changes.
 
-Currently, a possible alternate is **buildkit**. It already has containerd as a backend worker.   
+## Installation
 
-## Install
+It currently supports only **containerd** and **docker** with CRI enabled.
 
-### Containerd
+Until Docker migrates its [image and snapshot store](https://github.com/moby/moby/issues/38043) to containerd,
+I recommend you use containerd instead. Or, the driver can't use images managed by Docker daemon.
 
-Containerd is our recommend container runtime. It is the most compatible runtime to the driver. 
+If your container runtime can't be migrated, you can enable the CRI plugin by clearing the containerd config file `/etc/containerd/config.toml`, then restarting the containerd. 
 
 ```shell script
 kubectl apply -f https://raw.githubusercontent.com/warm-metal/csi-driver-image/master/install/cri-containerd.yaml
 ```
 
-### Docker
-
-As mentioned before, CRI is required to pull images.
-You can enable it by adding `--cri-containerd` for docker daemon or `--docker-opt="cri-containerd=true"` for minikube.
-
-Until Docker supports [image sharing](https://github.com/moby/moby/issues/38043) with its builtin containerd, We don't encourage this sort of usage.
-It means that the driver can't use images managed by Docker daemon. 
-
-```shell script
-kubectl apply -f https://raw.githubusercontent.com/warm-metal/csi-driver-image/master/install/cri-docker.yaml
-```
-
 ### Cluster with custom configuration
 
-Some K8s clusters installed with custom configurations, such as cluster installed via microk8s.
-For these clusters, provided manifests for both docker andcri are also available after modifying some hostpaths.
+For clusters installed with custom configurations, say microk8s,
+the provided manifests are also available after modifying some hostpaths.
 
 In the `volumes` section of the manifest, 
 1. Replace `/var/lib/kubelet` with `root-dir` of kubelet,
-2. Replace `/run/containerd.sock` with your containerd socket path.
+2. Replace `/run/containerd/containerd.sock` with your containerd socket path.
 
 ```yaml
       ...
