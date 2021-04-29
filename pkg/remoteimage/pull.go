@@ -3,11 +3,8 @@ package remoteimage
 import (
 	"context"
 	"github.com/containerd/containerd/reference/docker"
-	"k8s.io/api/core/v1"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	corev1 "k8s.io/api/core/v1"
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
-	"k8s.io/client-go/kubernetes"
-	"k8s.io/client-go/rest"
 	cri "k8s.io/cri-api/pkg/apis/runtime/v1alpha2"
 	"k8s.io/klog/v2"
 	"k8s.io/kubernetes/pkg/credentialprovider"
@@ -19,22 +16,18 @@ type Puller interface {
 	Pull(context.Context) error
 }
 
-func NewPuller(imageSvc cri.ImageServiceClient, image, secret, secretNamespace, sa string) Puller {
+func NewPuller(imageSvc cri.ImageServiceClient, image string, secrets []corev1.Secret) Puller {
 	return &puller{
-		imageSvc:        imageSvc,
-		image:           image,
-		secret:          secret,
-		secretNamespace: secretNamespace,
-		serviceAccount:  sa,
+		imageSvc: imageSvc,
+		image:    image,
+		secrets:  secrets,
 	}
 }
 
 type puller struct {
-	imageSvc        cri.ImageServiceClient
-	image           string
-	secret          string
-	secretNamespace string
-	serviceAccount  string // FIXME DO NOT USE IT NOW
+	imageSvc cri.ImageServiceClient
+	image    string
+	secrets  []corev1.Secret
 }
 
 func (p puller) Pull(ctx context.Context) (err error) {
@@ -44,30 +37,7 @@ func (p puller) Pull(ctx context.Context) (err error) {
 		return
 	}
 
-	var secrets []v1.Secret
-	if len(p.secret) > 0 {
-		config, err := rest.InClusterConfig()
-		if err != nil {
-			klog.Errorf("can't get cluster config: %s", err)
-			return err
-		}
-
-		clientset, err := kubernetes.NewForConfig(config)
-		if err != nil {
-			klog.Errorf("can't get cluster client: %s", err)
-			return err
-		}
-
-		secret, err := clientset.CoreV1().Secrets(p.secretNamespace).Get(ctx, p.secret, metav1.GetOptions{})
-		if err != nil {
-			klog.Errorf(`can't get secret "%s/%s": %s`, p.secretNamespace, p.secret, err)
-			return err
-		}
-
-		secrets = append(secrets, *secret)
-	}
-
-	keyRing, err := credential.MakeDockerKeyring(secrets, credentialprovider.NewDockerKeyring())
+	keyRing, err := credential.MakeDockerKeyring(p.secrets, credentialprovider.NewDockerKeyring())
 	if err != nil {
 		klog.Errorf("keyring: %s", err)
 		return
