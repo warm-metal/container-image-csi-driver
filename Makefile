@@ -13,12 +13,12 @@ e2e:
 	kubectl apply --wait -f test/e2e/manifest.yaml
 	kubectl -n cliapp-system wait --timeout=30m --for=condition=complete job/csi-driver-image-e2e-test
 
+.PHONY: integration
+integration:
+	./test/integration/test-in-minikube-containerd.sh
+	./test/integration/test-in-minikube-docker.sh
+
 .PHONY: image
 image:
-	kubectl dev build -t docker.io/warmmetal/csi-image:v0.3.0
+	kubectl dev build -t docker.io/warmmetal/csi-image:v0.4.0
 	kubectl dev build -t docker.io/warmmetal/csi-image:latest
-
-.PHONY: smoke
-smoke:
-	./hack/test-in-minikube-containerd.sh
-	./hack/test-in-minikube-docker.sh

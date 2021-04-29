@@ -5,6 +5,7 @@ import (
 	"github.com/container-storage-interface/spec/lib/go/csi"
 	"github.com/warm-metal/csi-driver-image/pkg/backend/containerd"
 	"github.com/warm-metal/csi-driver-image/pkg/cri"
+	"github.com/warm-metal/csi-driver-image/pkg/secret"
 	"github.com/warm-metal/csi-drivers/pkg/csi-common"
 	"k8s.io/klog/v2"
 
@@ -53,6 +54,7 @@ func main() {
 			DefaultNodeServer: csicommon.NewDefaultNodeServer(driver),
 			mounter:           containerd.NewMounter(*containerdSock),
 			imageSvc:          criClient,
+			secretCache:       secret.CreateCacheOrDie(),
 		},
 	)
 	server.Wait()

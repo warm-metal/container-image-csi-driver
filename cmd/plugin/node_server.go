@@ -5,6 +5,7 @@ import (
 	"github.com/container-storage-interface/spec/lib/go/csi"
 	"github.com/warm-metal/csi-driver-image/pkg/backend"
 	"github.com/warm-metal/csi-driver-image/pkg/remoteimage"
+	"github.com/warm-metal/csi-driver-image/pkg/secret"
 	"github.com/warm-metal/csi-drivers/pkg/csi-common"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
@@ -17,17 +18,19 @@ import (
 
 type nodeServer struct {
 	*csicommon.DefaultNodeServer
-	mounter  backend.Mounter
-	imageSvc cri.ImageServiceClient
+	mounter     backend.Mounter
+	imageSvc    cri.ImageServiceClient
+	secretCache secret.Cache
 }
 
 const (
-	ctxKeyVolumeHandle      = "volumeHandle"
-	ctxKeyImage             = "image"
-	ctxKeyPullAlways        = "pullAlways"
-	ctxKeySecret            = "secret"
-	ctxKeyPodNamespace      = "csi.storage.k8s.io/pod.namespace"
-	ctxKeyPodServiceAccount = "csi.storage.k8s.io/serviceAccount.name"
+	ctxKeyVolumeHandle    = "volumeHandle"
+	ctxKeyImage           = "image"
+	ctxKeyPullAlways      = "pullAlways"
+	ctxKeySecret          = "secret"
+	ctxKeySecretNamespace = "secretNamespace"
+	ctxKeyPodName         = "csi.storage.k8s.io/pod.name"
+	ctxKeyPodNamespace    = "csi.storage.k8s.io/pod.namespace"
 )
 
 func (n nodeServer) NodePublishVolume(ctx context.Context, req *csi.NodePublishVolumeRequest) (resp *csi.NodePublishVolumeResponse, err error) {
@@ -77,9 +80,10 @@ func (n nodeServer) NodePublishVolume(ctx context.Context, req *csi.NodePublishV
 		ReadOnly: req.Readonly,
 		VolumeId: req.VolumeId,
 	}
-	secret := ""
+	secretName := ""
+	secretNamespace := ""
+	pod := ""
 	namespace := ""
-	sa := ""
 
 	if len(req.VolumeContext) > 0 {
 		if len(req.VolumeContext[ctxKeyVolumeHandle]) > 0 {
@@ -89,16 +93,23 @@ func (n nodeServer) NodePublishVolume(ctx context.Context, req *csi.NodePublishV
 		}
 
 		opts.PullAlways = strings.ToLower(req.VolumeContext[ctxKeyPullAlways]) == "true"
-		secret = req.VolumeContext[ctxKeySecret]
-		if len(secret) > 0 {
-			namespace = req.VolumeContext[ctxKeyPodNamespace]
-			sa = req.VolumeContext[ctxKeyPodServiceAccount]
+		namespace = req.VolumeContext[ctxKeyPodNamespace]
+		pod = req.VolumeContext[ctxKeyPodName]
+		secretName = req.VolumeContext[ctxKeySecret]
+		secretNamespace = req.VolumeContext[ctxKeySecretNamespace]
+		if len(secretName) > 0 && len(secretNamespace) == 0 {
+			secretNamespace = namespace
 		}
 	}
 
+	secrets, err := n.secretCache.GetSecrets(ctx, secretName, secretNamespace, pod, namespace)
+	if err != nil {
+		err = status.Errorf(codes.Aborted, "unable to fetch secret: %s", err)
+		return
+	}
+
 	if err = n.mounter.Mount(
-		ctx, remoteimage.NewPuller(n.imageSvc, image, secret, namespace, sa),
-		req.VolumeId, image, req.TargetPath, &opts,
+		ctx, remoteimage.NewPuller(n.imageSvc, image, secrets), req.VolumeId, image, req.TargetPath, &opts,
 	); err != nil {
 		err = status.Error(codes.Internal, err.Error())
 		return

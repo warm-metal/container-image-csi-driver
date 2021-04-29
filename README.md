@@ -62,7 +62,11 @@ In the `volumes` section of the manifest,
 Provided manifests will install a CSIDriver `csi-image.warm-metal.tech` and a DaemonSet.
 You can mount images as either pre-provisioned PVs or ephemeral volumes.
 
-As a ephemeral volume, `volumeAttributes` are **image**(required), **secret**, and **pullAlways**.
+As ephemeral volumes, `volumeAttributes` are **image**(required), **secret**, **secretNamespace**, and **pullAlways**.
+
+For private images, **pullImageSecret settings** in both workload manifests and the driver DaemonSet manifest are also
+used(See #16). Users can add the secret name to workload ServiceAccounts or the plugin SA `csi-image-warm-metal`.
+If `csi-image-warm-metal` is chosen, the secret will be activated after restarting the plugin pod.
 
 ```yaml
 apiVersion: batch/v1
@@ -90,14 +94,15 @@ spec:
             driver: csi-image.warm-metal.tech
             volumeAttributes:
               image: "docker.io/warmmetal/csi-image-test:simple-fs"
-              # set pullAlways if you want to ignore local images
+              # # set pullAlways if you want to ignore local images
               # pullAlways: "true"
-              # set secret if the image is private
-              # secret: "pull image secret name"
+              # # set secret if the image is private
+              # secret: "name of the ImagePullSecret"
+              # secretNamespace: "namespace of the secret"
   backoffLimit: 0
 ```
 
-For a PV, the `volumeHandle` instead the attribute **image**, specify the target image.
+For pre-provisioned PVs, `volumeHandle` instead the attribute **image**, specify the target image.
 
 ```yaml
 apiVersion: v1
@@ -115,10 +120,11 @@ spec:
     driver: csi-image.warm-metal.tech
     volumeHandle: "docker.io/warmmetal/csi-image-test:simple-fs"
     # volumeAttributes:
-      # set pullAlways if you want to ignore local images
+      # # set pullAlways if you want to ignore local images
       # pullAlways: "true"
-      # set secret if the image is private
-      # secret: "pull image secret name"
+      # # set secret if the image is private
+      # secret: "name of the ImagePullSecret"
+      # secretNamespace: "namespace of the secret"
 ```
 
 See all [examples](https://github.com/warm-metal/csi-driver-image/tree/master/test/integration/manifests).
