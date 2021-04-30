@@ -102,14 +102,14 @@ func (n nodeServer) NodePublishVolume(ctx context.Context, req *csi.NodePublishV
 		}
 	}
 
-	secrets, err := n.secretCache.GetSecrets(ctx, secretName, secretNamespace, pod, namespace)
+	keyring, err := n.secretCache.GetDockerKeyring(ctx, secretName, secretNamespace, pod, namespace)
 	if err != nil {
-		err = status.Errorf(codes.Aborted, "unable to fetch secret: %s", err)
+		err = status.Errorf(codes.Aborted, "unable to fetch keyring: %s", err)
 		return
 	}
 
 	if err = n.mounter.Mount(
-		ctx, remoteimage.NewPuller(n.imageSvc, image, secrets), req.VolumeId, image, req.TargetPath, &opts,
+		ctx, remoteimage.NewPuller(n.imageSvc, image, keyring), req.VolumeId, image, req.TargetPath, &opts,
 	); err != nil {
 		err = status.Error(codes.Internal, err.Error())
 		return
