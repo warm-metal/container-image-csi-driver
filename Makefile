@@ -20,5 +20,4 @@ integration:
 
 .PHONY: image
 image:
-	kubectl dev build -t docker.io/warmmetal/csi-image:v0.4.0
-	kubectl dev build -t docker.io/warmmetal/csi-image:latest
+	kubectl dev build -t docker.io/warmmetal/csi-image:v0.4.1

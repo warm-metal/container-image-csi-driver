@@ -7,66 +7,46 @@ It uses CRI to pull images, then mounts them via the snapshot service of the run
 Every **read-only** volume of the same image will share the same snapshot.
 It doesn't duplicate any images or containers already exist in the runtime.
 
-What we can do further may be building images through the snapshot capability of CSI.
-This allows users to quickly ship images after making minor changes.
-
 ## Installation
 
-It currently supports only **containerd** and **docker** with CRI enabled.
-
-Until Docker migrates its [image and snapshot store](https://github.com/moby/moby/issues/38043) to containerd,
-I recommend you use containerd instead. Or, the driver can't use images managed by Docker daemon.
-
-If your container runtime can't be migrated, you can enable the CRI plugin by clearing the containerd config file `/etc/containerd/config.toml`, then restarting the containerd. 
+The manifest below installs a CSIDriver `csi-image.warm-metal.tech` and a DaemonSet.
 
 ```shell script
 kubectl apply -f https://raw.githubusercontent.com/warm-metal/csi-driver-image/master/install/cri-containerd.yaml
 ```
 
-### Cluster with custom configuration
+The driver currently supports only **containerd** and **docker** with CRI enabled.
+
+Until Docker migrates its [image and snapshot store](https://github.com/moby/moby/issues/38043) to containerd,
+I recommend you use containerd instead. Otherwise, the driver can't use images managed by Docker daemon.
+
+If your container runtime can't be migrated, you can enable the CRI plugin by clearing the containerd config file `/etc/containerd/config.toml`, then restarting the containerd.
+
+#### Cluster with custom configuration
 
 For clusters installed with custom configurations, say microk8s,
-the provided manifests are also available after modifying some hostpaths.
+the provided manifests are also available after modifying some hostpaths. See below.
 
 In the `volumes` section of the manifest, 
 1. Replace `/var/lib/kubelet` with `root-dir` of kubelet,
 2. Replace `/run/containerd/containerd.sock` with your containerd socket path.
 
-```yaml
-      ...
-      volumes:
-        - hostPath:
-            path: /var/lib/kubelet/plugins/csi-image.warm-metal.tech
-            type: DirectoryOrCreate
-          name: socket-dir
-        - hostPath:
-            path: /var/lib/kubelet/pods
-            type: DirectoryOrCreate
-          name: mountpoint-dir
-        - hostPath:
-            path: /var/lib/kubelet/plugins_registry
-            type: Directory
-          name: registration-dir
-        - hostPath:
-            path: /
-            type: Directory
-            name: host-rootfs
-        - hostPath:
-            path: /run/containerd/containerd.sock
-            type: Socket
-          name: runtime-socket
-```
+A tested manifest for microk8s clusters is available [here](https://raw.githubusercontent.com/warm-metal/csi-driver-image/master/install/cri-containerd-microk8s.yaml).
 
 ## Usage
 
-Provided manifests will install a CSIDriver `csi-image.warm-metal.tech` and a DaemonSet.
-You can mount images as either pre-provisioned PVs or ephemeral volumes.
+Users can mount images as either pre-provisioned PVs or ephemeral volumes.
+PVs can only be mounted in access mode **ReadOnlyMany**, while ephemeral volumes will be writable.
+Any changes in ephemeral volumes will be discarded after unmounting.
 
-As ephemeral volumes, `volumeAttributes` are **image**(required), **secret**, **secretNamespace**, and **pullAlways**.
+Private images are also supported.
+Besides the credential provider, **pullImageSecret settings** in both workload manifests and the driver DaemonSet manifest are also
+used to pull private images(See [#16](https://github.com/warm-metal/csi-driver-image/issues/16)). 
+Users can add the secret name to workload ServiceAccounts or the driver SA `csi-image-warm-metal`.
+If `csi-image-warm-metal` is chosen, the secret will be activated after restarting the driver pod.
 
-For private images, **pullImageSecret settings** in both workload manifests and the driver DaemonSet manifest are also
-used(See #16). Users can add the secret name to workload ServiceAccounts or the plugin SA `csi-image-warm-metal`.
-If `csi-image-warm-metal` is chosen, the secret will be activated after restarting the plugin pod.
+#### Ephemeral Volume
+For ephemeral volumes, `volumeAttributes` contains **image**(required), **secret**, **secretNamespace**, and **pullAlways**.
 
 ```yaml
 apiVersion: batch/v1
@@ -102,7 +82,8 @@ spec:
   backoffLimit: 0
 ```
 
-For pre-provisioned PVs, `volumeHandle` instead the attribute **image**, specify the target image.
+#### Pre-provisioned PV
+For pre-provisioned PVs, `volumeHandle` instead of the attribute **image**, specify the target image.
 
 ```yaml
 apiVersion: v1
@@ -127,4 +108,4 @@ spec:
       # secretNamespace: "namespace of the secret"
 ```
 
-See all [examples](https://github.com/warm-metal/csi-driver-image/tree/master/test/integration/manifests).
+See all [examples](https://github.com/warm-metal/csi-driver-image/tree/master/sample).

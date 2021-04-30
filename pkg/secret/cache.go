@@ -8,12 +8,20 @@ import (
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
 	"k8s.io/klog/v2"
+	"k8s.io/kubernetes/pkg/credentialprovider"
+	credential "k8s.io/kubernetes/pkg/credentialprovider/secrets"
 	"os"
 	"time"
+
+	// register credential providers
+	_ "k8s.io/kubernetes/pkg/credentialprovider/aws"
+	_ "k8s.io/kubernetes/pkg/credentialprovider/azure"
+	_ "k8s.io/kubernetes/pkg/credentialprovider/gcp"
+	_ "k8s.io/kubernetes/pkg/credentialprovider/plugin"
 )
 
 type Cache interface {
-	GetSecrets(ctx context.Context, secret, secretNS, pod, podNS string) ([]corev1.Secret, error)
+	GetDockerKeyring(ctx context.Context, secret, secretNS, pod, podNS string) (credentialprovider.DockerKeyring, error)
 }
 
 func CreateCacheOrDie() Cache {
@@ -29,6 +37,7 @@ func CreateCacheOrDie() Cache {
 
 	c := secretWOCache{
 		k8sCliSet: clientset,
+		keyring:   credentialprovider.NewDockerKeyring(),
 	}
 
 	curNamespace, err := ioutil.ReadFile("/run/secrets/kubernetes.io/serviceaccount/namespace")
@@ -71,11 +80,13 @@ type secretPair struct {
 type secretWOCache struct {
 	k8sCliSet     *kubernetes.Clientset
 	daemonSecrets []secretPair
+	keyring       credentialprovider.DockerKeyring
 }
 
-func (s secretWOCache) GetSecrets(
+func (s secretWOCache) GetDockerKeyring(
 	ctx context.Context, secret, secretNS, pod, podNS string,
-) (secrets []corev1.Secret, err error) {
+) (keyring credentialprovider.DockerKeyring, err error) {
+	var secrets []corev1.Secret
 	if len(secret) > 0 {
 		secret, err := s.k8sCliSet.CoreV1().Secrets(secretNS).Get(ctx, secret, metav1.GetOptions{})
 		if err != nil {
@@ -119,5 +130,10 @@ func (s secretWOCache) GetSecrets(
 		secrets = append(secrets, *secret)
 	}
 
-	return
+	keyRing, err := credential.MakeDockerKeyring(secrets, s.keyring)
+	if err != nil {
+		klog.Errorf("unable to create keyring: %s", err)
+	}
+
+	return keyRing, err
 }
