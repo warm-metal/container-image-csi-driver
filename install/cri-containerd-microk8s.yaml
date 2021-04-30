@@ -80,12 +80,12 @@ spec:
             - mountPath: /registration
               name: registration-dir
         - name: plugin
-          image: docker.io/warmmetal/csi-image:v0.4.1
+          image: docker.io/warmmetal/csi-image:v0.4.2
           imagePullPolicy: IfNotPresent
           args:
-            - "-endpoint=$(CSI_ENDPOINT)"
-            - "-node=$(KUBE_NODE_NAME)"
-            - "-containerd-addr=$(CRI_ADDR)"
+            - "--endpoint=$(CSI_ENDPOINT)"
+            - "--node=$(KUBE_NODE_NAME)"
+            - "--containerd-addr=$(CRI_ADDR)"
           env:
             - name: CSI_ENDPOINT
               value: unix:///csi/csi.sock

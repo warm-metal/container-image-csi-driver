@@ -1,8 +1,9 @@
 package main
 
 import (
-	"flag"
+	goflag "flag"
 	"github.com/container-storage-interface/spec/lib/go/csi"
+	flag "github.com/spf13/pflag"
 	"github.com/warm-metal/csi-driver-image/pkg/backend/containerd"
 	"github.com/warm-metal/csi-driver-image/pkg/cri"
 	"github.com/warm-metal/csi-driver-image/pkg/secret"
@@ -17,6 +18,10 @@ var (
 	nodeID         = flag.String("node", "", "node ID")
 	containerdSock = flag.String(
 		"containerd-addr", "unix:///var/run/containerd/containerd.sock", "endpoint of containerd")
+	imageCredentialProviderConfigFile = flag.String("image-credential-provider-config", "",
+		"The path to the credential provider plugin config file.")
+	imageCredentialProviderBinDir = flag.String("image-credential-provider-bin-dir", "",
+		"The path to the directory where credential provider plugin binaries are located.")
 )
 
 const (
@@ -26,6 +31,7 @@ const (
 
 func main() {
 	klog.InitFlags(nil)
+	flag.CommandLine.AddGoFlagSet(goflag.CommandLine)
 	if err := flag.Set("logtostderr", "true"); err != nil {
 		panic(err)
 	}
@@ -54,7 +60,7 @@ func main() {
 			DefaultNodeServer: csicommon.NewDefaultNodeServer(driver),
 			mounter:           containerd.NewMounter(*containerdSock),
 			imageSvc:          criClient,
-			secretCache:       secret.CreateCacheOrDie(),
+			secretCache:       secret.CreateCacheOrDie(*imageCredentialProviderConfigFile, *imageCredentialProviderBinDir),
 		},
 	)
 	server.Wait()
