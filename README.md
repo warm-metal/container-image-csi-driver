@@ -10,6 +10,7 @@ It doesn't duplicate any images or containers already exist in the runtime.
 ## Installation
 
 The manifest below installs a CSIDriver `csi-image.warm-metal.tech` and a DaemonSet.
+Changes between versions can be found in the [release](https://github.com/warm-metal/csi-driver-image/releases) page.
 
 ```shell script
 kubectl apply -f https://raw.githubusercontent.com/warm-metal/csi-driver-image/master/install/cri-containerd.yaml
@@ -44,6 +45,10 @@ Besides the credential provider, **pullImageSecret settings** in both workload m
 used to pull private images(See [#16](https://github.com/warm-metal/csi-driver-image/issues/16)). 
 Users can add the secret name to workload ServiceAccounts or the driver SA `csi-image-warm-metal`.
 If `csi-image-warm-metal` is chosen, the secret will be activated after restarting the driver pod.
+
+The [credential provider plugin](https://kubernetes.io/docs/tasks/kubelet-credential-provider/kubelet-credential-provider/)
+can be enabled in the same way as kubelet, that is, adding both `--image-credential-provider-config` and 
+`--image-credential-provider-bin-dir` flags to the args of the driver.
 
 #### Ephemeral Volume
 For ephemeral volumes, `volumeAttributes` contains **image**(required), **secret**, **secretNamespace**, and **pullAlways**.

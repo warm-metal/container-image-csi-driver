@@ -1,8 +1,9 @@
 package main
 
 import (
-	"flag"
+	goflag "flag"
 	"github.com/container-storage-interface/spec/lib/go/csi"
+	flag "github.com/spf13/pflag"
 	"github.com/warm-metal/csi-driver-image/pkg/backend/containerd"
 	"github.com/warm-metal/csi-driver-image/pkg/cri"
 	"github.com/warm-metal/csi-driver-image/pkg/secret"
@@ -30,6 +31,7 @@ const (
 
 func main() {
 	klog.InitFlags(nil)
+	flag.CommandLine.AddGoFlagSet(goflag.CommandLine)
 	if err := flag.Set("logtostderr", "true"); err != nil {
 		panic(err)
 	}
