@@ -8,9 +8,10 @@ source $(dirname "$0")/utils.sh
 REGISTRY_USERNAME=${REGISTRY_USERNAME:-}
 REGISTRY_PASSWORD=${REGISTRY_PASSWORD:-}
 REGISTRY_EMAIL=${REGISTRY_EMAIL:-}
+K8S_VERSION=${K8S_VERSION:-stable}
 
 echo "Testing on containerd"
-minikube start -p csi-image-test --container-runtime=containerd
+minikube start -p csi-image-test --kubernetes-version=${K8S_VERSION} --container-runtime=containerd
 
 echo "Installing csi-driver-image"
 kubectl delete --ignore-not-found -f install/cri-containerd.yaml

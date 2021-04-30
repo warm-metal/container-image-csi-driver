@@ -17,6 +17,10 @@ var (
 	nodeID         = flag.String("node", "", "node ID")
 	containerdSock = flag.String(
 		"containerd-addr", "unix:///var/run/containerd/containerd.sock", "endpoint of containerd")
+	imageCredentialProviderConfigFile = flag.String("image-credential-provider-config", "",
+		"The path to the credential provider plugin config file.")
+	imageCredentialProviderBinDir = flag.String("image-credential-provider-bin-dir", "",
+		"The path to the directory where credential provider plugin binaries are located.")
 )
 
 const (
@@ -54,7 +58,7 @@ func main() {
 			DefaultNodeServer: csicommon.NewDefaultNodeServer(driver),
 			mounter:           containerd.NewMounter(*containerdSock),
 			imageSvc:          criClient,
-			secretCache:       secret.CreateCacheOrDie(),
+			secretCache:       secret.CreateCacheOrDie(*imageCredentialProviderConfigFile, *imageCredentialProviderBinDir),
 		},
 	)
 	server.Wait()

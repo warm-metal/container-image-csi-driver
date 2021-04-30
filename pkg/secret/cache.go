@@ -9,6 +9,7 @@ import (
 	"k8s.io/client-go/rest"
 	"k8s.io/klog/v2"
 	"k8s.io/kubernetes/pkg/credentialprovider"
+	execplugin "k8s.io/kubernetes/pkg/credentialprovider/plugin"
 	credential "k8s.io/kubernetes/pkg/credentialprovider/secrets"
 	"os"
 	"time"
@@ -17,14 +18,20 @@ import (
 	_ "k8s.io/kubernetes/pkg/credentialprovider/aws"
 	_ "k8s.io/kubernetes/pkg/credentialprovider/azure"
 	_ "k8s.io/kubernetes/pkg/credentialprovider/gcp"
-	_ "k8s.io/kubernetes/pkg/credentialprovider/plugin"
 )
 
 type Cache interface {
 	GetDockerKeyring(ctx context.Context, secret, secretNS, pod, podNS string) (credentialprovider.DockerKeyring, error)
 }
 
-func CreateCacheOrDie() Cache {
+func CreateCacheOrDie(pluginConfigFile, pluginBinDir string) Cache {
+	if len(pluginConfigFile) > 0 && len(pluginBinDir) > 0 {
+		if err := execplugin.RegisterCredentialProviderPlugins(pluginConfigFile, pluginBinDir); err != nil {
+			klog.Fatalf("unable to register the credential plugin through %q and %q: %s", pluginConfigFile,
+				pluginBinDir, err)
+		}
+	}
+
 	config, err := rest.InClusterConfig()
 	if err != nil {
 		klog.Fatalf("unable to get cluster config: %s", err)
