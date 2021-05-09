@@ -19,6 +19,14 @@ integration:
 	./test/integration/test-in-minikube-containerd.sh
 	K8S_VERSION=v1.18.18 ./test/integration/test-in-minikube-containerd.sh
 
+.PHONY: containerd-integration
+containerd-integration:
+	./test/integration/test-in-minikube-containerd.sh
+
+.PHONY: docker-integration
+docker-integration:
+	./test/integration/test-in-minikube-docker.sh
+
 .PHONY: image
 image:
 	kubectl dev build -t docker.io/warmmetal/csi-image:v0.4.2
