@@ -1,0 +1,25 @@
+name: containerd
+on:
+  push:
+    branches: [ master ]
+  pull_request:
+    branches: [ master ]
+  workflow_dispatch:
+jobs:
+  integration:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v2
+      - name: Build image
+        run: ./hack/ci/build.sh
+      - name: Set up minikube
+        uses: opsgang/ga-setup-minikube@v0.1.2
+        with:
+          minikube-version: '1.20.0'
+          k8s-version: '1.21.0'
+      - name: Start a Kubernetes cluster with containerd
+        run: ./hack/ci/setup_containerd_cluster.sh 'v1.21.0'
+      - name: Install the CSI Driver
+        run: ./hack/ci/install_driver.sh
+      - name: Run integration Tests
+        run: ./hack/ci/test.sh

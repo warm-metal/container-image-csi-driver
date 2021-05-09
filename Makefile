@@ -1,3 +1,8 @@
+.PHONY: build
+build:
+	go vet ./...
+	go build -o _output/csi-image-plugin ./cmd/plugin
+
 .PHONY: sanity
 sanity:
 	kubectl dev build -t local.test/csi-driver-image-test:sanity test/sanity
@@ -18,14 +23,6 @@ integration:
 	./test/integration/test-in-minikube-docker.sh
 	./test/integration/test-in-minikube-containerd.sh
 	K8S_VERSION=v1.18.18 ./test/integration/test-in-minikube-containerd.sh
-
-.PHONY: containerd-integration
-containerd-integration:
-	./test/integration/test-in-minikube-containerd.sh
-
-.PHONY: docker-integration
-docker-integration:
-	./test/integration/test-in-minikube-docker.sh
 
 .PHONY: image
 image:
