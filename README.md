@@ -1,3 +1,6 @@
+[![containerd](https://github.com/warm-metal/csi-driver-image/actions/workflows/containerd.yaml/badge.svg)](https://github.com/warm-metal/csi-driver-image/actions/workflows/containerd.yaml)
+[![docker-containerd](https://github.com/warm-metal/csi-driver-image/actions/workflows/docker-containerd.yaml/badge.svg)](https://github.com/warm-metal/csi-driver-image/actions/workflows/docker-containerd.yaml)
+
 # csi-driver-image
 
 This is a CSI driver for mounting images as PVs or ephemeral volumes.
