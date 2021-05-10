@@ -1,3 +1,8 @@
+.PHONY: build
+build:
+	go vet ./...
+	go build -o _output/csi-image-plugin ./cmd/plugin
+
 .PHONY: sanity
 sanity:
 	kubectl dev build -t local.test/csi-driver-image-test:sanity test/sanity
