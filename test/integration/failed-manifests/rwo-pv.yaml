@@ -7,13 +7,13 @@ provisioner: csi-image.warm-metal.tech
 apiVersion: v1
 kind: PersistentVolume
 metadata:
-  name: pv-test-csi-image-test-simple-fs
+  name: pv-test-csi-image-rwo
 spec:
   storageClassName: csi-image.warm-metal.tech
   capacity:
     storage: 5Gi
   accessModes:
-    - ReadOnlyMany
+    - ReadWriteOnce
   persistentVolumeReclaimPolicy: Retain
   csi:
     driver: csi-image.warm-metal.tech
@@ -22,27 +22,27 @@ spec:
 apiVersion: v1
 kind: PersistentVolumeClaim
 metadata:
-  name: pvc-test-csi-image-test-simple-fs
+  name: pvc-test-csi-image-rwo
 spec:
   storageClassName: csi-image.warm-metal.tech
   accessModes:
-    - ReadOnlyMany
+    - ReadWriteOnce
   resources:
     requests:
       storage: 5Gi
-  volumeName: pv-test-csi-image-test-simple-fs
+  volumeName: pv-test-csi-image-rwo
 ---
 apiVersion: batch/v1
 kind: Job
 metadata:
-  name: pre-provisioned-pv
+  name: failed-rwo-pv
 spec:
   template:
     metadata:
-      name: pre-provisioned-pv
+      name: failed-rwo-pv
     spec:
       containers:
-        - name: pre-provisioned-pv
+        - name: failed-rwo-pv
           image: docker.io/warmmetal/csi-image-test:check-fs
           env:
             - name: TARGET
@@ -54,5 +54,5 @@ spec:
       volumes:
         - name: target
           persistentVolumeClaim:
-            claimName: pvc-test-csi-image-test-simple-fs
+            claimName: pvc-test-csi-image-rwo
   backoffLimit: 0

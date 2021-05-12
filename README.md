@@ -1,5 +1,6 @@
 [![containerd](https://github.com/warm-metal/csi-driver-image/actions/workflows/containerd.yaml/badge.svg)](https://github.com/warm-metal/csi-driver-image/actions/workflows/containerd.yaml)
 [![docker-containerd](https://github.com/warm-metal/csi-driver-image/actions/workflows/docker-containerd.yaml/badge.svg)](https://github.com/warm-metal/csi-driver-image/actions/workflows/docker-containerd.yaml)
+[![cri-o](https://github.com/warm-metal/csi-driver-image/actions/workflows/cri-o.yaml/badge.svg)](https://github.com/warm-metal/csi-driver-image/actions/workflows/cri-o.yaml)
 
 # csi-driver-image
 
@@ -16,10 +17,13 @@ The manifest below installs a CSIDriver `csi-image.warm-metal.tech` and a Daemon
 Changes between versions can be found in the [release](https://github.com/warm-metal/csi-driver-image/releases) page.
 
 ```shell script
-kubectl apply -f https://raw.githubusercontent.com/warm-metal/csi-driver-image/master/install/cri-containerd.yaml
+# For conainerd and docker,
+kubectl apply -f https://raw.githubusercontent.com/warm-metal/csi-driver-image/master/install/containerd.yaml
+# Or cri-o.
+kubectl apply -f https://raw.githubusercontent.com/warm-metal/csi-driver-image/master/install/cri-o.yaml
 ```
 
-The driver currently supports only **containerd** and **docker** with CRI enabled.
+The driver currently supports **cri-o**, **containerd** and **docker** with CRI enabled.
 
 Until Docker migrates its [image and snapshot store](https://github.com/moby/moby/issues/38043) to containerd,
 I recommend you use containerd instead. Otherwise, the driver can't use images managed by Docker daemon.

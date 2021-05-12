@@ -1,4 +1,4 @@
-name: containerd
+name: backward-compatibility
 on:
   push:
     branches: [ master ]
@@ -19,9 +19,5 @@ jobs:
           k8s-version: '1.21.0'
       - name: Start a Kubernetes cluster with containerd
         run: ./hack/ci/setup_containerd_cluster.sh 'v1.21.0'
-      - name: Install the CSI Driver
-        run: ./hack/ci/install_driver_containerd.sh
-      - name: Run integration Tests
-        run: ./hack/ci/test.sh
-      - name: Uninstall the CSI Driver
-        run: ./hack/ci/uninstall_driver_containerd.sh
+      - name: Test compatibility with versions prior to v0.4.2
+        run: ./test/integration/backward-compatability.sh

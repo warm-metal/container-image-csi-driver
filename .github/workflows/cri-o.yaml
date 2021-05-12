@@ -1,4 +1,4 @@
-name: containerd
+name: cri-o
 on:
   push:
     branches: [ master ]
@@ -17,11 +17,11 @@ jobs:
         with:
           minikube-version: '1.20.0'
           k8s-version: '1.21.0'
-      - name: Start a Kubernetes cluster with containerd
-        run: ./hack/ci/setup_containerd_cluster.sh 'v1.21.0'
+      - name: Start a Kubernetes cluster with cri-o
+        run: ./hack/ci/setup_crio_cluster.sh 'v1.21.0'
       - name: Install the CSI Driver
-        run: ./hack/ci/install_driver_containerd.sh
+        run: ./hack/ci/install_driver_crio.sh
       - name: Run integration Tests
         run: ./hack/ci/test.sh
       - name: Uninstall the CSI Driver
-        run: ./hack/ci/uninstall_driver_containerd.sh
+        run: ./hack/ci/uninstall_driver_crio.sh

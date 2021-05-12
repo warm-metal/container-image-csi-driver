@@ -47,8 +47,11 @@ spec:
           env:
             - name: TARGET
               value: /target
+            - name: CHECK_RO
+              value: "true"
           volumeMounts:
             - mountPath: /target
+              readOnly: true
               name: target
       restartPolicy: Never
       volumes:

@@ -1,0 +1,30 @@
+apiVersion: v1
+kind: Pod
+metadata:
+  name: compatible-ephemeral-volume
+spec:
+  containers:
+    - args:
+        - sleep
+        - 1d
+      image: busybox
+      name: compatible-ephemeral-volume
+      volumeMounts:
+      - mountPath: /rw
+        name: rw
+      - mountPath: /ro
+        name: ro
+  volumes:
+    - name: rw
+      csi:
+        driver: csi-image.warm-metal.tech
+        volumeAttributes:
+          image: "docker.io/warmmetal/csi-image-test:simple-fs"
+          pullAlways: "true"
+    - name: ro
+      csi:
+        driver: csi-image.warm-metal.tech
+        readOnly: true
+        volumeAttributes:
+          image: "docker.io/warmmetal/csi-image-test:simple-fs"
+          pullAlways: "true"
