@@ -67,7 +67,7 @@ spec:
                 command: ["/bin/sh", "-c", "rm -rf /registration/csi-image.warm-metal.tech /registration/csi-image.warm-metal.tech-reg.sock"]
           args:
             - --csi-address=/csi/csi.sock
-            - --kubelet-registration-path=/var/lib/kubelet/plugins/csi-image.warm-metal.tech/csi.sock
+            - --kubelet-registration-path=/var/snap/microk8s/common/var/lib/kubelet/plugins/csi-image.warm-metal.tech/csi.sock
           env:
             - name: KUBE_NODE_NAME
               valueFrom:
@@ -80,7 +80,7 @@ spec:
             - mountPath: /registration
               name: registration-dir
         - name: plugin
-          image: docker.io/warmmetal/csi-image:v0.4.2
+          image: docker.io/warmmetal/csi-image:v0.5.0
           imagePullPolicy: IfNotPresent
           args:
             - "--endpoint=$(CSI_ENDPOINT)"
@@ -107,7 +107,7 @@ spec:
           volumeMounts:
             - mountPath: /csi
               name: socket-dir
-            - mountPath: /var/lib/kubelet/pods
+            - mountPath: /var/snap/microk8s/common/var/lib/kubelet/pods
               mountPropagation: Bidirectional
               name: mountpoint-dir
             - mountPath: /run/containerd/containerd.sock
@@ -117,15 +117,15 @@ spec:
               name: host-rootfs
       volumes:
         - hostPath:
-            path: /var/lib/kubelet/plugins/csi-image.warm-metal.tech
+            path: /var/snap/microk8s/common/var/lib/kubelet/plugins/csi-image.warm-metal.tech
             type: DirectoryOrCreate
           name: socket-dir
         - hostPath:
-            path: /var/lib/kubelet/pods
+            path: /var/snap/microk8s/common/var/lib/kubelet/pods
             type: DirectoryOrCreate
           name: mountpoint-dir
         - hostPath:
-            path: /var/lib/kubelet/plugins_registry
+            path: /var/snap/microk8s/common/var/lib/kubelet/plugins_registry
             type: Directory
           name: registration-dir
         - hostPath:
@@ -133,6 +133,6 @@ spec:
             type: Directory
           name: host-rootfs
         - hostPath:
-            path: /run/k3s/containerd/containerd.sock
+            path: /var/snap/microk8s/common/run/containerd.sock
             type: Socket
           name: runtime-socket

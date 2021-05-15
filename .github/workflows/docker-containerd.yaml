@@ -19,6 +19,8 @@ jobs:
       - name: Start a Kubernetes cluster with docker
         run: ./hack/ci/setup_docker_cluster.sh
       - name: Install the CSI Driver
-        run: ./hack/ci/install_driver.sh
+        run: ./hack/ci/install_driver_containerd.sh
       - name: Run integration Tests
         run: ./hack/ci/test.sh
+      - name: Uninstall the CSI Driver
+        run: ./hack/ci/uninstall_driver_containerd.sh

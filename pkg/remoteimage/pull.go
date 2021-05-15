@@ -5,16 +5,14 @@ import (
 	"github.com/containerd/containerd/reference/docker"
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	cri "k8s.io/cri-api/pkg/apis/runtime/v1alpha2"
-	"k8s.io/klog/v2"
 	"k8s.io/kubernetes/pkg/credentialprovider"
-	"k8s.io/kubernetes/pkg/util/parsers"
 )
 
 type Puller interface {
 	Pull(context.Context) error
 }
 
-func NewPuller(imageSvc cri.ImageServiceClient, image string, keyring credentialprovider.DockerKeyring) Puller {
+func NewPuller(imageSvc cri.ImageServiceClient, image docker.Named, keyring credentialprovider.DockerKeyring) Puller {
 	return &puller{
 		imageSvc: imageSvc,
 		image:    image,
@@ -24,24 +22,13 @@ func NewPuller(imageSvc cri.ImageServiceClient, image string, keyring credential
 
 type puller struct {
 	imageSvc cri.ImageServiceClient
-	image    string
+	image    docker.Named
 	keyring credentialprovider.DockerKeyring
 }
 
 func (p puller) Pull(ctx context.Context) (err error) {
-	namedRef, err := docker.ParseDockerRef(p.image)
-	if err != nil {
-		klog.Errorf("fail to normalize image: %s, %s", p.image, err)
-		return
-	}
-
-	repo, _, _, err := parsers.ParseImageName(namedRef.String())
-	if err != nil {
-		klog.Errorf(`fail to parse "%s": %s`, namedRef, err)
-		return
-	}
-
-	imageSpec := &cri.ImageSpec{Image: namedRef.String()}
+	repo := p.image.Name()
+	imageSpec := &cri.ImageSpec{Image: p.image.String()}
 	creds, withCredentials := p.keyring.Lookup(repo)
 	if !withCredentials {
 		_, err = p.imageSvc.PullImage(ctx, &cri.PullImageRequest{

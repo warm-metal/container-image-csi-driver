@@ -1,4 +1,4 @@
-name: containerd
+name: restart-ds-containerd
 on:
   push:
     branches: [ master ]
@@ -21,7 +21,7 @@ jobs:
         run: ./hack/ci/setup_containerd_cluster.sh 'v1.21.0'
       - name: Install the CSI Driver
         run: ./hack/ci/install_driver_containerd.sh
-      - name: Run integration Tests
-        run: ./hack/ci/test.sh
+      - name: Test volumes between the ds restarted
+        run: ./test/integration/restart-ds.sh
       - name: Uninstall the CSI Driver
         run: ./hack/ci/uninstall_driver_containerd.sh

@@ -7,7 +7,7 @@ set -e
 
 IMG=docker.io/warmmetal/csi-image:$(git rev-parse --short HEAD)
 minikube image -p csi-image-test load ${IMG}
-lib::install_driver ${IMG}
+lib::install_driver_for_containerd ${IMG}
 
 set +e
 set +x

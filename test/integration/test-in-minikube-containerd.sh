@@ -1,14 +1,11 @@
 #!/usr/bin/env bash
 
 set -e
-set -x
 
-source $(dirname "$0")/../../hack/lib/cluster.sh
+source $(dirname "${BASH_SOURCE[0]}")/../../hack/helper/prepare_containerd_cluster.sh
+source $(dirname "${BASH_SOURCE[0]}")/cases.sh
+lib::uninstall_driver_for_containerd
+echo "Destroying cluster"
+minikube delete -p csi-image-test
 
-echo "Testing on containerd"
-lib::start_cluster_containerd ${K8S_VERSION}
-lib::install_driver
-source $(dirname "$0")/cases.sh
-
-set +x
 set +e

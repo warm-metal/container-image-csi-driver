@@ -1,0 +1,39 @@
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: two-readonly-ephemeral-volume
+spec:
+  template:
+    metadata:
+      name: two-readonly-ephemeral-volume
+    spec:
+      containers:
+        - name: two-readonly-ephemeral-volume
+          image: docker.io/warmmetal/csi-image-test:stat-fs
+          env:
+          - name: TARGET1
+            value: /target1
+          - name: TARGET2
+            value: /target2
+          volumeMounts:
+          - mountPath: /target1
+            name: target1
+          - mountPath: /target2
+            name: target2
+      restartPolicy: Never
+      volumes:
+        - name: target1
+          csi:
+            driver: csi-image.warm-metal.tech
+            readOnly: true
+            volumeAttributes:
+              image: "docker.io/warmmetal/csi-image-test:simple-fs"
+              pullAlways: "true"
+        - name: target2
+          csi:
+            driver: csi-image.warm-metal.tech
+            readOnly: true
+            volumeAttributes:
+              image: "docker.io/warmmetal/csi-image-test:simple-fs"
+              pullAlways: "true"
+  backoffLimit: 0

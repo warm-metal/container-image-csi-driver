@@ -67,7 +67,7 @@ spec:
                 command: ["/bin/sh", "-c", "rm -rf /registration/csi-image.warm-metal.tech /registration/csi-image.warm-metal.tech-reg.sock"]
           args:
             - --csi-address=/csi/csi.sock
-            - --kubelet-registration-path=/var/snap/microk8s/common/var/lib/kubelet/plugins/csi-image.warm-metal.tech/csi.sock
+            - --kubelet-registration-path=/var/lib/kubelet/plugins/csi-image.warm-metal.tech/csi.sock
           env:
             - name: KUBE_NODE_NAME
               valueFrom:
@@ -80,19 +80,19 @@ spec:
             - mountPath: /registration
               name: registration-dir
         - name: plugin
-          image: docker.io/warmmetal/csi-image:v0.4.2
+          image: docker.io/warmmetal/csi-image:v0.5.0
           imagePullPolicy: IfNotPresent
           args:
             - "--endpoint=$(CSI_ENDPOINT)"
             - "--node=$(KUBE_NODE_NAME)"
-            - "--containerd-addr=$(CRI_ADDR)"
+            - "--runtime-addr=$(CRI_ADDR)"
           env:
             - name: CSI_ENDPOINT
               value: unix:///csi/csi.sock
             - name: HOST_ROOTFS
               value: /host
             - name: CRI_ADDR
-              value: unix:///run/containerd/containerd.sock
+              value: cri-o:///var/run/crio/crio.sock
             - name: KUBE_NODE_NAME
               valueFrom:
                 fieldRef:
@@ -107,25 +107,25 @@ spec:
           volumeMounts:
             - mountPath: /csi
               name: socket-dir
-            - mountPath: /var/snap/microk8s/common/var/lib/kubelet/pods
+            - mountPath: /var/lib/kubelet/pods
               mountPropagation: Bidirectional
               name: mountpoint-dir
-            - mountPath: /run/containerd/containerd.sock
+            - mountPath: /var/run/crio/crio.sock
               name: runtime-socket
             - mountPath: /host
               mountPropagation: Bidirectional
               name: host-rootfs
       volumes:
         - hostPath:
-            path: /var/snap/microk8s/common/var/lib/kubelet/plugins/csi-image.warm-metal.tech
+            path: /var/lib/kubelet/plugins/csi-image.warm-metal.tech
             type: DirectoryOrCreate
           name: socket-dir
         - hostPath:
-            path: /var/snap/microk8s/common/var/lib/kubelet/pods
+            path: /var/lib/kubelet/pods
             type: DirectoryOrCreate
           name: mountpoint-dir
         - hostPath:
-            path: /var/snap/microk8s/common/var/lib/kubelet/plugins_registry
+            path: /var/lib/kubelet/plugins_registry
             type: Directory
           name: registration-dir
         - hostPath:
@@ -133,6 +133,6 @@ spec:
             type: Directory
           name: host-rootfs
         - hostPath:
-            path: /var/snap/microk8s/common/run/containerd.sock
+            path: /var/run/crio/crio.sock
             type: Socket
           name: runtime-socket
