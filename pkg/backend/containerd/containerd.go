@@ -90,14 +90,18 @@ func (s snapshotMounter) GetImageIDOrDie(ctx context.Context, image docker.Named
 func (s snapshotMounter) PrepareReadOnlySnapshot(
 	ctx context.Context, imageID string, key backend.SnapshotKey, metadata backend.SnapshotMetadata,
 ) error {
-	klog.Infof("create ro snapshot %q for image %q with metadata %#v", key, imageID, metadata)
 	labels := defaultSnapshotLabels()
 	if metadata != nil {
 		labels = withTargets(defaultSnapshotLabels(), metadata.GetTargets())
 	}
 
-	_, err := s.snapshotter.View(ctx, string(key), imageID, snapshots.WithLabels(labels))
-	if err != nil {
+	klog.Infof("create ro snapshot %q for image %q with metadata %#v", key, imageID, labels)
+	info, err := s.FindSnapshot(ctx, string(key), imageID, snapshots.KindView, labels)
+	if info != nil {
+		return err
+	}
+
+	if _, err = s.snapshotter.View(ctx, string(key), imageID, snapshots.WithLabels(labels)); err != nil {
 		klog.Errorf("unable to create read-only snapshot %q of image %q: %s", key, imageID, err)
 	}
 
@@ -107,18 +111,52 @@ func (s snapshotMounter) PrepareReadOnlySnapshot(
 func (s snapshotMounter) PrepareRWSnapshot(
 	ctx context.Context, imageID string, key backend.SnapshotKey, metadata backend.SnapshotMetadata,
 ) error {
-	klog.Infof("create rw snapshot %q for image %q with metadata %#v", key, imageID, metadata)
 	labels := defaultSnapshotLabels()
 	if metadata != nil {
 		labels = withTargets(defaultSnapshotLabels(), metadata.GetTargets())
 	}
 
-	_, err := s.snapshotter.Prepare(ctx, string(key), imageID, snapshots.WithLabels(labels))
-	if err != nil {
+	klog.Infof("create rw snapshot %q for image %q with metadata %#v", key, imageID, labels)
+	info, err := s.FindSnapshot(ctx, string(key), imageID, snapshots.KindActive, labels)
+	if info != nil {
+		return err
+	}
+
+	if _, err = s.snapshotter.Prepare(ctx, string(key), imageID, snapshots.WithLabels(labels)); err != nil {
 		klog.Errorf("unable to create snapshot %q of image %q: %s", key, imageID, err)
 	}
 
 	return err
+}
+
+func (s snapshotMounter) FindSnapshot(
+	ctx context.Context, key, parent string, kind snapshots.Kind, labels map[string]string,
+) (info *snapshots.Info, err error) {
+	stat, err := s.snapshotter.Stat(ctx, key)
+	if err != nil {
+		return
+	}
+
+	info = &stat
+
+	if info.Kind == kind && info.Parent == parent {
+		for k, v := range labels {
+			if k == gcLabel {
+				continue
+			}
+
+			if info.Labels[k] != v {
+				err = xerrors.Errorf("found existed snapshot %q with different configuration %#v", key, info)
+				return
+			}
+		}
+
+		klog.Infof("found existed snapshot %q, use it", key)
+		return
+	}
+
+	err = xerrors.Errorf("found existed snapshot %q with different configuration %#v", key, info)
+	return
 }
 
 func (s snapshotMounter) UpdateSnapshotMetadata(
@@ -176,7 +214,7 @@ func (s snapshotMounter) ListSnapshots(ctx context.Context) (ss []backend.Snapsh
 				}
 
 				if _, err := docker.ParseNamed(info.Name[len(labelPrefix)+1:]); err == nil {
-					klog.Warningf("snapshot %q with labels %#v is an old versioned snapshot used by a PV. " +
+					klog.Warningf("snapshot %q with labels %#v is an old versioned snapshot used by a PV. "+
 						"It will be excluded from the ro snapshot cache, but it still can be unmounted normally.",
 						info.Name, info.Labels)
 					targets = nil
@@ -212,11 +250,12 @@ const (
 	labelPrefix         = "csi-image.warm-metal.tech"
 	targetLabelPrefix   = labelPrefix + "/target"
 	volumeIdLabelPrefix = labelPrefix + "/id"
+	gcLabel             = "containerd.io/gc.root"
 )
 
 func defaultSnapshotLabels() map[string]string {
 	return map[string]string{
-		"containerd.io/gc.root": time.Now().UTC().Format(time.RFC3339),
+		gcLabel: time.Now().UTC().Format(time.RFC3339),
 	}
 }
 

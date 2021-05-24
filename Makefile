@@ -29,13 +29,14 @@ integration:
 
 .PHONY: image
 image:
-	kubectl dev build -t docker.io/warmmetal/csi-image:v0.5.0 --push
+	kubectl dev build -t docker.io/warmmetal/csi-image:v0.5.1 --push
 
 .PHONY: local
 local:
-	kubectl dev build -t docker.io/warmmetal/csi-image:v0.5.0
+	kubectl dev build -t docker.io/warmmetal/csi-image:v0.5.1
 
 .PHONY: test-deps
 test-deps:
 	kubectl dev build --push -t docker.io/warmmetal/csi-image-test:stat-fs -f csi-image-test:stat-fs.dockerfile hack/integration-test-image
 	kubectl dev build --push -t docker.io/warmmetal/csi-image-test:check-fs -f csi-image-test:check-fs.dockerfile hack/integration-test-image
+	kubectl dev build --push -t docker.io/warmmetal/csi-image-test:write-check -f csi-image-test:write-check.dockerfile hack/integration-test-image
