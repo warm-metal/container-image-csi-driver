@@ -7,11 +7,13 @@ import (
 	"github.com/containers/storage"
 	"github.com/containers/storage/types"
 	"github.com/warm-metal/csi-driver-image/pkg/backend"
+	"golang.org/x/xerrors"
 	"io/ioutil"
 	"k8s.io/klog/v2"
 	k8smount "k8s.io/utils/mount"
 	"net"
 	"net/http"
+	"reflect"
 	"time"
 )
 
@@ -30,7 +32,7 @@ func NewMounter(socketPath string) *backend.SnapshotMounter {
 	})
 }
 
-func (s snapshotMounter) Mount(ctx context.Context, key backend.SnapshotKey, target backend.MountTarget, ro bool) error {
+func (s snapshotMounter) Mount(_ context.Context, key backend.SnapshotKey, target backend.MountTarget, ro bool) error {
 	src, err := s.imageStore.Mount(string(key), "")
 	if err != nil {
 		klog.Errorf("unable to mount snapshot %q: %s", key, err)
@@ -50,7 +52,7 @@ func (s snapshotMounter) Mount(ctx context.Context, key backend.SnapshotKey, tar
 	return nil
 }
 
-func (s snapshotMounter) Unmount(ctx context.Context, target backend.MountTarget) error {
+func (s snapshotMounter) Unmount(_ context.Context, target backend.MountTarget) error {
 	if err := k8smount.New("").Unmount(string(target)); err != nil {
 		klog.Errorf("unable to unmount %q: %s", target, err)
 		return err
@@ -60,7 +62,12 @@ func (s snapshotMounter) Unmount(ctx context.Context, target backend.MountTarget
 }
 
 func (s snapshotMounter) ImageExists(ctx context.Context, image docker.Named) bool {
-	return s.imageStore.Exists(image.String())
+	if _, err := s.imageStore.Image(image.String()); err != nil {
+		klog.Errorf("unable to retrieve the local image %q: %s", image, err)
+		return false
+	}
+
+	return true
 }
 
 func (s snapshotMounter) GetImageIDOrDie(ctx context.Context, image docker.Named) string {
@@ -100,8 +107,38 @@ func (s snapshotMounter) prepareSnapshot(
 			key, imageID, metadata, len(metaString))
 	}
 
-	_, err := s.imageStore.CreateContainer(string(key), nil, imageID, "", metaString, opts)
-	if err != nil {
+	c, err := s.imageStore.Container(string(key))
+	if err == nil {
+		if c.ImageID != imageID {
+			return xerrors.Errorf("found existed snapshot %q with different image %#v", key, c.ImageID)
+		}
+
+		if metadata == nil {
+			klog.Infof("found existed snapshot %q, use it", key)
+			return nil
+		}
+
+		if c.Metadata == "" {
+			return xerrors.Errorf("found existed snapshot %q without metadata", key)
+		}
+
+		existedMetadata := make(backend.SnapshotMetadata)
+		if err := existedMetadata.Decode(c.Metadata); err == nil {
+			return xerrors.Errorf("found existed snapshot %q with unknown metadata %s", key, c.Metadata)
+		}
+
+		for k, v := range metadata {
+			if !reflect.DeepEqual(v, existedMetadata[k]) {
+				return xerrors.Errorf("found existed snapshot %q with different configuration %#v", key,
+					existedMetadata)
+			}
+		}
+
+		klog.Infof("found existed snapshot %q, use it", key)
+		return nil
+	}
+
+	if _, err = s.imageStore.CreateContainer(string(key), nil, imageID, "", metaString, opts); err != nil {
 		klog.Errorf("unable to create container for image %q: %s", imageID, err)
 		return err
 	}
@@ -147,16 +184,16 @@ func (s snapshotMounter) ListSnapshots(context.Context) (ss []backend.SnapshotMe
 
 	klog.Infof("found %d containers", len(containers))
 
-	for _, container := range containers {
-		if container.Metadata != "" {
+	for _, c := range containers {
+		if c.Metadata != "" {
 			metadata := make(backend.SnapshotMetadata)
-			if err := metadata.Decode(container.Metadata); err == nil {
-				metadata.SetSnapshotKey(container.ID)
+			if err := metadata.Decode(c.Metadata); err == nil {
+				metadata.SetSnapshotKey(c.ID)
 				ss = append(ss, metadata)
-				klog.Infof("got ro snapshot %q with targets %#v", container.ID, metadata.GetTargets())
+				klog.Infof("got ro snapshot %q with targets %#v", c.ID, metadata.GetTargets())
 			} else {
 				klog.Warningf("unable to decode the metadata of snapshot %q: %s. it may be not a snapshot",
-					container.ID, err)
+					c.ID, err)
 			}
 		}
 	}

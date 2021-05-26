@@ -36,7 +36,7 @@ const (
 )
 
 func (n nodeServer) NodePublishVolume(ctx context.Context, req *csi.NodePublishVolumeRequest) (resp *csi.NodePublishVolumeResponse, err error) {
-	klog.Infof("request: %s", req.String())
+	klog.Infof("mount request: %s", req.String())
 	if len(req.VolumeId) == 0 {
 		err = status.Error(codes.InvalidArgument, "VolumeId is missing")
 		return
@@ -120,8 +120,10 @@ func (n nodeServer) NodePublishVolume(ctx context.Context, req *csi.NodePublishV
 
 	puller := remoteimage.NewPuller(n.imageSvc, namedRef, keyring)
 	if pullAlways || !n.mounter.ImageExists(ctx, namedRef) {
-		if err := puller.Pull(ctx); err != nil {
+		klog.Errorf("pull image %q", image)
+		if err = puller.Pull(ctx); err != nil {
 			err = status.Errorf(codes.Aborted, "unable to pull image %q: %s", image, err)
+			return
 		}
 	}
 
@@ -137,6 +139,7 @@ func (n nodeServer) NodePublishVolume(ctx context.Context, req *csi.NodePublishV
 }
 
 func (n nodeServer) NodeUnpublishVolume(ctx context.Context, req *csi.NodeUnpublishVolumeRequest) (resp *csi.NodeUnpublishVolumeResponse, err error) {
+	klog.Infof("unmount request: %s", req.String())
 	if len(req.VolumeId) == 0 {
 		err = status.Error(codes.InvalidArgument, "VolumeId is missing")
 		return
