@@ -16,25 +16,38 @@ metadata:
   namespace: kube-system
 ---
 apiVersion: rbac.authorization.k8s.io/v1
-kind: ClusterRole
+kind: Role
 metadata:
   name: csi-image-warm-metal
+  namespace: kube-system
 rules:
   - apiGroups:
       - ""
+    resourceNames:
+      - csi-image-warm-metal
     resources:
-      - secrets
-      - pods
+      - serviceaccounts
     verbs:
       - get
+# If you would like to attach PullImageSecrets to the SA csi-image-warm-metal,
+# enable the following rules and specify secret names.
+#  - apiGroups:
+#      - ""
+#    resourceNames:
+#      - "" # The secret name
+#    resources:
+#      - secrets
+#    verbs:
+#      - get
 ---
 apiVersion: rbac.authorization.k8s.io/v1
-kind: ClusterRoleBinding
+kind: RoleBinding
 metadata:
   name: csi-image-warm-metal
+  namespace: kube-system
 roleRef:
   apiGroup: rbac.authorization.k8s.io
-  kind: ClusterRole
+  kind: Role
   name: csi-image-warm-metal
 subjects:
   - kind: ServiceAccount

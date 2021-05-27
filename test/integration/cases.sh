@@ -13,6 +13,10 @@ kubectl create secret docker-registry warmmetal \
   --docker-server=http://localhost:31000/ \
   --docker-username=${REGISTRY_USERNAME} \
   --docker-password="${REGISTRY_PASSWORD}"
+kubectl -n kube-system create secret docker-registry warmmetal \
+  --docker-server=http://localhost:31000/ \
+  --docker-username=${REGISTRY_USERNAME} \
+  --docker-password="${REGISTRY_PASSWORD}"
 kubectl create sa warmmetal
 kubectl patch sa warmmetal -p '{"imagePullSecrets": [{"name": "warmmetal"}]}'
 
@@ -25,10 +29,7 @@ for i in ${TestBase}/failed-manifests/*.yaml; do
 done
 
 echo "Attatch secret to the daemon SA"
-kubectl -n kube-system create secret docker-registry warmmetal \
-  --docker-server=http://localhost:31000/ \
-  --docker-username=${REGISTRY_USERNAME} \
-  --docker-password="${REGISTRY_PASSWORD}"
+kubectl -n kube-system patch role csi-image-warm-metal -p '{"rules": [{"apiGroups":[""],"resourceNames":["csi-image-warm-metal"],"resources":["serviceaccounts"],"verbs":["get"]},{"apiGroups":[""],"resourceNames":["warmmetal"],"resources":["secrets"],"verbs":["get"]}]}'
 kubectl -n kube-system patch sa csi-image-warm-metal -p '{"imagePullSecrets": [{"name": "warmmetal"}]}'
 kubectl -n kube-system delete po $(kubectl get po -n kube-system -o=custom-columns=:metadata.name --no-headers -l=app=csi-image-warm-metal)
 kubectlwait kube-system -l=app=csi-image-warm-metal

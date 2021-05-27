@@ -2,6 +2,7 @@ package secret
 
 import (
 	"context"
+	"encoding/json"
 	"io/ioutil"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -10,8 +11,6 @@ import (
 	"k8s.io/klog/v2"
 	"k8s.io/kubernetes/pkg/credentialprovider"
 	execplugin "k8s.io/kubernetes/pkg/credentialprovider/plugin"
-	credential "k8s.io/kubernetes/pkg/credentialprovider/secrets"
-	"os"
 	"time"
 
 	// register credential providers
@@ -21,8 +20,10 @@ import (
 )
 
 type Cache interface {
-	GetDockerKeyring(ctx context.Context, secret, secretNS, pod, podNS string) (credentialprovider.DockerKeyring, error)
+	GetDockerKeyring(ctx context.Context, secrets map[string]string) (credentialprovider.DockerKeyring, error)
 }
+
+const daemonSA = "csi-image-warm-metal"
 
 func CreateCacheOrDie(pluginConfigFile, pluginBinDir string) Cache {
 	if len(pluginConfigFile) > 0 && len(pluginBinDir) > 0 {
@@ -53,94 +54,127 @@ func CreateCacheOrDie(pluginConfigFile, pluginBinDir string) Cache {
 		return c
 	}
 
-	curPod := os.Getenv("POD_NAME")
-	if len(curPod) == 0 {
-		klog.Warning(`unable to fetch the current pod name from env "POD_NAME"`)
-		return c
-	}
-
 	ctx, cancel := context.WithTimeout(context.TODO(), 10*time.Second)
 	defer cancel()
 	namespace := string(curNamespace)
-	pod, err := clientset.CoreV1().Pods(namespace).Get(ctx, curPod, metav1.GetOptions{})
+	sa, err := clientset.CoreV1().ServiceAccounts(namespace).Get(ctx, daemonSA, metav1.GetOptions{})
 	if err != nil {
-		klog.Fatalf(`unable to fetch the daemon pod "%s/%s": %s`, namespace, curPod, err)
+		klog.Errorf(`unable to fetch service account of the daemon pod "%s/%s": %s`, namespace, daemonSA, err)
+		return c
 	}
 
-	c.daemonSecrets = make([]secretPair, len(pod.Spec.ImagePullSecrets))
+	c.daemonSecrets = make([]corev1.Secret, len(sa.ImagePullSecrets))
 	klog.Infof(
-		`got %d imagePullSecrets from the daemon pod %s/%s`, len(pod.Spec.ImagePullSecrets), namespace, curPod,
+		`got %d imagePullSecrets from the service account %s/%s`, len(sa.ImagePullSecrets), namespace, daemonSA,
 	)
-	for i := range pod.Spec.ImagePullSecrets {
-		c.daemonSecrets[i] = secretPair{pod.Spec.ImagePullSecrets[i].Name, namespace}
+
+	for i := range sa.ImagePullSecrets {
+		s := &sa.ImagePullSecrets[i]
+		secret, err := clientset.CoreV1().Secrets(namespace).Get(ctx, s.Name, metav1.GetOptions{})
+		if err != nil {
+			klog.Errorf(`unable to fetch secret "%s/%s": %s`, namespace, s.Name, err)
+			continue
+		}
+
+		c.daemonSecrets[i] = *secret
 	}
 
 	return c
 }
 
-type secretPair struct {
-	name      string
-	namespace string
-}
-
-// FIXME we need to somehow cache and watch remote secrets to reuse them and prevent always retrieving same secrets.
 type secretWOCache struct {
 	k8sCliSet     *kubernetes.Clientset
-	daemonSecrets []secretPair
+	daemonSecrets []corev1.Secret
 	keyring       credentialprovider.DockerKeyring
 }
 
-func (s secretWOCache) GetDockerKeyring(
-	ctx context.Context, secret, secretNS, pod, podNS string,
-) (keyring credentialprovider.DockerKeyring, err error) {
-	var secrets []corev1.Secret
-	if len(secret) > 0 {
-		secret, err := s.k8sCliSet.CoreV1().Secrets(secretNS).Get(ctx, secret, metav1.GetOptions{})
-		if err != nil {
-			klog.Errorf(`unable to fetch secret "%s/%s": %s`, secretNS, secret, err)
-			return nil, err
-		}
-
-		secrets = append(secrets, *secret)
-	}
-
-	if len(pod) > 0 {
-		pod, err := s.k8sCliSet.CoreV1().Pods(podNS).Get(ctx, pod, metav1.GetOptions{})
-		if err != nil {
-			klog.Errorf(`unable to fetch pod "%s/%s": %s`, podNS, pod, err)
-			return nil, err
-		}
-
-		klog.Infof(
-			`got %d imagePullSecrets from the workload pod %s/%s`, len(pod.Spec.ImagePullSecrets),
-			pod.Namespace, pod.Name,
-		)
-
-		for _, secretRef := range pod.Spec.ImagePullSecrets {
-			secret, err := s.k8sCliSet.CoreV1().Secrets(podNS).Get(ctx, secretRef.Name, metav1.GetOptions{})
-			if err != nil {
-				klog.Errorf(`unable to fetch secret "%s/%s": %s`, podNS, secretRef.Name, err)
-				return nil, err
-			}
-
-			secrets = append(secrets, *secret)
-		}
-	}
-
-	for _, pair := range s.daemonSecrets {
-		secret, err := s.k8sCliSet.CoreV1().Secrets(pair.namespace).Get(ctx, pair.name, metav1.GetOptions{})
-		if err != nil {
-			klog.Errorf(`unable to fetch secret "%s/%s": %s`, pair.namespace, pair.name, err)
-			return nil, err
-		}
-
-		secrets = append(secrets, *secret)
-	}
-
-	keyRing, err := credential.MakeDockerKeyring(secrets, s.keyring)
+func (s secretWOCache) GetDockerKeyring(ctx context.Context, secretData map[string]string) (keyring credentialprovider.DockerKeyring, err error) {
+	keyRing, err := s.makeDockerKeyring(s.daemonSecrets, secretData)
 	if err != nil {
 		klog.Errorf("unable to create keyring: %s", err)
 	}
 
 	return keyRing, err
+}
+
+func (s secretWOCache) makeDockerKeyring(passedSecrets []corev1.Secret, secretData map[string]string) (credentialprovider.DockerKeyring, error) {
+	passedCredentials := make([]credentialprovider.DockerConfig, 0, len(passedSecrets)+len(secretData))
+	if len(secretData) > 0 {
+		cred, err := parseDockerConfigFromSecretData(stringSecretData(secretData))
+		if err != nil {
+			return nil, err
+		}
+
+		passedCredentials = append(passedCredentials, cred)
+	}
+
+	for _, passedSecret := range passedSecrets {
+		if len(passedSecret.Data) == 0 {
+			continue
+		}
+
+		cred, err := parseDockerConfigFromSecretData(byteSecretData(passedSecret.Data))
+		if err != nil {
+			return nil, err
+		}
+
+		passedCredentials = append(passedCredentials, cred)
+	}
+
+	if len(passedCredentials) > 0 {
+		basicKeyring := &credentialprovider.BasicDockerKeyring{}
+		for _, currCredentials := range passedCredentials {
+			basicKeyring.Add(currCredentials)
+		}
+		return credentialprovider.UnionDockerKeyring{basicKeyring, s.keyring}, nil
+	}
+
+	return s.keyring, nil
+}
+
+type secretDataWrapper interface {
+	Get(key string) (data []byte, existed bool)
+}
+
+type byteSecretData map[string][]byte
+
+func (b byteSecretData) Get(key string) (data []byte, existed bool) {
+	data, existed = b[key]
+	return
+}
+
+type stringSecretData map[string]string
+
+func (s stringSecretData) Get(key string) (data []byte, existed bool) {
+	strings, existed := s[key]
+	if existed {
+		data = []byte(strings)
+	}
+
+	return
+}
+
+func parseDockerConfigFromSecretData(data secretDataWrapper) (credentialprovider.DockerConfig, error) {
+	if dockerConfigJSONBytes, existed := data.Get(corev1.DockerConfigJsonKey); existed {
+		if len(dockerConfigJSONBytes) > 0 {
+			dockerConfigJSON := credentialprovider.DockerConfigJSON{}
+			if err := json.Unmarshal(dockerConfigJSONBytes, &dockerConfigJSON); err != nil {
+				return nil, err
+			}
+
+			return dockerConfigJSON.Auths, nil
+		}
+	}
+
+	if dockercfgBytes, existed := data.Get(corev1.DockerConfigKey); existed {
+		if len(dockercfgBytes) > 0 {
+			dockercfg := credentialprovider.DockerConfig{}
+			if err := json.Unmarshal(dockercfgBytes, &dockercfg); err != nil {
+				return nil, err
+			}
+			return dockercfg, nil
+		}
+	}
+
+	return nil, nil
 }

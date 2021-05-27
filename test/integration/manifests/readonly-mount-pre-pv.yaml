@@ -18,6 +18,8 @@ spec:
   csi:
     driver: csi-image.warm-metal.tech
     volumeHandle: "docker.io/warmmetal/csi-image-test:simple-fs"
+    volumeAttributes:
+      pullAlways: "true"
 ---
 apiVersion: v1
 kind: PersistentVolumeClaim
