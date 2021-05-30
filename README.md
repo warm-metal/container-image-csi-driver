@@ -19,33 +19,30 @@ then mounts images via the snapshot/storage service of the runtime.
 
 ## Installation
 
-The manifest below installs a CSIDriver `csi-image.warm-metal.tech` and a DaemonSet.
-Changes between versions can be found in the [release](https://github.com/warm-metal/csi-driver-image/releases) page.
+The driver requires to mount various host paths for different container runtimes.
+So, I build a binary utility, `warm-metal-csi-image-install`, to reduce the installation complexity.
+It supports kubernetes, microk8s and k3s clusters with container runtime **cri-o**, **containerd** or **docker**.
+Users can run this utility on any nodes in their clusters to generate proper manifests to install the driver.
+The download link is available on the [release page](https://github.com/warm-metal/csi-driver-image/releases).
 
 ```shell script
-# For conainerd and docker,
-kubectl apply -f https://raw.githubusercontent.com/warm-metal/csi-driver-image/master/install/containerd.yaml
-# Or cri-o.
-kubectl apply -f https://raw.githubusercontent.com/warm-metal/csi-driver-image/master/install/cri-o.yaml
+# To print manifests
+warm-metal-csi-image-install
+
+# To show the detected configuration
+warm-metal-csi-image-install --print-detected-instead
+
+# To change the default namespace that the driver to be installed in
+warm-metal-csi-image-install --namespace=foo
 ```
 
-The driver currently supports **cri-o**, **containerd** and **docker** with CRI enabled.
-
+#### Notice for docker
 Until Docker migrates its [image and snapshot store](https://github.com/moby/moby/issues/38043) to containerd,
 I recommend you use containerd instead. Otherwise, the driver can't use images managed by Docker daemon.
 
-If your container runtime can't be migrated, you can enable the CRI plugin by clearing the containerd config file `/etc/containerd/config.toml`, then restarting the containerd.
-
-#### Cluster with custom configuration
-
-For clusters installed with custom configurations, say microk8s,
-the provided manifests are also available after modifying some hostpaths. See below.
-
-In the `volumes` section of the manifest, 
-1. Replace `/var/lib/kubelet` with `root-dir` of kubelet,
-2. Replace `/run/containerd/containerd.sock` with your containerd socket path.
-
-A tested manifest for microk8s clusters is available [here](https://raw.githubusercontent.com/warm-metal/csi-driver-image/master/install/cri-containerd-microk8s.yaml).
+If your container runtime can't be migrated, you can enable the CRI plugin by clearing 
+the containerd config file `/etc/containerd/config.toml`,
+then restarting the containerd.
 
 ## Usage
 
@@ -132,34 +129,11 @@ Otherwise, you need ImagePullSecrets to store your credential. The following lin
 
 If the secret is desired to be shared by all volumes, you can add it to the ServiceAccount of the driver,
 `csi-image-warm-metal` by default, and update the Role `csi-image-warm-metal` to make sure the daemon has permissions to fetch the secret,
-then restart the driver daemon pod.
+then restart the driver daemon pod. Users can run `warm-metal-csi-image-install` to generate new manifests and apply them to update.
 
-The sample Role spec is below.
-```yaml
-apiVersion: rbac.authorization.k8s.io/v1
-kind: Role
-metadata:
-  name: csi-image-warm-metal
-  namespace: kube-system
-rules:
-  - apiGroups:
-      - ""
-    resourceNames:
-      - csi-image-warm-metal
-    resources:
-      - serviceaccounts
-    verbs:
-      - get
-# If you would like to attach PullImageSecrets to the SA csi-image-warm-metal,
-# enable the following rules and specify secret names.
-#  - apiGroups:
-#      - ""
-#    resourceNames:
-#      - "" # The secret name
-#    resources:
-#      - secrets
-#    verbs:
-#      - get
+```shell script
+# use secrets foo and bar
+warm-metal-csi-image-install --pull-image-secret-for-daemonset=foo --pull-image-secret-for-daemonset=bar
 ```
 
 If the secret works only for particular workloads, you can  set via the `nodePublishSecretRef` attribute of ephemeral volumes. 

@@ -7,7 +7,7 @@ source $(dirname "${BASH_SOURCE[0]}")/../lib/cluster.sh
 
 echo "Testing on containerd"
 lib::start_cluster_containerd ${K8S_VERSION}
-lib::install_driver_for_containerd
+lib::install_driver
 
 echo "Install a private registry"
 lib::install_private_registry

@@ -44,30 +44,37 @@ function lib::start_cluster_docker() {
   fi
 }
 
-function lib::install_driver_for_containerd() {
-  lib::install_driver $(dirname "${BASH_SOURCE[0]}")/../../install/containerd.yaml $1
+function lib::gen_manifests() {
+  local secret=$1
+  minikube cp -p csi-image-test _output/warm-metal-csi-image-install /usr/bin/warm-metal-csi-image-install > /dev/null
+  minikube ssh -p csi-image-test -- sudo chmod +x /usr/bin/warm-metal-csi-image-install
+  if [[ "${secret}" != "" ]]; then
+    minikube ssh --native-ssh=false -p csi-image-test -- sudo warm-metal-csi-image-install --pull-image-secret-for-daemonset=${secret} 2>/dev/null
+  else
+    minikube ssh --native-ssh=false -p csi-image-test -- sudo warm-metal-csi-image-install 2>/dev/null
+  fi
 }
 
-function lib::uninstall_driver_for_containerd() {
-  kubectl delete -f $(dirname "${BASH_SOURCE[0]}")/../../install/containerd.yaml
+function lib::uninstall_driver() {
+  local manifest=$(lib::gen_manifests)
+  echo "${manifest}" | kubectl delete -f -
 }
 
-function lib::install_driver_for_crio() {
-  lib::install_driver $(dirname "${BASH_SOURCE[0]}")/../../install/cri-o.yaml $1
-}
-
-function lib::uninstall_driver_for_crio() {
-  kubectl delete -f $(dirname "${BASH_SOURCE[0]}")/../../install/cri-o.yaml
+function lib::install_driver_from_manifest_file() {
+  local manifest=$1
+  kubectl delete --ignore-not-found -f ${manifest}
+  kubectl apply -f ${manifest}
+  kubectlwait kube-system -l=app=csi-image-warm-metal
 }
 
 function lib::install_driver() {
-  local manifest=$1
-  local image=$2
-  kubectl delete --ignore-not-found -f "${manifest}"
+  local image=$1
+  local manifest=$(lib::gen_manifests $2)
+  echo "${manifest}" | kubectl delete --ignore-not-found -f -
   if [ "${image}" != "" ]; then
-    sed "s|image: docker.io/warmmetal/csi-image.*|image: ${image}|" "${manifest}" | kubectl apply -f -
+    echo "${manifest}" | sed "s|image: docker.io/warmmetal/csi-image.*|image: ${image}|" | kubectl apply -f -
   else
-    kubectl apply -f "${manifest}"
+    echo "${manifest}" | kubectl apply -f -
   fi
   kubectlwait kube-system -l=app=csi-image-warm-metal
 }

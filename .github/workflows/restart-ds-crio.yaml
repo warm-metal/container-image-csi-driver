@@ -10,8 +10,6 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v2
-      - name: Build image
-        run: ./hack/ci/build.sh
       - name: Set up minikube
         uses: opsgang/ga-setup-minikube@v0.1.2
         with:
@@ -19,6 +17,8 @@ jobs:
           k8s-version: '1.21.0'
       - name: Start a Kubernetes cluster with cri-o
         run: ./hack/ci/setup_crio_cluster.sh 'v1.21.0'
+      - name: Build image
+        run: ./hack/ci/build.sh
       - name: Install the CSI Driver
         run: ./hack/ci/install_driver_crio.sh
       - name: Test volumes between the ds restarted
