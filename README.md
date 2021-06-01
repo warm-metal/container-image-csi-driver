@@ -6,10 +6,16 @@
 
 This is a CSI driver for mounting images as PVs or ephemeral volumes.
 
-Our first aim is resource-saving. The driver shares the image store with the container runtime.
-It uses CRI to pull images, then mounts them via the snapshot service of the runtime.  
-Every **read-only** volume of the same image will share the same snapshot.
-It doesn't duplicate any images or containers already exist in the runtime.
+It pulls images via CRI and shares the image store with the container runtime, 
+then mounts images via the snapshot/storage service of the runtime.
+**Read-Only** volumes of the same image share the same snapshot.
+**Read-Write** volumes keep their own snapshot and changes until pod deletion.
+
+- [Installation](#installation)
+- [Usage](#usage)
+    * [Ephemeral Volume](#ephemeral-volume)
+    * [Pre-provisioned PV](#pre-provisioned-pv)
+    * [Private Image](#private-image)
 
 ## Installation
 
@@ -47,16 +53,6 @@ Users can mount images as either pre-provisioned PVs or ephemeral volumes.
 PVs can only be mounted in access mode **ReadOnlyMany**, while ephemeral volumes will be writable.
 Any changes in ephemeral volumes will be discarded after unmounting.
 
-Private images are also supported.
-Besides the credential provider, **pullImageSecret settings** in both workload manifests and the driver DaemonSet manifest are also
-used to pull private images(See [#16](https://github.com/warm-metal/csi-driver-image/issues/16)). 
-Users can add the secret name to workload ServiceAccounts or the driver SA `csi-image-warm-metal`.
-If `csi-image-warm-metal` is chosen, the secret will be activated after restarting the driver pod.
-
-The [credential provider plugin](https://kubernetes.io/docs/tasks/kubelet-credential-provider/kubelet-credential-provider/)
-can be enabled in the same way as kubelet, that is, adding both `--image-credential-provider-config` and 
-`--image-credential-provider-bin-dir` flags to the args of the driver.
-
 #### Ephemeral Volume
 For ephemeral volumes, `volumeAttributes` contains **image**(required), **secret**, **secretNamespace**, and **pullAlways**.
 
@@ -84,13 +80,12 @@ spec:
         - name: target
           csi:
             driver: csi-image.warm-metal.tech
+            # nodePublishSecretRef:
+            #  name: "ImagePullSecret name in the same namespace"
             volumeAttributes:
               image: "docker.io/warmmetal/csi-image-test:simple-fs"
               # # set pullAlways if you want to ignore local images
               # pullAlways: "true"
-              # # set secret if the image is private
-              # secret: "name of the ImagePullSecret"
-              # secretNamespace: "namespace of the secret"
   backoffLimit: 0
 ```
 
@@ -112,12 +107,63 @@ spec:
   csi:
     driver: csi-image.warm-metal.tech
     volumeHandle: "docker.io/warmmetal/csi-image-test:simple-fs"
+    # nodePublishSecretRef:
+    #  name: "name of the ImagePullSecret"
+    #  namespace: "namespace of the secret"
     # volumeAttributes:
       # # set pullAlways if you want to ignore local images
       # pullAlways: "true"
-      # # set secret if the image is private
-      # secret: "name of the ImagePullSecret"
-      # secretNamespace: "namespace of the secret"
 ```
 
 See all [examples](https://github.com/warm-metal/csi-driver-image/tree/master/sample).
+
+#### Private Image
+
+There are several ways to configure credentials for private image pulling. 
+
+If your clusters are in cloud, the credential provider are enabled automatically.
+If your cloud provider provides a credential provider plugin instead, you can enable it by adding 
+both `--image-credential-provider-config` and `--image-credential-provider-bin-dir` flags to the driver.
+See [credential provider plugin](https://kubernetes.io/docs/tasks/kubelet-credential-provider/kubelet-credential-provider/).
+
+Otherwise, you need ImagePullSecrets to store your credential. The following links may help.
+- [https://kubernetes.io/docs/tasks/configure-pod-container/pull-image-private-registry/](https://kubernetes.io/docs/tasks/configure-pod-container/pull-image-private-registry/).
+- [https://kubernetes.io/docs/tasks/configure-pod-container/configure-service-account/#add-imagepullsecrets-to-a-service-account](https://kubernetes.io/docs/tasks/configure-pod-container/configure-service-account/#add-imagepullsecrets-to-a-service-account)
+
+If the secret is desired to be shared by all volumes, you can add it to the ServiceAccount of the driver,
+`csi-image-warm-metal` by default, and update the Role `csi-image-warm-metal` to make sure the daemon has permissions to fetch the secret,
+then restart the driver daemon pod.
+
+The sample Role spec is below.
+```yaml
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: csi-image-warm-metal
+  namespace: kube-system
+rules:
+  - apiGroups:
+      - ""
+    resourceNames:
+      - csi-image-warm-metal
+    resources:
+      - serviceaccounts
+    verbs:
+      - get
+# If you would like to attach PullImageSecrets to the SA csi-image-warm-metal,
+# enable the following rules and specify secret names.
+#  - apiGroups:
+#      - ""
+#    resourceNames:
+#      - "" # The secret name
+#    resources:
+#      - secrets
+#    verbs:
+#      - get
+```
+
+If the secret works only for particular workloads, you can  set via the `nodePublishSecretRef` attribute of ephemeral volumes. 
+See the above sample manifest, and notice that secrets and workloads must in the same namespace.
+(Since version v0.5.1, pulling private images using the ImagePullSecrets which attached to workload service accounts is no longer supported for security reasons.)
+
+You can also set the secret to a PV, then share the PV with multiple workloads. See the sample above.

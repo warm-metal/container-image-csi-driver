@@ -28,10 +28,6 @@ const (
 	ctxKeyVolumeHandle    = "volumeHandle"
 	ctxKeyImage           = "image"
 	ctxKeyPullAlways      = "pullAlways"
-	ctxKeySecret          = "secret"
-	ctxKeySecretNamespace = "secretNamespace"
-	ctxKeyPodName         = "csi.storage.k8s.io/pod.name"
-	ctxKeyPodNamespace    = "csi.storage.k8s.io/pod.namespace"
 	ctxKeyEphemeralVolume = "csi.storage.k8s.io/ephemeral"
 )
 
@@ -98,15 +94,8 @@ func (n nodeServer) NodePublishVolume(ctx context.Context, req *csi.NodePublishV
 	}
 
 	pullAlways := strings.ToLower(req.VolumeContext[ctxKeyPullAlways]) == "true"
-	namespace := req.VolumeContext[ctxKeyPodNamespace]
-	pod := req.VolumeContext[ctxKeyPodName]
-	secretName := req.VolumeContext[ctxKeySecret]
-	secretNamespace := req.VolumeContext[ctxKeySecretNamespace]
-	if len(secretName) > 0 && len(secretNamespace) == 0 {
-		secretNamespace = namespace
-	}
 
-	keyring, err := n.secretCache.GetDockerKeyring(ctx, secretName, secretNamespace, pod, namespace)
+	keyring, err := n.secretCache.GetDockerKeyring(ctx, req.Secrets)
 	if err != nil {
 		err = status.Errorf(codes.Aborted, "unable to fetch keyring: %s", err)
 		return
@@ -152,7 +141,7 @@ func (n nodeServer) NodeUnpublishVolume(ctx context.Context, req *csi.NodeUnpubl
 
 	notMnt, err := k8smount.New("").IsLikelyNotMountPoint(req.TargetPath)
 	if err != nil || notMnt {
-		return
+		return &csi.NodeUnpublishVolumeResponse{}, err
 	}
 
 	if err = n.mounter.Unmount(ctx, req.VolumeId, backend.MountTarget(req.TargetPath)); err != nil {
