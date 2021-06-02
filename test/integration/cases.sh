@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 
-source $(dirname "${BASH_SOURCE[0]}")/../../hack/lib/utils.sh
+source $(dirname "${BASH_SOURCE[0]}")/../../hack/lib/cluster.sh
 
 TestBase=$(dirname "${BASH_SOURCE[0]}")
 
@@ -28,11 +28,8 @@ for i in ${TestBase}/failed-manifests/*.yaml; do
   lib::run_failed_test_job $i
 done
 
-echo "Attatch secret to the daemon SA"
-kubectl -n kube-system patch role csi-image-warm-metal -p '{"rules": [{"apiGroups":[""],"resourceNames":["csi-image-warm-metal"],"resources":["serviceaccounts"],"verbs":["get"]},{"apiGroups":[""],"resourceNames":["warmmetal"],"resources":["secrets"],"verbs":["get"]}]}'
-kubectl -n kube-system patch sa csi-image-warm-metal -p '{"imagePullSecrets": [{"name": "warmmetal"}]}'
-kubectl -n kube-system delete po $(kubectl get po -n kube-system -o=custom-columns=:metadata.name --no-headers -l=app=csi-image-warm-metal)
-kubectlwait kube-system -l=app=csi-image-warm-metal
+echo "Install secret for daemon"
+lib::install_driver "${IMG}" "warmmetal"
 
 for i in ${TestBase}/daemon-dependent-manifests/*.yaml; do
   echo "start job $(basename $i)"

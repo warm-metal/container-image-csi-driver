@@ -29,16 +29,6 @@ rules:
       - serviceaccounts
     verbs:
       - get
-# If you would like to attach PullImageSecrets to the SA csi-image-warm-metal,
-# enable the following rules and specify secret names.
-#  - apiGroups:
-#      - ""
-#    resourceNames:
-#      - "" # The secret name
-#    resources:
-#      - secrets
-#    verbs:
-#      - get
 ---
 apiVersion: rbac.authorization.k8s.io/v1
 kind: RoleBinding
@@ -54,9 +44,10 @@ subjects:
     name: csi-image-warm-metal
     namespace: kube-system
 ---
-kind: DaemonSet
 apiVersion: apps/v1
+kind: DaemonSet
 metadata:
+  creationTimestamp: null
   name: csi-image-warm-metal
   namespace: kube-system
 spec:
@@ -65,20 +56,12 @@ spec:
       app: csi-image-warm-metal
   template:
     metadata:
+      creationTimestamp: null
       labels:
         app: csi-image-warm-metal
     spec:
-      hostNetwork: true
-      serviceAccountName: csi-image-warm-metal
       containers:
-        - name: node-driver-registrar
-          image: quay.io/k8scsi/csi-node-driver-registrar:v1.1.0
-          imagePullPolicy: IfNotPresent
-          lifecycle:
-            preStop:
-              exec:
-                command: ["/bin/sh", "-c", "rm -rf /registration/csi-image.warm-metal.tech /registration/csi-image.warm-metal.tech-reg.sock"]
-          args:
+        - args:
             - --csi-address=/csi/csi.sock
             - --kubelet-registration-path=/var/snap/microk8s/common/var/lib/kubelet/plugins/csi-image.warm-metal.tech/csi.sock
           env:
@@ -87,34 +70,40 @@ spec:
                 fieldRef:
                   apiVersion: v1
                   fieldPath: spec.nodeName
+          image: quay.io/k8scsi/csi-node-driver-registrar:v1.1.0
+          imagePullPolicy: IfNotPresent
+          lifecycle:
+            preStop:
+              exec:
+                command:
+                  - /bin/sh
+                  - -c
+                  - rm -rf /registration/csi-image.warm-metal.tech /registration/csi-image.warm-metal.tech-reg.sock
+          name: node-driver-registrar
+          resources: {}
           volumeMounts:
             - mountPath: /csi
               name: socket-dir
             - mountPath: /registration
               name: registration-dir
-        - name: plugin
-          image: docker.io/warmmetal/csi-image:v0.5.1
-          imagePullPolicy: IfNotPresent
-          args:
-            - "--endpoint=$(CSI_ENDPOINT)"
-            - "--node=$(KUBE_NODE_NAME)"
-            - "--runtime-addr=$(CRI_ADDR)"
+        - args:
+            - --endpoint=$(CSI_ENDPOINT)
+            - --node=$(KUBE_NODE_NAME)
+            - --runtime-addr=$(CRI_ADDR)
           env:
             - name: CSI_ENDPOINT
               value: unix:///csi/csi.sock
-            - name: HOST_ROOTFS
-              value: /host
             - name: CRI_ADDR
-              value: containerd:///run/containerd/containerd.sock
+              value: containerd:///var/snap/microk8s/common/run/containerd.sock
             - name: KUBE_NODE_NAME
               valueFrom:
                 fieldRef:
                   apiVersion: v1
                   fieldPath: spec.nodeName
-            - name: POD_NAME
-              valueFrom:
-                fieldRef:
-                  fieldPath: metadata.name
+          image: docker.io/warmmetal/csi-image:v0.5.1
+          imagePullPolicy: IfNotPresent
+          name: plugin
+          resources: {}
           securityContext:
             privileged: true
           volumeMounts:
@@ -123,11 +112,13 @@ spec:
             - mountPath: /var/snap/microk8s/common/var/lib/kubelet/pods
               mountPropagation: Bidirectional
               name: mountpoint-dir
-            - mountPath: /run/containerd/containerd.sock
+            - mountPath: /var/snap/microk8s/common/run/containerd.sock
               name: runtime-socket
-            - mountPath: /host
+            - mountPath: /var/snap/microk8s/common/var/lib/containerd/io.containerd.snapshotter.v1.overlayfs
               mountPropagation: Bidirectional
-              name: host-rootfs
+              name: snapshot-root-0
+      hostNetwork: true
+      serviceAccountName: csi-image-warm-metal
       volumes:
         - hostPath:
             path: /var/snap/microk8s/common/var/lib/kubelet/plugins/csi-image.warm-metal.tech
@@ -142,10 +133,16 @@ spec:
             type: Directory
           name: registration-dir
         - hostPath:
-            path: /
-            type: Directory
-          name: host-rootfs
-        - hostPath:
             path: /var/snap/microk8s/common/run/containerd.sock
             type: Socket
           name: runtime-socket
+        - hostPath:
+            path: /var/snap/microk8s/common/var/lib/containerd/io.containerd.snapshotter.v1.overlayfs
+            type: Directory
+          name: snapshot-root-0
+  updateStrategy: {}
+status:
+  currentNumberScheduled: 0
+  desiredNumberScheduled: 0
+  numberMisscheduled: 0
+  numberReady: 0

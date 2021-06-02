@@ -6,7 +6,7 @@ source $(dirname "${BASH_SOURCE[0]}")/../../hack/lib/cluster.sh
 
 echo "Testing on containerd"
 lib::start_cluster_crio ${K8S_VERSION}
-lib::install_driver_for_crio
+lib::install_driver
 
 echo "Install a private registry"
 lib::install_private_registry
@@ -16,7 +16,7 @@ minikube ssh -p csi-image-test -- sudo podman push localhost:31000/warmmetal/csi
 
 source $(dirname "${BASH_SOURCE[0]}")/cases.sh
 
-lib::install_driver_for_crio
+lib::uninstall_driver
 echo "Destroying cluster"
 minikube delete -p csi-image-test
 set +e

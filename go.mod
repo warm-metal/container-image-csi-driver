@@ -7,6 +7,7 @@ require (
 	github.com/container-storage-interface/spec v1.4.0
 	github.com/containerd/containerd v1.5.0-beta.4
 	github.com/containers/storage v1.30.2
+	github.com/mitchellh/go-ps v1.0.0 // indirect
 	github.com/opencontainers/image-spec v1.0.1
 	github.com/spf13/pflag v1.0.5
 	github.com/warm-metal/csi-drivers v0.5.0-alpha.0.0.20210404173852-9ec9cb097dd2
@@ -19,6 +20,7 @@ require (
 	k8s.io/klog/v2 v2.8.0
 	k8s.io/kubernetes v1.21.0
 	k8s.io/utils v0.0.0-20201110183641-67b214c5f920
+	sigs.k8s.io/yaml v1.2.0 // indirect
 )
 
 replace (

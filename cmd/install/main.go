@@ -1,0 +1,326 @@
+package main
+
+import (
+	"bytes"
+	"fmt"
+	"github.com/spf13/pflag"
+	appsv1 "k8s.io/api/apps/v1"
+	corev1 "k8s.io/api/core/v1"
+	rbacv1 "k8s.io/api/rbac/v1"
+	"os"
+	"sigs.k8s.io/yaml"
+	"strings"
+	"text/template"
+)
+
+var Version = "unset"
+
+var showVersion = pflag.Bool("version", false, "Show the version number.")
+var namespace = pflag.String("namespace", "kube-system", "Specify the namespace to be installed in.")
+var daemonSecret = pflag.StringSlice("pull-image-secret-for-daemonset", nil,
+	"PullImageSecrets set to the driver to mount private images. It must be created in the same namespace with the daemonset.")
+var printDetectedInstead = pflag.Bool("print-detected-instead", false, "Print detected configuration instead of manifests")
+
+func main() {
+	pflag.Parse()
+	if *showVersion {
+		fmt.Fprintln(os.Stderr, Version)
+		return
+	}
+
+	t := template.Must(template.New("driverDS").Parse(dsTemplate))
+	conf := detectKubeletProcess()
+	if conf == nil {
+		return
+	}
+
+	conf.Image = fmt.Sprintf("docker.io/warmmetal/csi-image:%s", Version)
+
+	vols := detectImageSvcVolumes(conf.ImageSocketPath)
+	if len(vols) == 0 {
+		return
+	}
+
+	if conf.Runtime == CriO {
+		criVols := fetchCriOVolumes(conf.RuntimeSocketPath)
+		if len(criVols) == 0 {
+			return
+		}
+
+		vols = append(vols, criVols...)
+	}
+
+	conf.RuntimeVolumes = make([]corev1.Volume, 0, len(vols))
+	for _, v := range vols {
+		if len(conf.RuntimeVolumes) == 0 {
+			conf.RuntimeVolumes = append(conf.RuntimeVolumes, v)
+			continue
+		}
+
+		for i, vol := range conf.RuntimeVolumes {
+			if strings.HasPrefix(v.HostPath.Path, vol.HostPath.Path) {
+				break
+			}
+
+			if strings.HasPrefix(vol.HostPath.Path, v.HostPath.Path) {
+				conf.RuntimeVolumes[i] = v
+				break
+			}
+
+			conf.RuntimeVolumes = append(conf.RuntimeVolumes, v)
+		}
+	}
+
+	if *printDetectedInstead {
+		fmt.Println(conf)
+		return
+	}
+
+	mntProp := corev1.MountPropagationBidirectional
+	conf.RuntimeVolumeMounts = make([]corev1.VolumeMount, 0, len(vols))
+	for _, vol := range conf.RuntimeVolumes {
+		conf.RuntimeVolumeMounts = append(conf.RuntimeVolumeMounts, corev1.VolumeMount{
+			Name:             vol.Name,
+			MountPath:        vol.HostPath.Path,
+			MountPropagation: &mntProp,
+		})
+	}
+
+	manifest := &bytes.Buffer{}
+	if err := t.Execute(manifest, conf); err != nil {
+		fmt.Fprintf(os.Stderr, err.Error())
+	}
+
+	ds := appsv1.DaemonSet{}
+	if err := yaml.Unmarshal(manifest.Bytes(), &ds); err != nil {
+		panic(err)
+	}
+
+	ds.Spec.Template.Spec.Volumes = append(ds.Spec.Template.Spec.Volumes, conf.RuntimeVolumes...)
+	ds.Spec.Template.Spec.Containers[1].VolumeMounts = append(
+		ds.Spec.Template.Spec.Containers[1].VolumeMounts, conf.RuntimeVolumeMounts...,
+	)
+	out, err := yaml.Marshal(&ds)
+	if err != nil {
+		panic(err)
+	}
+
+	saManifests := defaultSAManifests
+	roleManifests := defaultRBACRoleManifests
+	if len(*daemonSecret) > 0 {
+		role := rbacv1.Role{}
+		if err := yaml.Unmarshal([]byte(defaultRBACRoleManifests), &role); err != nil {
+			panic(err)
+		}
+
+		role.Rules = append(role.Rules, rbacv1.PolicyRule{
+			Verbs:           []string{"get"},
+			APIGroups:       []string{""},
+			Resources:       []string{"secrets"},
+			ResourceNames:   *daemonSecret,
+		})
+
+		updated, err := yaml.Marshal(&role)
+		if err != nil {
+			panic(err)
+		}
+
+		roleManifests = string(updated)
+
+		sa := corev1.ServiceAccount{}
+		if err := yaml.Unmarshal([]byte(defaultSAManifests), &sa); err != nil {
+			panic(err)
+		}
+		for _, secret := range *daemonSecret {
+			sa.ImagePullSecrets = append(sa.ImagePullSecrets, corev1.LocalObjectReference{Name:secret})
+		}
+
+		updated, err = yaml.Marshal(&sa)
+		if err != nil {
+			panic(err)
+		}
+		saManifests = string(updated)
+	}
+
+	allManifests := staticManifests + saManifests + "\n---\n" + roleManifests + rbacRoleBindingManifests + string(out)
+	if *namespace != "kube-system" {
+		allManifests = strings.ReplaceAll(allManifests, "kube-system", *namespace)
+	}
+	fmt.Print(allManifests)
+}
+
+type ContainerRuntime string
+
+const (
+	Containerd = ContainerRuntime("containerd")
+	CriO       = ContainerRuntime("cri-o")
+)
+
+type driverConfig struct {
+	Image               string
+	KubeletRoot         string
+	Runtime             ContainerRuntime
+	RuntimeSocketPath   string
+	ImageSocketPath     string
+	RuntimeVolumes      []corev1.Volume
+	RuntimeVolumeMounts []corev1.VolumeMount
+}
+
+func (d driverConfig) String() string {
+	b := &strings.Builder{}
+	b.Grow(16*5+128*len(d.RuntimeVolumes))
+	fmt.Fprintln(b,`Kubelet Root  : `, d.KubeletRoot)
+	fmt.Fprintln(b,`Runtime       : `, d.Runtime)
+	fmt.Fprintln(b,`Runtime Socket: `, d.RuntimeSocketPath)
+	fmt.Fprintln(b,`Image Socket  : `, d.ImageSocketPath)
+	fmt.Fprintln(b,`Host Paths    :`)
+
+	for _, v := range d.RuntimeVolumes {
+		fmt.Fprintln(b, v.HostPath.Path)
+	}
+
+	return b.String()
+}
+
+const staticManifests = `---
+apiVersion: storage.k8s.io/v1
+kind: CSIDriver
+metadata:
+  name: csi-image.warm-metal.tech
+spec:
+  attachRequired: false
+  podInfoOnMount: true
+  volumeLifecycleModes:
+    - Persistent
+    - Ephemeral
+---
+`
+
+const defaultSAManifests = `---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: csi-image-warm-metal
+  namespace: kube-system
+---
+`
+
+const defaultRBACRoleManifests = `---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: csi-image-warm-metal
+  namespace: kube-system
+rules:
+  - apiGroups:
+      - ""
+    resourceNames:
+      - csi-image-warm-metal
+    resources:
+      - serviceaccounts
+    verbs:
+      - get
+---
+`
+
+const rbacRoleBindingManifests = `---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: csi-image-warm-metal
+  namespace: kube-system
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: csi-image-warm-metal
+subjects:
+  - kind: ServiceAccount
+    name: csi-image-warm-metal
+    namespace: kube-system
+---
+`
+
+const dsTemplate = `---
+kind: DaemonSet
+apiVersion: apps/v1
+metadata:
+  name: csi-image-warm-metal
+  namespace: kube-system
+spec:
+  selector:
+    matchLabels:
+      app: csi-image-warm-metal
+  template:
+    metadata:
+      labels:
+        app: csi-image-warm-metal
+    spec:
+      hostNetwork: true
+      serviceAccountName: csi-image-warm-metal
+      containers:
+        - name: node-driver-registrar
+          image: quay.io/k8scsi/csi-node-driver-registrar:v1.1.0
+          imagePullPolicy: IfNotPresent
+          lifecycle:
+            preStop:
+              exec:
+                command: ["/bin/sh", "-c", "rm -rf /registration/csi-image.warm-metal.tech /registration/csi-image.warm-metal.tech-reg.sock"]
+          args:
+            - --csi-address=/csi/csi.sock
+            - --kubelet-registration-path={{.KubeletRoot}}/plugins/csi-image.warm-metal.tech/csi.sock
+          env:
+            - name: KUBE_NODE_NAME
+              valueFrom:
+                fieldRef:
+                  apiVersion: v1
+                  fieldPath: spec.nodeName
+          volumeMounts:
+            - mountPath: /csi
+              name: socket-dir
+            - mountPath: /registration
+              name: registration-dir
+        - name: plugin
+          image: {{.Image}}
+          imagePullPolicy: IfNotPresent
+          args:
+            - "--endpoint=$(CSI_ENDPOINT)"
+            - "--node=$(KUBE_NODE_NAME)"
+            - "--runtime-addr=$(CRI_ADDR)"
+          env:
+            - name: CSI_ENDPOINT
+              value: unix:///csi/csi.sock
+            - name: CRI_ADDR
+              value: {{.Runtime}}://{{.RuntimeSocketPath}}
+            - name: KUBE_NODE_NAME
+              valueFrom:
+                fieldRef:
+                  apiVersion: v1
+                  fieldPath: spec.nodeName
+          securityContext:
+            privileged: true
+          volumeMounts:
+            - mountPath: /csi
+              name: socket-dir
+            - mountPath: {{.KubeletRoot}}/pods
+              mountPropagation: Bidirectional
+              name: mountpoint-dir
+            - mountPath: {{.RuntimeSocketPath}}
+              name: runtime-socket
+      volumes:
+        - hostPath:
+            path: {{.KubeletRoot}}/plugins/csi-image.warm-metal.tech
+            type: DirectoryOrCreate
+          name: socket-dir
+        - hostPath:
+            path: {{.KubeletRoot}}/pods
+            type: DirectoryOrCreate
+          name: mountpoint-dir
+        - hostPath:
+            path: {{.KubeletRoot}}/plugins_registry
+            type: Directory
+          name: registration-dir
+        - hostPath:
+            path: {{.RuntimeSocketPath}}
+            type: Socket
+          name: runtime-socket
+---`

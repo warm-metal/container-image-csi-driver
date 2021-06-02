@@ -10,8 +10,6 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v2
-      - name: Build image
-        run: ./hack/ci/build.sh
       - name: Set up minikube
         uses: opsgang/ga-setup-minikube@v0.1.2
         with:
@@ -19,5 +17,7 @@ jobs:
           k8s-version: '1.21.0'
       - name: Start a Kubernetes cluster with containerd
         run: ./hack/ci/setup_containerd_cluster.sh 'v1.21.0'
+      - name: Build image
+        run: ./hack/ci/build.sh
       - name: Test compatibility with versions prior to v0.4.2
         run: ./test/integration/backward-compatability.sh

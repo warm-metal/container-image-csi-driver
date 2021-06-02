@@ -5,7 +5,7 @@ source $(dirname "$0")/../lib/cluster.sh
 set -x
 set -e
 
-lib::uninstall_driver_for_containerd
+lib::uninstall_driver
 
 set +e
 set +x

@@ -5,7 +5,7 @@ source $(dirname "$0")/../lib/cluster.sh
 set -x
 set -e
 
-lib::install_driver_for_crio
+lib::uninstall_driver
 
 set +e
 set +x

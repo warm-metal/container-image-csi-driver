@@ -6,7 +6,7 @@ echo "Testing on docker"
 lib::start_cluster_docker
 
 set -e
-lib::install_driver_for_containerd
+lib::install_driver
 
 echo "Install a private registry"
 lib::install_private_registry
@@ -16,7 +16,7 @@ minikube ssh -p csi-image-test -- sudo ctr -n k8s.io i push localhost:31000/warm
 
 source $(dirname "${BASH_SOURCE[0]}")/cases.sh
 
-lib::uninstall_driver_for_containerd
+lib::uninstall_driver
 echo "Destroying cluster"
 minikube delete -p csi-image-test
 set +e
