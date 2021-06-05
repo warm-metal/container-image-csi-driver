@@ -36,6 +36,8 @@ warm-metal-csi-image-install --print-detected-instead
 warm-metal-csi-image-install --namespace=foo
 ```
 
+You can found some installation manifests as samples in [examples](https://github.com/warm-metal/csi-driver-image/tree/master/sample).
+
 #### Notice for docker
 Until Docker migrates its [image and snapshot store](https://github.com/moby/moby/issues/38043) to containerd,
 I recommend you use containerd instead. Otherwise, the driver can't use images managed by Docker daemon.
