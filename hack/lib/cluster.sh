@@ -25,7 +25,7 @@ function lib::start_cluster_docker() {
     --container-runtime=docker \
     --insecure-registry=localhost:31000
 
-  kubectl apply -f https://raw.githubusercontent.com/warm-metal/kube-systemd/master/config/samples/install.yaml
+  kubectl apply -f $(dirname "${BASH_SOURCE[0]}")/kube-systemd.yaml
   kubectlwait kube-systemd-system -l=control-plane=controller-manager
 
   kubectl apply -f $(dirname "${BASH_SOURCE[0]}")/kube-systemd-containerd.yaml
