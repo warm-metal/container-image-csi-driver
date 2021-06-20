@@ -19,23 +19,13 @@ func init() {
 	framework.AfterReadingAllFlags(&framework.TestContext)
 }
 
-var CSITestSuites = []func() testsuites.TestSuite{
-	testsuites.InitVolumesTestSuite,
-	testsuites.InitVolumeIOTestSuite,
-	testsuites.InitVolumeModeTestSuite,
-	testsuites.InitSubPathTestSuite,
-	testsuites.InitProvisioningTestSuite,
-	//testsuites.InitSnapshottableTestSuite,
-	//testsuites.InitMultiVolumeTestSuite,
-}
-
 // This executes testSuites for csi volumes.
 var _ = utils.SIGDescribe("CSI Volumes", func() {
 	testfiles.AddFileSource(testfiles.RootFileSource{Root: path.Join(framework.TestContext.RepoRoot, "../../deploy/kubernetes/")})
 
 	curDriver := &driver{}
 	Context(testsuites.GetDriverNameWithFeatureTags(curDriver), func() {
-		testsuites.DefineTestSuite(curDriver, CSITestSuites)
+		testsuites.DefineTestSuite(curDriver, testsuites.CSISuites)
 	})
 
 })
