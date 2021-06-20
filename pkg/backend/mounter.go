@@ -151,7 +151,7 @@ func (s *SnapshotMounter) unrefROSnapshot(ctx context.Context, target MountTarge
 		klog.Fatalf("refcount of snapshot %q is 0", key)
 	}
 
-	klog.Infof("snapshot %q doesn't used by other volumes. delete it", key)
+	klog.Infof("snapshot %q isn't used by other volumes. delete it", key)
 	if err := s.runtime.DestroySnapshot(ctx, key); err != nil {
 		klog.Fatalf("unable to destroy snapshot %q: %s. We will crash. Dangling snapshots will be destroyed " +
 			"when restarting", key, err)

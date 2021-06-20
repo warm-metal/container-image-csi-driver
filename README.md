@@ -1,7 +1,7 @@
 [![containerd](https://github.com/warm-metal/csi-driver-image/actions/workflows/containerd.yaml/badge.svg)](https://github.com/warm-metal/csi-driver-image/actions/workflows/containerd.yaml)
 [![docker-containerd](https://github.com/warm-metal/csi-driver-image/actions/workflows/docker-containerd.yaml/badge.svg)](https://github.com/warm-metal/csi-driver-image/actions/workflows/docker-containerd.yaml)
 [![cri-o](https://github.com/warm-metal/csi-driver-image/actions/workflows/cri-o.yaml/badge.svg)](https://github.com/warm-metal/csi-driver-image/actions/workflows/cri-o.yaml)
-![Docker Pulls](https://img.shields.io/docker/pulls/warmmetal/csi-image?color=0)
+![Docker Pulls](https://img.shields.io/docker/pulls/warmmetal/csi-image?color=brightgreen&logo=docker&logoColor=lightgrey&labelColor=black)
 
 # csi-driver-image
 
@@ -144,3 +144,13 @@ See the above sample manifest, and notice that secrets and workloads must in the
 (Since version v0.5.1, pulling private images using the ImagePullSecrets which attached to workload service accounts is no longer supported for security reasons.)
 
 You can also set the secret to a PV, then share the PV with multiple workloads. See the sample above.
+
+## Tests
+
+### Sanity test
+
+See [test/sanity](https://github.com/warm-metal/csi-driver-image/tree/master/test/sanity).
+
+### E2E test
+
+See [test/e2e](https://github.com/warm-metal/csi-driver-image/tree/master/test/e2e).

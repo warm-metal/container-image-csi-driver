@@ -1,7 +1,7 @@
 package main
 
 import (
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2eskipper "k8s.io/kubernetes/test/e2e/framework/skipper"
@@ -21,10 +21,15 @@ func (d driver) GetCSIDriverName(config *testsuites.PerTestConfig) string {
 }
 
 func (d driver) GetPersistentVolumeSource(readOnly bool, fsType string, testVolume testsuites.TestVolume) (*v1.PersistentVolumeSource, *v1.VolumeNodeAffinity) {
+	if !readOnly {
+		return nil, nil
+	}
+
 	return &v1.PersistentVolumeSource{
 			CSI: &v1.CSIPersistentVolumeSource{
 				Driver:       "csi-image.warm-metal.tech",
 				VolumeHandle: "docker.io/warmmetal/csi-image-test:simple-fs",
+				ReadOnly:     true,
 			},
 		}, &v1.VolumeNodeAffinity{
 			Required: &v1.NodeSelector{
@@ -44,9 +49,11 @@ func (d driver) GetPersistentVolumeSource(readOnly bool, fsType string, testVolu
 }
 
 func (d driver) GetVolumeSource(readOnly bool, fsType string, testVolume testsuites.TestVolume) *v1.VolumeSource {
+	ro := readOnly
 	return &v1.VolumeSource{
 		CSI: &v1.CSIVolumeSource{
-			Driver: "csi-image.warm-metal.tech",
+			Driver:   "csi-image.warm-metal.tech",
+			ReadOnly: &ro,
 			VolumeAttributes: map[string]string{
 				"image": "docker.io/warmmetal/csi-image-test:simple-fs",
 			},
@@ -68,11 +75,14 @@ func (d driver) GetDriverInfo() *testsuites.DriverInfo {
 	return &testsuites.DriverInfo{
 		Name: "csi-image.warm-metal.tech",
 		Capabilities: map[testsuites.Capability]bool{
-			testsuites.CapExec:          true,
-			testsuites.CapMultiPODs:     true,
-			testsuites.CapPVCDataSource: true,
+			testsuites.CapExec:             true,
+			testsuites.CapMultiPODs:        true,
+			testsuites.CapPersistence:      true,
+			testsuites.CapSingleNodeVolume: true,
+			testsuites.CapPVCDataSource:    true,
 		},
-		SupportedFsType: sets.NewString(""),
+		SupportedFsType:     sets.NewString(""),
+		RequiredAccessModes: []v1.PersistentVolumeAccessMode{v1.ReadOnlyMany},
 	}
 }
 
@@ -81,11 +91,18 @@ func (d driver) SkipUnsupportedTest(pattern testpatterns.TestPattern) {
 	switch pattern.VolType {
 	case "",
 		testpatterns.CSIInlineVolume,
-		testpatterns.PreprovisionedPV:
+		testpatterns.PreprovisionedPV,
+		testpatterns.GenericEphemeralVolume:
 		supported = true
 	}
+
+	if pattern.VolMode == v1.PersistentVolumeBlock {
+		supported = false
+	}
+
 	if !supported {
-		e2eskipper.Skipf("Driver %q does not support volume type %q - skipping", "csi-image.warm-metal.tech", pattern.VolType)
+		e2eskipper.Skipf("Driver %q does not support tests %q-%q-%q - skipping",
+			"csi-image.warm-metal.tech", pattern.Name, pattern.VolType, pattern.VolMode)
 	}
 }
 
