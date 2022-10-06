@@ -2,8 +2,9 @@ VERSION = v0.5.1
 
 IMAGE_BUILDER ?= docker
 IMAGE_BUILD_CMD ?= buildx
+REGISTRY ?= docker.io/warmmetal
 
-export IMG = docker.io/warmmetal/csi-image:$(VERSION)
+export IMG = $(REGISTRY)/csi-image:$(VERSION)
 
 .PHONY: build
 build:
@@ -31,18 +32,20 @@ integration:
 
 .PHONY: image
 image:
-	$(IMAGE_BUILDER) $(IMAGE_BUILD_CMD) build -t docker.io/warmmetal/csi-image:$(VERSION) --push
+	$(IMAGE_BUILDER) $(IMAGE_BUILD_CMD) build -t $(REGISTRY)/csi-image:$(VERSION) --push
 
 .PHONY: local
 local:
-	$(IMAGE_BUILDER) $(IMAGE_BUILD_CMD) build -t docker.io/warmmetal/csi-image:$(VERSION)
+	$(IMAGE_BUILDER) $(IMAGE_BUILD_CMD) build -t $(REGISTRY)/csi-image:$(VERSION)
 
 .PHONY: test-deps
 test-deps:
-	$(IMAGE_BUILDER) $(IMAGE_BUILD_CMD) build --push -t docker.io/warmmetal/csi-image-test:stat-fs -f csi-image-test:stat-fs.dockerfile hack/integration-test-image
-	$(IMAGE_BUILDER) $(IMAGE_BUILD_CMD) build --push -t docker.io/warmmetal/csi-image-test:check-fs -f csi-image-test:check-fs.dockerfile hack/integration-test-image
-	$(IMAGE_BUILDER) $(IMAGE_BUILD_CMD) build --push -t docker.io/warmmetal/csi-image-test:write-check -f csi-image-test:write-check.dockerfile hack/integration-test-image
+	$(IMAGE_BUILDER) $(IMAGE_BUILD_CMD) build --push -t $(REGISTRY)/csi-image-test:stat-fs -f csi-image-test:stat-fs.dockerfile hack/integration-test-image
+	$(IMAGE_BUILDER) $(IMAGE_BUILD_CMD) build --push -t $(REGISTRY)/csi-image-test:check-fs -f csi-image-test:check-fs.dockerfile hack/integration-test-image
+	$(IMAGE_BUILDER) $(IMAGE_BUILD_CMD) build --push -t $(REGISTRY)/csi-image-test:write-check -f csi-image-test:write-check.dockerfile hack/integration-test-image
 
 .PHONY: install-util
 install-util:
-	GOOS=linux CGO_ENABLED="0" go build -ldflags "-X main.Version=$(VERSION)" -o _output/warm-metal-csi-image-install ./cmd/install
+	GOOS=linux CGO_ENABLED="0" go build \
+	  -ldflags "-X main.Version=$(VERSION) -X main.Registry=$(REGISTRY)" \
+	  -o _output/warm-metal-csi-image-install ./cmd/install
