@@ -3,16 +3,18 @@ package main
 import (
 	"bytes"
 	"fmt"
+	"os"
+	"strings"
+	"text/template"
+
 	"github.com/spf13/pflag"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	rbacv1 "k8s.io/api/rbac/v1"
-	"os"
 	"sigs.k8s.io/yaml"
-	"strings"
-	"text/template"
 )
 
+var Registry = "docker.io/warmmetal"
 var Version = "unset"
 
 var showVersion = pflag.Bool("version", false, "Show the version number.")
@@ -34,7 +36,7 @@ func main() {
 		return
 	}
 
-	conf.Image = fmt.Sprintf("docker.io/warmmetal/csi-image:%s", Version)
+	conf.Image = fmt.Sprintf("%s/csi-image:%s", Registry, Version)
 
 	vols := detectImageSvcVolumes(conf.ImageSocketPath)
 	if len(vols) == 0 {
@@ -114,10 +116,10 @@ func main() {
 		}
 
 		role.Rules = append(role.Rules, rbacv1.PolicyRule{
-			Verbs:           []string{"get"},
-			APIGroups:       []string{""},
-			Resources:       []string{"secrets"},
-			ResourceNames:   *daemonSecret,
+			Verbs:         []string{"get"},
+			APIGroups:     []string{""},
+			Resources:     []string{"secrets"},
+			ResourceNames: *daemonSecret,
 		})
 
 		updated, err := yaml.Marshal(&role)
@@ -132,7 +134,7 @@ func main() {
 			panic(err)
 		}
 		for _, secret := range *daemonSecret {
-			sa.ImagePullSecrets = append(sa.ImagePullSecrets, corev1.LocalObjectReference{Name:secret})
+			sa.ImagePullSecrets = append(sa.ImagePullSecrets, corev1.LocalObjectReference{Name: secret})
 		}
 
 		updated, err = yaml.Marshal(&sa)
@@ -168,12 +170,12 @@ type driverConfig struct {
 
 func (d driverConfig) String() string {
 	b := &strings.Builder{}
-	b.Grow(16*5+128*len(d.RuntimeVolumes))
-	fmt.Fprintln(b,`Kubelet Root  : `, d.KubeletRoot)
-	fmt.Fprintln(b,`Runtime       : `, d.Runtime)
-	fmt.Fprintln(b,`Runtime Socket: `, d.RuntimeSocketPath)
-	fmt.Fprintln(b,`Image Socket  : `, d.ImageSocketPath)
-	fmt.Fprintln(b,`Host Paths    :`)
+	b.Grow(16*5 + 128*len(d.RuntimeVolumes))
+	fmt.Fprintln(b, `Kubelet Root  : `, d.KubeletRoot)
+	fmt.Fprintln(b, `Runtime       : `, d.Runtime)
+	fmt.Fprintln(b, `Runtime Socket: `, d.RuntimeSocketPath)
+	fmt.Fprintln(b, `Image Socket  : `, d.ImageSocketPath)
+	fmt.Fprintln(b, `Host Paths    :`)
 
 	for _, v := range d.RuntimeVolumes {
 		fmt.Fprintln(b, v.HostPath.Path)
