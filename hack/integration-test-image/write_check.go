@@ -25,7 +25,7 @@ func main() {
 	fmt.Println("If got a SIGUSR1, ${HOSTNAME} will be written to file ${TARGET}/hostname.")
 	fmt.Println("If got a SIGUSR2, the hostname will be read from file ${TARGET}/hostname and compared to ${HOSTNAME} then exit.")
 
-	ch := make(chan os.Signal)
+	ch := make(chan os.Signal, 1)
 	defer close(ch)
 	signal.Notify(ch, syscall.SIGUSR1, syscall.SIGUSR2)
 	defer signal.Stop(ch)
