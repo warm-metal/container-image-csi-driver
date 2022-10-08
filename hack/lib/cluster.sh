@@ -46,12 +46,11 @@ function lib::start_cluster_docker() {
 
 function lib::gen_manifests() {
   local secret=$1
-  minikube cp -p csi-image-test _output/warm-metal-csi-image-install /usr/bin/warm-metal-csi-image-install > /dev/null
-  minikube ssh -p csi-image-test -- sudo chmod +x /usr/bin/warm-metal-csi-image-install
+  docker cp _output/warm-metal-csi-image-install kind-${GITHUB_RUN_ID}-control-plane:/usr/bin/warm-metal-csi-image-install
   if [[ "${secret}" != "" ]]; then
-    minikube ssh --native-ssh=false -p csi-image-test -- sudo warm-metal-csi-image-install --pull-image-secret-for-daemonset=${secret} 2>/dev/null
+    docker exec kind-${GITHUB_RUN_ID}-control-plane warm-metal-csi-image-install --pull-image-secret-for-daemonset=${secret} 2>/dev/null
   else
-    minikube ssh --native-ssh=false -p csi-image-test -- sudo warm-metal-csi-image-install 2>/dev/null
+    docker exec kind-${GITHUB_RUN_ID}-control-plane warm-metal-csi-image-install 2>/dev/null
   fi
 }
 
@@ -80,13 +79,29 @@ function lib::install_driver() {
 }
 
 function lib::install_private_registry() {
-  # go around image pulling of the registry addon.
-  minikube cache reload -p csi-image-test
-  minikube addons -p csi-image-test enable registry --images=KubeRegistryProxy=google_containers/kube-registry-proxy:0.4
+  docker run -d \
+    -p 127.0.0.1:5000:5000 \
+    --restart=always \
+    --name private-registry \
+    --mount type=bind,source=$(realpath $(dirname "${BASH_SOURCE[0]}")/htpasswd),target=/auth/htpasswd \
+    -e "REGISTRY_AUTH=htpasswd" \
+    -e "REGISTRY_AUTH_HTPASSWD_REALM=Registry Realm" \
+    -e REGISTRY_AUTH_HTPASSWD_PATH=/auth/htpasswd \
+    registry:2
 
-  kubectl -n kube-system apply -f $(dirname "${BASH_SOURCE[0]}")/registry-svc.yaml
-  kubectl -n kube-system create cm registry-htpasswd --from-file=$(dirname "${BASH_SOURCE[0]}")/htpasswd
-  kubectl -n kube-system patch rc registry --patch '{"spec": {"template": {"spec": {"containers": [{"name": "registry", "env": [{"name": "REGISTRY_AUTH", "value": "htpasswd"}, {"name": "REGISTRY_AUTH_HTPASSWD_REALM", "value": "Registry Realm"}, {"name": "REGISTRY_AUTH_HTPASSWD_PATH", "value": "/auth/htpasswd"}], "volumeMounts": [{"name": "htpasswd", "mountPath": "/auth"}]}], "volumes": [{"name": "htpasswd", "configMap": {"name": "registry-htpasswd"}}]}}}}'
-  kubectl -n kube-system delete po -l kubernetes.io/minikube-addons=registry -l actual-registry=true
-  kubectlwait kube-system -l kubernetes.io/minikube-addons=registry -l actual-registry=true
+  if [ "$(docker inspect -f='{{json .NetworkSettings.Networks.kind}}' 'private-registry')" = 'null' ]; then
+    docker network connect "kind" "private-registry"
+  fi
+  
+  cat <<EOF | kubectl apply -f -
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: local-registry-hosting
+  namespace: kube-public
+data:
+  localRegistryHosting.v1: |
+    host: "private-registry:5000"
+    help: "https://kind.sigs.k8s.io/docs/user/local-registry/"
+EOF
 }

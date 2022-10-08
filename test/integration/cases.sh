@@ -10,11 +10,11 @@ export REGISTRY_PASSWORD=warmmetal
 
 echo "Install private secret and SA"
 kubectl create secret docker-registry warmmetal \
-  --docker-server=http://localhost:31000/ \
+  --docker-server=http://private-registry:5000/ \
   --docker-username=${REGISTRY_USERNAME} \
   --docker-password="${REGISTRY_PASSWORD}"
 kubectl -n kube-system create secret docker-registry warmmetal \
-  --docker-server=http://localhost:31000/ \
+  --docker-server=http://private-registry:5000/ \
   --docker-username=${REGISTRY_USERNAME} \
   --docker-password="${REGISTRY_PASSWORD}"
 kubectl create sa warmmetal

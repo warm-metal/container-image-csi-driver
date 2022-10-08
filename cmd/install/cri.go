@@ -8,6 +8,8 @@ import (
 	"net/http"
 	"net/url"
 	"os"
+	"path/filepath"
+	"strings"
 	"time"
 
 	"github.com/BurntSushi/toml"
@@ -17,6 +19,7 @@ import (
 )
 
 var typeDir = corev1.HostPathDirectory
+var typeFile = corev1.HostPathFile
 
 func detectImageSvcVolumes(imageSvcSocketPath string) []corev1.Volume {
 	socketUrl := url.URL{
@@ -69,6 +72,8 @@ type crioRootConfig struct {
 		// RunRoot is a path to the "run directory" where state information not
 		// explicitly handled by other options will be stored.
 		RunRoot string `toml:"runroot"`
+
+		StorageOption []string `toml:"storage_option"`
 	} `toml:"crio"`
 }
 
@@ -132,6 +137,23 @@ func fetchCriOVolumes(socketPath string) []corev1.Volume {
 				},
 			},
 		})
+	}
+
+	const overlayfsPrefix = "overlay.mount_program="
+	for _, opt := range c.Crio.StorageOption {
+		opt = strings.Trim(opt, `"`)
+		if strings.HasPrefix(opt, overlayfsPrefix) {
+			program := opt[len(overlayfsPrefix):]
+			vols = append(vols, corev1.Volume{
+				Name: filepath.Base(program),
+				VolumeSource: corev1.VolumeSource{
+					HostPath: &corev1.HostPathVolumeSource{
+						Path: program,
+						Type: &typeFile,
+					},
+				},
+			})
+		}
 	}
 
 	return vols

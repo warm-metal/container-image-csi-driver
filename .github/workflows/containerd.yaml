@@ -1,4 +1,4 @@
-name: containerd
+name: containerd-11mins
 on:
   push:
     branches: [ master ]
@@ -10,18 +10,19 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v2
-      - name: Set up minikube
-        uses: opsgang/ga-setup-minikube@v0.1.2
+      - name: Start a kind cluster with containerd
+        uses: helm/kind-action@v1.4.0
         with:
-          minikube-version: '1.20.0'
-          k8s-version: '1.21.0'
-      - name: Start a Kubernetes cluster with containerd
-        run: ./hack/ci/setup_containerd_cluster.sh 'v1.21.0'
+          cluster_name: kind-${{ github.run_id }}
+          kubectl_version: 'v1.25.2'
+          config: ./hack/ci/containerd-cluster-conf.yaml
+      - name: Install private registry
+        run: ./hack/ci/setup_private_registry.sh
       - name: Build image
         run: ./hack/ci/build.sh
       - name: Install the CSI Driver
-        run: ./hack/ci/install_driver_containerd.sh
+        run: ./hack/ci/install_driver.sh
       - name: Run integration Tests
         run: ./hack/ci/test.sh
       - name: Uninstall the CSI Driver
-        run: ./hack/ci/uninstall_driver_containerd.sh
+        run: ./hack/ci/uninstall_driver.sh

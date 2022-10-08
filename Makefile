@@ -1,4 +1,4 @@
-VERSION = v0.5.1
+VERSION ?= v0.5.1
 
 IMAGE_BUILDER ?= docker
 IMAGE_BUILD_CMD ?= buildx
@@ -36,7 +36,7 @@ image:
 
 .PHONY: local
 local:
-	$(IMAGE_BUILDER) $(IMAGE_BUILD_CMD) build -t $(REGISTRY)/csi-image:$(VERSION)
+	$(IMAGE_BUILDER) $(IMAGE_BUILD_CMD) build -t $(REGISTRY)/csi-image:$(VERSION) .
 
 .PHONY: test-deps
 test-deps:
