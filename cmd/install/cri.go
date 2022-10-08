@@ -3,16 +3,17 @@ package main
 import (
 	"context"
 	"fmt"
-	"github.com/BurntSushi/toml"
-	"google.golang.org/grpc"
 	"io/ioutil"
-	corev1 "k8s.io/api/core/v1"
-	criapis "k8s.io/cri-api/pkg/apis/runtime/v1alpha2"
 	"net"
 	"net/http"
 	"net/url"
 	"os"
 	"time"
+
+	"github.com/BurntSushi/toml"
+	"google.golang.org/grpc"
+	corev1 "k8s.io/api/core/v1"
+	criapis "k8s.io/cri-api/pkg/apis/runtime/v1alpha2"
 )
 
 var typeDir = corev1.HostPathDirectory
@@ -20,7 +21,7 @@ var typeDir = corev1.HostPathDirectory
 func detectImageSvcVolumes(imageSvcSocketPath string) []corev1.Volume {
 	socketUrl := url.URL{
 		Scheme: "unix",
-		Path: imageSvcSocketPath,
+		Path:   imageSvcSocketPath,
 	}
 
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
@@ -28,7 +29,7 @@ func detectImageSvcVolumes(imageSvcSocketPath string) []corev1.Volume {
 
 	conn, err := grpc.DialContext(ctx, socketUrl.String(), grpc.WithInsecure())
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "unable to connect to the CRI image service via %s: %s\n", socketUrl, err)
+		fmt.Fprintf(os.Stderr, "unable to connect to the CRI image service via %v: %s\n", socketUrl, err)
 		return nil
 	}
 
@@ -46,7 +47,7 @@ func detectImageSvcVolumes(imageSvcSocketPath string) []corev1.Volume {
 		}
 
 		vols = append(vols, corev1.Volume{
-			Name:         fmt.Sprintf("snapshot-root-%d", i),
+			Name: fmt.Sprintf("snapshot-root-%d", i),
 			VolumeSource: corev1.VolumeSource{
 				HostPath: &corev1.HostPathVolumeSource{
 					Path: fs.FsId.Mountpoint,
@@ -111,7 +112,7 @@ func fetchCriOVolumes(socketPath string) []corev1.Volume {
 	var vols []corev1.Volume
 	if c.Crio.Root != "" {
 		vols = append(vols, corev1.Volume{
-			Name:         "crio-root",
+			Name: "crio-root",
 			VolumeSource: corev1.VolumeSource{
 				HostPath: &corev1.HostPathVolumeSource{
 					Path: c.Crio.Root,
@@ -123,7 +124,7 @@ func fetchCriOVolumes(socketPath string) []corev1.Volume {
 
 	if c.Crio.RunRoot != "" {
 		vols = append(vols, corev1.Volume{
-			Name:         "crio-run-root",
+			Name: "crio-run-root",
 			VolumeSource: corev1.VolumeSource{
 				HostPath: &corev1.HostPathVolumeSource{
 					Path: c.Crio.RunRoot,
