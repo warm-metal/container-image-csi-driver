@@ -6,8 +6,11 @@ REGISTRY ?= docker.io/warmmetal
 
 export IMG = $(REGISTRY)/csi-image:$(VERSION)
 
+# cgo is required to build containers/storage
+# For ubuntu, install libbtrfs-dev and libdevmapper-dev before building
 .PHONY: build
 build:
+	go fmt ./...
 	go vet ./...
 	go build -o _output/csi-image-plugin ./cmd/plugin
 

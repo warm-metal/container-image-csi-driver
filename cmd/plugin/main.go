@@ -3,6 +3,8 @@ package main
 import (
 	goflag "flag"
 	"fmt"
+	"net/url"
+
 	"github.com/container-storage-interface/spec/lib/go/csi"
 	flag "github.com/spf13/pflag"
 	"github.com/warm-metal/csi-driver-image/pkg/backend"
@@ -10,9 +12,8 @@ import (
 	"github.com/warm-metal/csi-driver-image/pkg/backend/crio"
 	"github.com/warm-metal/csi-driver-image/pkg/cri"
 	"github.com/warm-metal/csi-driver-image/pkg/secret"
-	"github.com/warm-metal/csi-drivers/pkg/csi-common"
+	csicommon "github.com/warm-metal/csi-drivers/pkg/csi-common"
 	"k8s.io/klog/v2"
-	"net/url"
 
 	"time"
 )
@@ -22,11 +23,11 @@ const (
 	driverVersion = "v1.0.0"
 
 	containerdScheme = "containerd"
-	criOScheme = "cri-o"
+	criOScheme       = "cri-o"
 )
 
 var (
-	endpoint       = flag.String("endpoint", "unix:///csi/csi.sock",
+	endpoint = flag.String("endpoint", "unix:///csi/csi.sock",
 		"The endpoint of the CSI driver usually shared with the driver registrar.")
 	nodeID         = flag.String("node", "", "The node name that driver currently runs on.")
 	containerdSock = flag.String(
@@ -34,10 +35,10 @@ var (
 		"The unix socket of containerd. Deprecated. Use --runtime-addr instead.")
 	runtimeAddr = flag.String(
 		"runtime-addr", "",
-		fmt.Sprintf("The unix socket of the container runtime. Currently both containerd and cri-o are supported." +
+		fmt.Sprintf("The unix socket of the container runtime. Currently both containerd and cri-o are supported."+
 			"Users need to replace the leading %q with %q or %q to indicate the working runtime.",
 			"unix", containerdScheme, criOScheme),
-		)
+	)
 	imageCredentialProviderConfigFile = flag.String("image-credential-provider-config", "",
 		"The path to the credential provider plugin config file.")
 	imageCredentialProviderBinDir = flag.String("image-credential-provider-bin-dir", "",

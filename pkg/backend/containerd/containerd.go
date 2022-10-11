@@ -2,18 +2,19 @@ package containerd
 
 import (
 	"context"
+	"errors"
 	"fmt"
+	"os"
+	"strings"
+	"time"
+
 	"github.com/containerd/containerd"
 	"github.com/containerd/containerd/mount"
 	"github.com/containerd/containerd/reference/docker"
 	"github.com/containerd/containerd/snapshots"
 	"github.com/opencontainers/image-spec/identity"
 	"github.com/warm-metal/csi-driver-image/pkg/backend"
-	"golang.org/x/xerrors"
 	"k8s.io/klog/v2"
-	"os"
-	"strings"
-	"time"
 )
 
 type snapshotMounter struct {
@@ -45,7 +46,7 @@ func (s snapshotMounter) Mount(ctx context.Context, key backend.SnapshotKey, tar
 	if err != nil {
 		mountsErr := describeMounts(mounts, string(target))
 		if len(mountsErr) > 0 {
-			err = xerrors.New(mountsErr)
+			err = errors.New(mountsErr)
 		}
 
 		klog.Errorf("unable to mount snapshot %q to target %s: %s", key, target, err)
@@ -146,7 +147,7 @@ func (s snapshotMounter) FindSnapshot(
 			}
 
 			if info.Labels[k] != v {
-				err = xerrors.Errorf("found existed snapshot %q with different configuration %#v", key, info)
+				err = fmt.Errorf("found existed snapshot %q with different configuration %#v", key, info)
 				return
 			}
 		}
@@ -155,7 +156,7 @@ func (s snapshotMounter) FindSnapshot(
 		return
 	}
 
-	err = xerrors.Errorf("found existed snapshot %q with different configuration %#v", key, info)
+	err = fmt.Errorf("found existed snapshot %q with different configuration %#v", key, info)
 	return
 }
 

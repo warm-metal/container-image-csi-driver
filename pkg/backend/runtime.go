@@ -2,11 +2,12 @@ package backend
 
 import (
 	"context"
+
 	"github.com/containerd/containerd/reference/docker"
 )
 
 type MountOptions struct {
-	ReadOnly   bool
+	ReadOnly bool
 }
 
 type SnapshotKey string

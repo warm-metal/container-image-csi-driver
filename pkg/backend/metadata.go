@@ -2,6 +2,7 @@ package backend
 
 import (
 	"encoding/json"
+
 	"k8s.io/klog/v2"
 )
 
@@ -74,7 +75,7 @@ func (m SnapshotMetadata) Decode(encoded string) error {
 
 func createSnapshotMetaData(target MountTarget) SnapshotMetadata {
 	return SnapshotMetadata{
-		MetaDataKeyTargets: map[MountTarget]struct{}{target:{}},
+		MetaDataKeyTargets: map[MountTarget]struct{}{target: {}},
 	}
 }
 
