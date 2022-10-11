@@ -15,7 +15,8 @@ function kubectlwait() {
   wait kubectl get po -n $@ -o=custom-columns=:metadata.name --no-headers
   local pods=$(kubectl get po -n $@ -o=custom-columns=:metadata.name,:metadata.deletionTimestamp --no-headers | grep '<none>' | awk '{ print $1 }')
   while IFS= read -r pod; do
-    kubectl wait -n $1 --timeout=5m --for=condition=ready po $pod
+    trap "kubectl -n $1 describe po $pod; docker exec kind-${GITHUB_RUN_ID}-control-plane crictl images" ERR
+    kubectl wait -n $1 --timeout=3m --for=condition=ready po $pod
   done <<< "$pods"
 }
 

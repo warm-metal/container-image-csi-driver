@@ -59,16 +59,21 @@ func main() {
 			continue
 		}
 
+		occuppied := false
 		for i, vol := range conf.RuntimeVolumes {
 			if strings.HasPrefix(v.HostPath.Path, vol.HostPath.Path) {
+				occuppied = true
 				break
 			}
 
 			if strings.HasPrefix(vol.HostPath.Path, v.HostPath.Path) {
+				occuppied = true
 				conf.RuntimeVolumes[i] = v
 				break
 			}
+		}
 
+		if !occuppied {
 			conf.RuntimeVolumes = append(conf.RuntimeVolumes, v)
 		}
 	}
@@ -80,12 +85,20 @@ func main() {
 
 	mntProp := corev1.MountPropagationBidirectional
 	conf.RuntimeVolumeMounts = make([]corev1.VolumeMount, 0, len(vols))
-	for _, vol := range conf.RuntimeVolumes {
-		conf.RuntimeVolumeMounts = append(conf.RuntimeVolumeMounts, corev1.VolumeMount{
-			Name:             vol.Name,
-			MountPath:        vol.HostPath.Path,
-			MountPropagation: &mntProp,
-		})
+	for i := range conf.RuntimeVolumes {
+		vol := &conf.RuntimeVolumes[i]
+		if vol.HostPath.Type != nil && *vol.HostPath.Type == corev1.HostPathDirectory {
+			conf.RuntimeVolumeMounts = append(conf.RuntimeVolumeMounts, corev1.VolumeMount{
+				Name:             vol.Name,
+				MountPath:        vol.HostPath.Path,
+				MountPropagation: &mntProp,
+			})
+		} else {
+			conf.RuntimeVolumeMounts = append(conf.RuntimeVolumeMounts, corev1.VolumeMount{
+				Name:      vol.Name,
+				MountPath: vol.HostPath.Path,
+			})
+		}
 	}
 
 	manifest := &bytes.Buffer{}

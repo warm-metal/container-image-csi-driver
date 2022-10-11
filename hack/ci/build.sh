@@ -1,8 +1,16 @@
 #!/usr/bin/env bash
 
 set -e
-IMG=docker.io/warmmetal/csi-image:$(git rev-parse --short HEAD)
-docker build -t ${IMG} .
-minikube image -p csi-image-test load ${IMG}
+set -x
+VERSION=$(git rev-parse --short HEAD)
+IMG=docker.io/warmmetal/csi-image:${VERSION}
+BUILDER=$(docker buildx ls | grep ci-builderx || true)
+[ "${BUILDER}" != "" ] || docker buildx create \
+    --name ci-builderx --driver docker-container \
+    --bootstrap \
+    --driver-opt image=moby/buildkit:master,network=host
+docker buildx use ci-builderx
+docker buildx build -t ${IMG} -o "type=oci,dest=csi-image.tar" .
+kind load image-archive csi-image.tar -n kind-${GITHUB_RUN_ID}
 make install-util
 set +e
