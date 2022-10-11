@@ -2,6 +2,7 @@ package remoteimage
 
 import (
 	"context"
+
 	"github.com/containerd/containerd/reference/docker"
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	cri "k8s.io/cri-api/pkg/apis/runtime/v1alpha2"
@@ -23,7 +24,7 @@ func NewPuller(imageSvc cri.ImageServiceClient, image docker.Named, keyring cred
 type puller struct {
 	imageSvc cri.ImageServiceClient
 	image    docker.Named
-	keyring credentialprovider.DockerKeyring
+	keyring  credentialprovider.DockerKeyring
 }
 
 func (p puller) Pull(ctx context.Context) (err error) {

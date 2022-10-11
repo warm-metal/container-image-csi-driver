@@ -3,7 +3,9 @@ package secret
 import (
 	"context"
 	"encoding/json"
-	"io/ioutil"
+	"os"
+	"time"
+
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes"
@@ -11,7 +13,6 @@ import (
 	"k8s.io/klog/v2"
 	"k8s.io/kubernetes/pkg/credentialprovider"
 	execplugin "k8s.io/kubernetes/pkg/credentialprovider/plugin"
-	"time"
 
 	// register credential providers
 	_ "k8s.io/kubernetes/pkg/credentialprovider/aws"
@@ -48,7 +49,7 @@ func CreateCacheOrDie(pluginConfigFile, pluginBinDir string) Cache {
 		keyring:   credentialprovider.NewDockerKeyring(),
 	}
 
-	curNamespace, err := ioutil.ReadFile("/run/secrets/kubernetes.io/serviceaccount/namespace")
+	curNamespace, err := os.ReadFile("/run/secrets/kubernetes.io/serviceaccount/namespace")
 	if err != nil {
 		klog.Warningf("unable to fetch the current namespace from the sa volume: %q", err.Error())
 		return c

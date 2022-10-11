@@ -12,5 +12,5 @@ BUILDER=$(docker buildx ls | grep ci-builderx || true)
 docker buildx use ci-builderx
 docker buildx build -t ${IMG} -o "type=oci,dest=csi-image.tar" .
 kind load image-archive csi-image.tar -n kind-${GITHUB_RUN_ID}
-make install-util
+docker buildx build --target install-util -o "type=local,dest=_output/" .
 set +e

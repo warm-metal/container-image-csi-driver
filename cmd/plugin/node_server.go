@@ -2,19 +2,20 @@ package main
 
 import (
 	"context"
+	"os"
+	"strings"
+
 	"github.com/container-storage-interface/spec/lib/go/csi"
 	"github.com/containerd/containerd/reference/docker"
 	"github.com/warm-metal/csi-driver-image/pkg/backend"
 	"github.com/warm-metal/csi-driver-image/pkg/remoteimage"
 	"github.com/warm-metal/csi-driver-image/pkg/secret"
-	"github.com/warm-metal/csi-drivers/pkg/csi-common"
+	csicommon "github.com/warm-metal/csi-drivers/pkg/csi-common"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 	cri "k8s.io/cri-api/pkg/apis/runtime/v1alpha2"
 	"k8s.io/klog/v2"
 	k8smount "k8s.io/utils/mount"
-	"os"
-	"strings"
 )
 
 type nodeServer struct {

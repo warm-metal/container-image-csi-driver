@@ -3,14 +3,14 @@ package main
 import (
 	"bytes"
 	"fmt"
-	"github.com/mitchellh/go-ps"
-	"github.com/spf13/pflag"
-	"io/ioutil"
 	"net/url"
 	"os"
 	"path/filepath"
 	"strconv"
 	"strings"
+
+	"github.com/mitchellh/go-ps"
+	"github.com/spf13/pflag"
 )
 
 func detectKubeletProcess() *driverConfig {
@@ -35,10 +35,10 @@ func detectKubeletProcess() *driverConfig {
 
 	if k3s {
 		return &driverConfig{
-			KubeletRoot:         "/var/lib/kubelet",
-			Runtime:             Containerd,
-			RuntimeSocketPath:   "/run/k3s/containerd/containerd.sock",
-			ImageSocketPath:     "/run/k3s/containerd/containerd.sock",
+			KubeletRoot:       "/var/lib/kubelet",
+			Runtime:           Containerd,
+			RuntimeSocketPath: "/run/k3s/containerd/containerd.sock",
+			ImageSocketPath:   "/run/k3s/containerd/containerd.sock",
 		}
 	}
 
@@ -46,7 +46,7 @@ func detectKubeletProcess() *driverConfig {
 		fmt.Fprintln(os.Stderr, "kubelet process not found")
 	}
 
-	kubeletCmdLine, err := ioutil.ReadFile(filepath.Join("/proc", strconv.Itoa(pid), "cmdline"))
+	kubeletCmdLine, err := os.ReadFile(filepath.Join("/proc", strconv.Itoa(pid), "cmdline"))
 	if err != nil {
 		panic(err)
 	}

@@ -2,19 +2,21 @@ package crio
 
 import (
 	"context"
+	"fmt"
+	"io"
+
+	"net"
+	"net/http"
+	"reflect"
+	"time"
+
 	"github.com/BurntSushi/toml"
 	"github.com/containerd/containerd/reference/docker"
 	"github.com/containers/storage"
 	"github.com/containers/storage/types"
 	"github.com/warm-metal/csi-driver-image/pkg/backend"
-	"golang.org/x/xerrors"
-	"io/ioutil"
 	"k8s.io/klog/v2"
 	k8smount "k8s.io/utils/mount"
-	"net"
-	"net/http"
-	"reflect"
-	"time"
 )
 
 type snapshotMounter struct {
@@ -110,7 +112,7 @@ func (s snapshotMounter) prepareSnapshot(
 	c, err := s.imageStore.Container(string(key))
 	if err == nil {
 		if c.ImageID != imageID {
-			return xerrors.Errorf("found existed snapshot %q with different image %#v", key, c.ImageID)
+			return fmt.Errorf("found existed snapshot %q with different image %#v", key, c.ImageID)
 		}
 
 		if metadata == nil {
@@ -119,17 +121,17 @@ func (s snapshotMounter) prepareSnapshot(
 		}
 
 		if c.Metadata == "" {
-			return xerrors.Errorf("found existed snapshot %q without metadata", key)
+			return fmt.Errorf("found existed snapshot %q without metadata", key)
 		}
 
 		existedMetadata := make(backend.SnapshotMetadata)
 		if err := existedMetadata.Decode(c.Metadata); err == nil {
-			return xerrors.Errorf("found existed snapshot %q with unknown metadata %s", key, c.Metadata)
+			return fmt.Errorf("found existed snapshot %q with unknown metadata %s", key, c.Metadata)
 		}
 
 		for k, v := range metadata {
 			if !reflect.DeepEqual(v, existedMetadata[k]) {
-				return xerrors.Errorf("found existed snapshot %q with different configuration %#v", key,
+				return fmt.Errorf("found existed snapshot %q with different configuration %#v", key,
 					existedMetadata)
 			}
 		}
@@ -233,7 +235,7 @@ func fetchCriOConfigOrDie(socketPath string) types.StoreOptions {
 	}
 
 	defer resp.Body.Close()
-	body, err := ioutil.ReadAll(resp.Body)
+	body, err := io.ReadAll(resp.Body)
 	if err != nil {
 		klog.Fatalf("unable to read cri-o configuration response: %s", err)
 	}

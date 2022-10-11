@@ -1,16 +1,19 @@
-FROM docker.io/library/golang:1.16-alpine3.13 as builder
-
+FROM docker.io/library/golang:1.19.2-alpine3.16 as builder
+RUN apk add --no-cache btrfs-progs-dev lvm2-dev make build-base
 WORKDIR /go/src/csi-driver-image
 COPY go.mod go.sum ./
-
 RUN go mod download
-
 COPY cmd ./cmd
 COPY pkg ./pkg
+COPY Makefile ./
+RUN make build
+RUN make install-util
 
-RUN CGO_ENABLED=0 go build -o csi-image-plugin ./cmd/plugin
+FROM scratch as install-util
+COPY --from=builder /go/src/csi-driver-image/_output/warm-metal-csi-image-install /
 
-FROM alpine:3.13
+FROM alpine:3.16
+RUN apk add --no-cache btrfs-progs-dev lvm2-dev
 WORKDIR /
-COPY --from=builder /go/src/csi-driver-image/csi-image-plugin /usr/bin/
+COPY --from=builder /go/src/csi-driver-image/_output/csi-image-plugin /usr/bin/
 ENTRYPOINT ["csi-image-plugin"]

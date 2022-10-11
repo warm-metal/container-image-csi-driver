@@ -3,11 +3,12 @@ package backend
 import (
 	"context"
 	"fmt"
+	"sync"
+	"time"
+
 	"github.com/containerd/containerd/reference/docker"
 	"k8s.io/klog/v2"
 	k8smount "k8s.io/utils/mount"
-	"sync"
-	"time"
 )
 
 type SnapshotMounter struct {
@@ -66,7 +67,7 @@ func (s *SnapshotMounter) buildSnapshotCacheOrDie() {
 		for target := range targets {
 			// FIXME Considering using checksum of target instead to shorten metadata.
 			// But the mountpoint checking become unavailable any more.
-			if notMount, err := mounter.IsLikelyNotMountPoint(string(target)); err != nil  || notMount {
+			if notMount, err := mounter.IsLikelyNotMountPoint(string(target)); err != nil || notMount {
 				klog.Errorf("target %q is not a mountpoint yet. trying to release the ref of snapshot %q",
 					key)
 				delete(targets, target)
@@ -140,7 +141,7 @@ func (s *SnapshotMounter) unrefROSnapshot(ctx context.Context, target MountTarge
 		delete(targets, target)
 		klog.Infof("snapshot %q is also used by other volumes. update its metadata", key)
 		if err := s.runtime.UpdateSnapshotMetadata(ctx, key, buildSnapshotMetaData(targets)); err != nil {
-			klog.Fatalf("unable to update snapshot %q to unref it: %s. We will crash. The snapshot will be " +
+			klog.Fatalf("unable to update snapshot %q to unref it: %s. We will crash. The snapshot will be "+
 				"updated when restarting", key, err)
 		}
 		delete(s.targetRoSnapshotMap, target)
@@ -153,7 +154,7 @@ func (s *SnapshotMounter) unrefROSnapshot(ctx context.Context, target MountTarge
 
 	klog.Infof("snapshot %q isn't used by other volumes. delete it", key)
 	if err := s.runtime.DestroySnapshot(ctx, key); err != nil {
-		klog.Fatalf("unable to destroy snapshot %q: %s. We will crash. Dangling snapshots will be destroyed " +
+		klog.Fatalf("unable to destroy snapshot %q: %s. We will crash. Dangling snapshots will be destroyed "+
 			"when restarting", key, err)
 	}
 
