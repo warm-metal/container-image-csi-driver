@@ -20,117 +20,42 @@ import (
 	_ "k8s.io/kubernetes/pkg/credentialprovider/gcp"
 )
 
-type Cache interface {
+type Store interface {
 	GetDockerKeyring(ctx context.Context, secrets map[string]string) (credentialprovider.DockerKeyring, error)
 }
 
-const daemonSA = "csi-image-warm-metal"
-
-func CreateCacheOrDie(pluginConfigFile, pluginBinDir string) Cache {
-	if len(pluginConfigFile) > 0 && len(pluginBinDir) > 0 {
-		if err := execplugin.RegisterCredentialProviderPlugins(pluginConfigFile, pluginBinDir); err != nil {
-			klog.Fatalf("unable to register the credential plugin through %q and %q: %s", pluginConfigFile,
-				pluginBinDir, err)
-		}
-	}
-
-	config, err := rest.InClusterConfig()
-	if err != nil {
-		klog.Fatalf("unable to get cluster config: %s", err)
-	}
-
-	clientset, err := kubernetes.NewForConfig(config)
-	if err != nil {
-		klog.Fatalf("unable to get cluster client: %s", err)
-	}
-
-	c := secretWOCache{
-		k8sCliSet: clientset,
-		keyring:   credentialprovider.NewDockerKeyring(),
-	}
-
-	curNamespace, err := os.ReadFile("/run/secrets/kubernetes.io/serviceaccount/namespace")
-	if err != nil {
-		klog.Warningf("unable to fetch the current namespace from the sa volume: %q", err.Error())
-		return c
-	}
-
-	ctx, cancel := context.WithTimeout(context.TODO(), 10*time.Second)
-	defer cancel()
-	namespace := string(curNamespace)
-	sa, err := clientset.CoreV1().ServiceAccounts(namespace).Get(ctx, daemonSA, metav1.GetOptions{})
-	if err != nil {
-		klog.Errorf(`unable to fetch service account of the daemon pod "%s/%s": %s`, namespace, daemonSA, err)
-		return c
-	}
-
-	c.daemonSecrets = make([]corev1.Secret, len(sa.ImagePullSecrets))
-	klog.Infof(
-		`got %d imagePullSecrets from the service account %s/%s`, len(sa.ImagePullSecrets), namespace, daemonSA,
-	)
-
-	for i := range sa.ImagePullSecrets {
-		s := &sa.ImagePullSecrets[i]
-		secret, err := clientset.CoreV1().Secrets(namespace).Get(ctx, s.Name, metav1.GetOptions{})
-		if err != nil {
-			klog.Errorf(`unable to fetch secret "%s/%s": %s`, namespace, s.Name, err)
+func makeDockerKeyringFromSecrets(secrets []corev1.Secret) (credentialprovider.DockerKeyring, error) {
+	keyring := &credentialprovider.BasicDockerKeyring{}
+	for _, secret := range secrets {
+		if len(secret.Data) == 0 {
 			continue
 		}
 
-		c.daemonSecrets[i] = *secret
+		cred, err := parseDockerConfigFromSecretData(byteSecretData(secret.Data))
+		if err != nil {
+			klog.Errorf(`unable to parse secret %s, %#v`, err, secret)
+			return nil, err
+		}
+
+		keyring.Add(cred)
 	}
 
-	return c
+	return keyring, nil
 }
 
-type secretWOCache struct {
-	k8sCliSet     *kubernetes.Clientset
-	daemonSecrets []corev1.Secret
-	keyring       credentialprovider.DockerKeyring
-}
-
-func (s secretWOCache) GetDockerKeyring(ctx context.Context, secretData map[string]string) (keyring credentialprovider.DockerKeyring, err error) {
-	keyRing, err := s.makeDockerKeyring(s.daemonSecrets, secretData)
-	if err != nil {
-		klog.Errorf("unable to create keyring: %s", err)
-	}
-
-	return keyRing, err
-}
-
-func (s secretWOCache) makeDockerKeyring(passedSecrets []corev1.Secret, secretData map[string]string) (credentialprovider.DockerKeyring, error) {
-	passedCredentials := make([]credentialprovider.DockerConfig, 0, len(passedSecrets)+len(secretData))
+func makeDockerKeyringFromMap(secretData map[string]string) (credentialprovider.DockerKeyring, error) {
+	keyring := &credentialprovider.BasicDockerKeyring{}
 	if len(secretData) > 0 {
 		cred, err := parseDockerConfigFromSecretData(stringSecretData(secretData))
 		if err != nil {
+			klog.Errorf(`unable to parse secret data %s, %#v`, err, secretData)
 			return nil, err
 		}
 
-		passedCredentials = append(passedCredentials, cred)
+		keyring.Add(cred)
 	}
 
-	for _, passedSecret := range passedSecrets {
-		if len(passedSecret.Data) == 0 {
-			continue
-		}
-
-		cred, err := parseDockerConfigFromSecretData(byteSecretData(passedSecret.Data))
-		if err != nil {
-			return nil, err
-		}
-
-		passedCredentials = append(passedCredentials, cred)
-	}
-
-	if len(passedCredentials) > 0 {
-		basicKeyring := &credentialprovider.BasicDockerKeyring{}
-		for _, currCredentials := range passedCredentials {
-			basicKeyring.Add(currCredentials)
-		}
-		return credentialprovider.UnionDockerKeyring{basicKeyring, s.keyring}, nil
-	}
-
-	return s.keyring, nil
+	return keyring, nil
 }
 
 type secretDataWrapper interface {
@@ -178,4 +103,134 @@ func parseDockerConfigFromSecretData(data secretDataWrapper) (credentialprovider
 	}
 
 	return nil, nil
+}
+
+type persistentKeyringGetter interface {
+	Get(context.Context) credentialprovider.DockerKeyring
+}
+
+type keyringStore struct {
+	persistentKeyringGetter
+}
+
+func (s keyringStore) GetDockerKeyring(ctx context.Context, secretData map[string]string) (keyring credentialprovider.DockerKeyring, err error) {
+	var preferredKeyring credentialprovider.DockerKeyring
+	if len(secretData) > 0 {
+		preferredKeyring, err = makeDockerKeyringFromMap(secretData)
+		if err != nil {
+			return nil, err
+		}
+	}
+
+	daemonKeyring := s.Get(ctx)
+	if preferredKeyring != nil {
+		return credentialprovider.UnionDockerKeyring{preferredKeyring, daemonKeyring}, nil
+	}
+
+	return daemonKeyring, err
+}
+
+const daemonSA = "csi-image-warm-metal"
+
+type secretFetcher struct {
+	Client    *kubernetes.Clientset
+	Namespace string
+}
+
+func (f secretFetcher) Fetch(ctx context.Context) ([]corev1.Secret, error) {
+	sa, err := f.Client.CoreV1().ServiceAccounts(f.Namespace).Get(ctx, daemonSA, metav1.GetOptions{})
+	if err != nil {
+		klog.Errorf(`unable to fetch service account of the daemon pod "%s/%s": %s`, f.Namespace, daemonSA, err)
+		return nil, err
+	}
+
+	secrets := make([]corev1.Secret, len(sa.ImagePullSecrets))
+	klog.V(2).Infof(
+		`got %d imagePullSecrets from the service account %s/%s`, len(sa.ImagePullSecrets), f.Namespace, daemonSA,
+	)
+
+	for i := range sa.ImagePullSecrets {
+		s := &sa.ImagePullSecrets[i]
+		secret, err := f.Client.CoreV1().Secrets(f.Namespace).Get(ctx, s.Name, metav1.GetOptions{})
+		if err != nil {
+			klog.Errorf(`unable to fetch secret "%s/%s": %s`, f.Namespace, s.Name, err)
+			continue
+		}
+
+		secrets[i] = *secret
+	}
+
+	return secrets, nil
+}
+
+func (s secretFetcher) Get(ctx context.Context) credentialprovider.DockerKeyring {
+	secrets, _ := s.Fetch(ctx)
+	keyring, _ := makeDockerKeyringFromSecrets(secrets)
+	return keyring
+}
+
+func createSecretFetcher() *secretFetcher {
+	config, err := rest.InClusterConfig()
+	if err != nil {
+		klog.Fatalf("unable to get cluster config: %s", err)
+	}
+
+	clientset, err := kubernetes.NewForConfig(config)
+	if err != nil {
+		klog.Fatalf("unable to get cluster client: %s", err)
+	}
+
+	curNamespace, err := os.ReadFile("/run/secrets/kubernetes.io/serviceaccount/namespace")
+	if err != nil {
+		klog.Fatalf("unable to fetch the current namespace from the sa volume: %q", err.Error())
+	}
+
+	return &secretFetcher{
+		Client:    clientset,
+		Namespace: string(curNamespace),
+	}
+}
+
+func createFetcherOrDie() Store {
+	return keyringStore{
+		persistentKeyringGetter: createSecretFetcher(),
+	}
+}
+
+type secretWOCache struct {
+	daemonKeyring credentialprovider.DockerKeyring
+}
+
+func (s secretWOCache) Get(_ context.Context) credentialprovider.DockerKeyring {
+	return s.daemonKeyring
+}
+
+func createCacheOrDie() Store {
+	fetcher := createSecretFetcher()
+	ctx, cancel := context.WithTimeout(context.TODO(), 10*time.Second)
+	defer cancel()
+
+	var keyring credentialprovider.DockerKeyring
+	secrets, _ := fetcher.Fetch(ctx)
+	keyring, _ = makeDockerKeyringFromSecrets(secrets)
+	return keyringStore{
+		persistentKeyringGetter: secretWOCache{
+			daemonKeyring: keyring,
+		},
+	}
+}
+
+func CreateStoreOrDie(pluginConfigFile, pluginBinDir string, enableCache bool) Store {
+	if len(pluginConfigFile) > 0 && len(pluginBinDir) > 0 {
+		if err := execplugin.RegisterCredentialProviderPlugins(pluginConfigFile, pluginBinDir); err != nil {
+			klog.Fatalf("unable to register the credential plugin through %q and %q: %s", pluginConfigFile,
+				pluginBinDir, err)
+		}
+	}
+
+	if enableCache {
+		return createCacheOrDie()
+	} else {
+		return createFetcherOrDie()
+	}
 }

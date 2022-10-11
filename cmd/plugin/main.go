@@ -39,10 +39,13 @@ var (
 			"Users need to replace the leading %q with %q or %q to indicate the working runtime.",
 			"unix", containerdScheme, criOScheme),
 	)
-	imageCredentialProviderConfigFile = flag.String("image-credential-provider-config", "",
+	icpConf = flag.String("image-credential-provider-config", "",
 		"The path to the credential provider plugin config file.")
-	imageCredentialProviderBinDir = flag.String("image-credential-provider-bin-dir", "",
+	icpBin = flag.String("image-credential-provider-bin-dir", "",
 		"The path to the directory where credential provider plugin binaries are located.")
+	enableCache = flag.Bool("enable-daemon-image-credential-cache", true,
+		"Whether to save contents of imagepullsecrets of the daemon ServiceAccount in memory. "+
+			"If set to false, secrets will be fetched from the API server on every image pull.")
 )
 
 func main() {
@@ -111,7 +114,7 @@ func main() {
 			DefaultNodeServer: csicommon.NewDefaultNodeServer(driver),
 			mounter:           mounter,
 			imageSvc:          criClient,
-			secretCache:       secret.CreateCacheOrDie(*imageCredentialProviderConfigFile, *imageCredentialProviderBinDir),
+			secretStore:       secret.CreateStoreOrDie(*icpConf, *icpBin, *enableCache),
 		},
 	)
 	server.Wait()

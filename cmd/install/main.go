@@ -14,14 +14,18 @@ import (
 	"sigs.k8s.io/yaml"
 )
 
-var Registry = "docker.io/warmmetal"
-var Version = "unset"
+var (
+	Registry = "docker.io/warmmetal"
+	Version  = "unset"
 
-var showVersion = pflag.Bool("version", false, "Show the version number.")
-var namespace = pflag.String("namespace", "kube-system", "Specify the namespace to be installed in.")
-var daemonSecret = pflag.StringSlice("pull-image-secret-for-daemonset", nil,
-	"PullImageSecrets set to the driver to mount private images. It must be created in the same namespace with the daemonset.")
-var printDetectedInstead = pflag.Bool("print-detected-instead", false, "Print detected configuration instead of manifests")
+	showVersion  = pflag.Bool("version", false, "Show the version number.")
+	namespace    = pflag.String("namespace", "kube-system", "Specify the namespace to be installed in.")
+	daemonSecret = pflag.StringSlice("pull-image-secret-for-daemonset", nil,
+		"PullImageSecrets set to the driver to mount private images. It must be created in the same namespace with the daemonset.")
+	printDetectedInstead = pflag.Bool("print-detected-instead", false, "Print detected configuration instead of manifests")
+	enableCache          = pflag.Bool("enable-daemon-image-credential-cache", true,
+		"Set --enable-daemon-image-credential-cache to the driver daemon")
+)
 
 func main() {
 	pflag.Parse()
@@ -36,6 +40,7 @@ func main() {
 		return
 	}
 
+	conf.EnableCache = *enableCache
 	conf.Image = fmt.Sprintf("%s/csi-image:%s", Registry, Version)
 
 	vols := detectImageSvcVolumes(conf.ImageSocketPath)
@@ -108,6 +113,7 @@ func main() {
 
 	ds := appsv1.DaemonSet{}
 	if err := yaml.Unmarshal(manifest.Bytes(), &ds); err != nil {
+		fmt.Fprintf(os.Stderr, manifest.String())
 		panic(err)
 	}
 
@@ -179,6 +185,7 @@ type driverConfig struct {
 	ImageSocketPath     string
 	RuntimeVolumes      []corev1.Volume
 	RuntimeVolumeMounts []corev1.VolumeMount
+	EnableCache         bool
 }
 
 func (d driverConfig) String() string {
@@ -188,6 +195,7 @@ func (d driverConfig) String() string {
 	fmt.Fprintln(b, `Runtime       : `, d.Runtime)
 	fmt.Fprintln(b, `Runtime Socket: `, d.RuntimeSocketPath)
 	fmt.Fprintln(b, `Image Socket  : `, d.ImageSocketPath)
+	fmt.Fprintln(b, `EnableCache   : `, d.EnableCache)
 	fmt.Fprintln(b, `Host Paths    :`)
 
 	for _, v := range d.RuntimeVolumes {
@@ -301,6 +309,7 @@ spec:
             - "--endpoint=$(CSI_ENDPOINT)"
             - "--node=$(KUBE_NODE_NAME)"
             - "--runtime-addr=$(CRI_ADDR)"
+            - "--enable-daemon-image-credential-cache={{.EnableCache}}"
           env:
             - name: CSI_ENDPOINT
               value: unix:///csi/csi.sock

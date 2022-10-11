@@ -46,9 +46,18 @@ function lib::start_cluster_docker() {
 
 function lib::gen_manifests() {
   local secret=$1
+  local disableCache=$2
   docker cp _output/warm-metal-csi-image-install kind-${GITHUB_RUN_ID}-control-plane:/usr/bin/warm-metal-csi-image-install
   if [[ "${secret}" != "" ]]; then
-    docker exec kind-${GITHUB_RUN_ID}-control-plane warm-metal-csi-image-install --pull-image-secret-for-daemonset=${secret} 2>/dev/null
+    if [[ "${disableCache}" != "" ]]; then
+      docker exec kind-${GITHUB_RUN_ID}-control-plane \
+        warm-metal-csi-image-install \
+        --enable-daemon-image-credential-cache=false \
+        --pull-image-secret-for-daemonset=${secret} 2>/dev/null
+    else
+      docker exec kind-${GITHUB_RUN_ID}-control-plane \
+        warm-metal-csi-image-install --pull-image-secret-for-daemonset=${secret} 2>/dev/null
+    fi
   else
     docker exec kind-${GITHUB_RUN_ID}-control-plane warm-metal-csi-image-install 2>/dev/null
   fi
