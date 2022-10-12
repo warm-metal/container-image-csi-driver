@@ -35,6 +35,12 @@ warm-metal-csi-image-install --print-detected-instead
 
 # To change the default namespace that the driver to be installed in
 warm-metal-csi-image-install --namespace=foo
+
+# To set a Secret as the imagepullsecret
+warm-metal-csi-image-install --pull-image-secret-for-daemonset=foo
+
+# To disable the memroy cache for imagepullsecrets if Secrets are short-lived.
+warm-metal-csi-image-install --pull-image-secret-for-daemonset=foo --enable-daemon-image-credential-cache=false
 ```
 
 You can found some installation manifests as samples in [examples](https://github.com/warm-metal/csi-driver-image/tree/master/sample).

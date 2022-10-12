@@ -22,7 +22,7 @@ type nodeServer struct {
 	*csicommon.DefaultNodeServer
 	mounter     *backend.SnapshotMounter
 	imageSvc    cri.ImageServiceClient
-	secretCache secret.Cache
+	secretStore secret.Store
 }
 
 const (
@@ -96,7 +96,7 @@ func (n nodeServer) NodePublishVolume(ctx context.Context, req *csi.NodePublishV
 
 	pullAlways := strings.ToLower(req.VolumeContext[ctxKeyPullAlways]) == "true"
 
-	keyring, err := n.secretCache.GetDockerKeyring(ctx, req.Secrets)
+	keyring, err := n.secretStore.GetDockerKeyring(ctx, req.Secrets)
 	if err != nil {
 		err = status.Errorf(codes.Aborted, "unable to fetch keyring: %s", err)
 		return
