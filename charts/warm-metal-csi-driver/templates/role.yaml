@@ -1,0 +1,15 @@
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: csi-image-warm-metal
+  namespace: kube-system
+rules:
+  - apiGroups:
+      - ""
+    resourceNames:
+      - csi-image-warm-metal
+    resources:
+      - serviceaccounts
+    verbs:
+      - get
