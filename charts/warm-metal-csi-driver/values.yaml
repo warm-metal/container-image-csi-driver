@@ -1,0 +1,13 @@
+# Valid EKS values
+runtime:
+  engine: containerd
+  socketPath: /run/containerd/containerd.sock
+kubeletRoot: /var/lib/kubelet
+snapshotRoot: /var/lib/containerd/io.containerd.snapshotter.v1.overlayfs
+image:
+  tag: v0.5.1
+  repository: docker.io/warmmetal/csi-image
+csiNodeDriverRegistrar:
+  image:
+    tag: v1.1.0
+    repository: quay.io/k8scsi/csi-node-driver-registrar
