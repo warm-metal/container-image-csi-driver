@@ -13,7 +13,7 @@ import (
 	csicommon "github.com/warm-metal/csi-drivers/pkg/csi-common"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
-	cri "k8s.io/cri-api/pkg/apis/runtime/v1alpha2"
+	cri "k8s.io/cri-api/pkg/apis/runtime/v1"
 	"k8s.io/klog/v2"
 	k8smount "k8s.io/utils/mount"
 )

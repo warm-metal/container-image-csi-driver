@@ -5,7 +5,7 @@ import (
 
 	"github.com/containerd/containerd/reference/docker"
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
-	cri "k8s.io/cri-api/pkg/apis/runtime/v1alpha2"
+	cri "k8s.io/cri-api/pkg/apis/runtime/v1"
 	"k8s.io/kubernetes/pkg/credentialprovider"
 )
 
