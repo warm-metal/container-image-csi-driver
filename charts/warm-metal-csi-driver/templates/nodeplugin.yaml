@@ -1,0 +1,133 @@
+apiVersion: apps/v1
+kind: DaemonSet
+metadata:
+  name: {{ include "warm-metal-csi-driver.fullname" . }}-nodeplugin
+  labels:
+    {{- include "warm-metal-csi-driver.nodeplugin.labels" . | nindent 4 }}
+spec:
+  updateStrategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxUnavailable: "10%"
+  selector:
+    matchLabels:
+      {{- include "warm-metal-csi-driver.nodeplugin.selectorLabels" . | nindent 6 }}
+  template:
+    metadata:
+      labels:
+        {{- include "warm-metal-csi-driver.nodeplugin.labels" . | nindent 8 }}
+    spec:
+      containers:
+        - name: node-driver-registrar
+          args:
+            - "--csi-address=/csi/csi.sock"
+            - --kubelet-registration-path={{ .Values.kubeletRoot }}/plugins/csi-image.warm-metal.tech/csi.sock
+            - "-v={{ .Values.logLevel }}"
+          env:
+            - name: KUBE_NODE_NAME
+              valueFrom:
+                fieldRef:
+                  apiVersion: v1
+                  fieldPath: spec.nodeName
+          image: "{{ .Values.csiNodeDriverRegistrar.image.repository }}:{{ .Values.csiNodeDriverRegistrar.image.tag }}"
+          imagePullPolicy: {{ .Values.csiNodeDriverRegistrar.image.pullPolicy }}
+          lifecycle:
+            preStop:
+              exec:
+                command:
+                  - /bin/sh
+                  - -c
+                  - rm -rf /registration/csi-image.warm-metal.tech /registration/csi-image.warm-metal.tech-reg.sock
+          {{- with .Values.csiNodeDriverRegistrar.resources }}
+          resources:
+          {{- toYaml . | nindent 12 }}
+          {{- end }}
+          volumeMounts:
+            - mountPath: /csi
+              name: socket-dir
+            - mountPath: /registration
+              name: registration-dir
+        - name: liveness-probe
+          image: "{{ .Values.csiLivenessProbe.image.repository }}:{{ .Values.csiLivenessProbe.image.tag }}"
+          imagePullPolicy: {{ .Values.csiLivenessProbe.image.pullPolicy }}
+          args:
+            - "--csi-address=/csi/csi.sock"
+            - "--http-endpoint=:9809"
+            - "-v={{ .Values.logLevel }}"
+          {{- with .Values.csiLivenessProbe.resources }}
+          resources:
+          {{- toYaml . | nindent 12 }}
+          {{- end }}
+          volumeMounts:
+            - mountPath: /csi
+              name: socket-dir
+        - name: csi-plugin
+          args:
+            - --endpoint=$(CSI_ENDPOINT)
+            - --node=$(KUBE_NODE_NAME)
+            - --runtime-addr=$(CRI_ADDR)
+            - --node-plugin-sa={{ include "warm-metal-csi-driver.fullname" . }}-nodeplugin
+            - "-v={{ .Values.logLevel }}"
+            - "--mode=node"
+          env:
+            - name: CSI_ENDPOINT
+              value: unix:///csi/csi.sock
+            - name: CRI_ADDR
+              value: {{ .Values.runtime.engine }}://{{ .Values.runtime.socketPath }}
+            - name: KUBE_NODE_NAME
+              valueFrom:
+                fieldRef:
+                  apiVersion: v1
+                  fieldPath: spec.nodeName
+          {{- with .Values.csiPlugin.resources }}
+          resources:
+          {{- toYaml . | nindent 12 }}
+          {{- end }}
+          image: "{{ .Values.csiPlugin.image.repository }}:{{ .Values.csiPlugin.image.tag | default .Chart.AppVersion }}"
+          imagePullPolicy: {{ .Values.csiPlugin.image.pullPolicy }}
+          ports:
+            - containerPort: 9809
+              name: metrics
+              protocol: TCP
+          livenessProbe:
+            {{- toYaml .Values.csiPlugin.livenessProbe | nindent 12}}
+          securityContext:
+            privileged: true
+          volumeMounts:
+            - mountPath: /csi
+              name: socket-dir
+            - mountPath: {{ .Values.kubeletRoot }}/pods
+              mountPropagation: Bidirectional
+              name: mountpoint-dir
+            - mountPath: {{ .Values.runtime.socketPath }}
+              name: runtime-socket
+            - mountPath: {{ .Values.snapshotRoot }}
+              mountPropagation: Bidirectional
+              name: snapshot-root-0
+      hostNetwork: true
+      serviceAccountName: {{ include "warm-metal-csi-driver.fullname" . }}-nodeplugin
+      volumes:
+        - hostPath:
+            path: {{ .Values.kubeletRoot }}/plugins/csi-image.warm-metal.tech
+            type: DirectoryOrCreate
+          name: socket-dir
+        - hostPath:
+            path: {{ .Values.kubeletRoot }}/pods
+            type: DirectoryOrCreate
+          name: mountpoint-dir
+        - hostPath:
+            path: {{ .Values.kubeletRoot }}/plugins_registry
+            type: Directory
+          name: registration-dir
+        - hostPath:
+            path: {{ .Values.runtime.socketPath }}
+            type: Socket
+          name: runtime-socket
+        - hostPath:
+            path: {{ .Values.snapshotRoot }}
+            type: Directory
+          name: snapshot-root-0
+      {{- with .Values.tolerations }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
