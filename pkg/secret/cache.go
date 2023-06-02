@@ -180,7 +180,7 @@ func createSecretFetcher() *secretFetcher {
 		klog.Fatalf("unable to get cluster client: %s", err)
 	}
 
-	curNamespace, err := os.ReadFile("/run/secrets/kubernetes.io/serviceaccount/namespace")
+	curNamespace, err := os.ReadFile("/var/run/secrets/kubernetes.io/serviceaccount/namespace")
 	if err != nil {
 		klog.Fatalf("unable to fetch the current namespace from the sa volume: %q", err.Error())
 	}
