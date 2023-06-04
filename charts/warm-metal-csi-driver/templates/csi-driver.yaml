@@ -1,8 +1,9 @@
----
 apiVersion: storage.k8s.io/v1
 kind: CSIDriver
 metadata:
   name: csi-image.warm-metal.tech
+  labels:
+    {{- include "warm-metal-csi-driver.labels" . | nindent 4 }}
 spec:
   attachRequired: false
   podInfoOnMount: true

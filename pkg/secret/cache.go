@@ -130,23 +130,22 @@ func (s keyringStore) GetDockerKeyring(ctx context.Context, secretData map[strin
 	return daemonKeyring, err
 }
 
-const daemonSA = "csi-image-warm-metal"
-
 type secretFetcher struct {
-	Client    *kubernetes.Clientset
-	Namespace string
+	Client       *kubernetes.Clientset
+	nodePluginSA string
+	Namespace    string
 }
 
 func (f secretFetcher) Fetch(ctx context.Context) ([]corev1.Secret, error) {
-	sa, err := f.Client.CoreV1().ServiceAccounts(f.Namespace).Get(ctx, daemonSA, metav1.GetOptions{})
+	sa, err := f.Client.CoreV1().ServiceAccounts(f.Namespace).Get(ctx, f.nodePluginSA, metav1.GetOptions{})
 	if err != nil {
-		klog.Errorf(`unable to fetch service account of the daemon pod "%s/%s": %s`, f.Namespace, daemonSA, err)
+		klog.Errorf(`unable to fetch service account of the daemon pod "%s/%s": %s`, f.Namespace, f.nodePluginSA, err)
 		return nil, err
 	}
 
 	secrets := make([]corev1.Secret, len(sa.ImagePullSecrets))
 	klog.V(2).Infof(
-		`got %d imagePullSecrets from the service account %s/%s`, len(sa.ImagePullSecrets), f.Namespace, daemonSA,
+		`got %d imagePullSecrets from the service account %s/%s`, len(sa.ImagePullSecrets), f.Namespace, f.nodePluginSA,
 	)
 
 	for i := range sa.ImagePullSecrets {
@@ -169,7 +168,7 @@ func (s secretFetcher) Get(ctx context.Context) credentialprovider.DockerKeyring
 	return keyring
 }
 
-func createSecretFetcher() *secretFetcher {
+func createSecretFetcher(nodePluginSA string) *secretFetcher {
 	config, err := rest.InClusterConfig()
 	if err != nil {
 		klog.Fatalf("unable to get cluster config: %s", err)
@@ -186,14 +185,15 @@ func createSecretFetcher() *secretFetcher {
 	}
 
 	return &secretFetcher{
-		Client:    clientset,
-		Namespace: string(curNamespace),
+		Client:       clientset,
+		nodePluginSA: nodePluginSA,
+		Namespace:    string(curNamespace),
 	}
 }
 
-func createFetcherOrDie() Store {
+func createFetcherOrDie(nodePluginSA string) Store {
 	return keyringStore{
-		persistentKeyringGetter: createSecretFetcher(),
+		persistentKeyringGetter: createSecretFetcher(nodePluginSA),
 	}
 }
 
@@ -205,8 +205,8 @@ func (s secretWOCache) Get(_ context.Context) credentialprovider.DockerKeyring {
 	return s.daemonKeyring
 }
 
-func createCacheOrDie() Store {
-	fetcher := createSecretFetcher()
+func createCacheOrDie(nodePluginSA string) Store {
+	fetcher := createSecretFetcher(nodePluginSA)
 	ctx, cancel := context.WithTimeout(context.TODO(), 10*time.Second)
 	defer cancel()
 
@@ -220,7 +220,7 @@ func createCacheOrDie() Store {
 	}
 }
 
-func CreateStoreOrDie(pluginConfigFile, pluginBinDir string, enableCache bool) Store {
+func CreateStoreOrDie(pluginConfigFile, pluginBinDir, nodePluginSA string, enableCache bool) Store {
 	if len(pluginConfigFile) > 0 && len(pluginBinDir) > 0 {
 		if err := execplugin.RegisterCredentialProviderPlugins(pluginConfigFile, pluginBinDir); err != nil {
 			klog.Fatalf("unable to register the credential plugin through %q and %q: %s", pluginConfigFile,
@@ -229,8 +229,8 @@ func CreateStoreOrDie(pluginConfigFile, pluginBinDir string, enableCache bool) S
 	}
 
 	if enableCache {
-		return createCacheOrDie()
+		return createCacheOrDie(nodePluginSA)
 	} else {
-		return createFetcherOrDie()
+		return createFetcherOrDie(nodePluginSA)
 	}
 }

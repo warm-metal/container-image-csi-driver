@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	goflag "flag"
 	"fmt"
 	"net/url"
@@ -12,6 +13,7 @@ import (
 	"github.com/warm-metal/csi-driver-image/pkg/backend/crio"
 	"github.com/warm-metal/csi-driver-image/pkg/cri"
 	"github.com/warm-metal/csi-driver-image/pkg/secret"
+	"github.com/warm-metal/csi-driver-image/pkg/watcher"
 	csicommon "github.com/warm-metal/csi-drivers/pkg/csi-common"
 	"k8s.io/klog/v2"
 
@@ -24,6 +26,9 @@ const (
 
 	containerdScheme = "containerd"
 	criOScheme       = "cri-o"
+
+	nodeMode       = "node"
+	controllerMode = "controller"
 )
 
 var (
@@ -46,6 +51,9 @@ var (
 	enableCache = flag.Bool("enable-daemon-image-credential-cache", true,
 		"Whether to save contents of imagepullsecrets of the daemon ServiceAccount in memory. "+
 			"If set to false, secrets will be fetched from the API server on every image pull.")
+	watcherResyncPeriod = flag.Duration("watcher-resync-period", 30*time.Minute, "The resync period of the pvc watcher.")
+	mode                = flag.String("mode", "", "The mode of the driver. Valid values are: node, controller")
+	nodePluginSA        = flag.String("node-plugin-sa", "csi-image-warm-metal", "The name of the ServiceAccount used by the node plugin.")
 )
 
 func main() {
@@ -63,8 +71,12 @@ func main() {
 		csi.VolumeCapability_AccessMode_MULTI_NODE_READER_ONLY,
 	})
 	driver.AddControllerServiceCapabilities([]csi.ControllerServiceCapability_RPC_Type{
-		csi.ControllerServiceCapability_RPC_UNKNOWN,
+		csi.ControllerServiceCapability_RPC_CREATE_DELETE_VOLUME,
 	})
+
+	if len(*mode) == 0 {
+		klog.Fatalf("The mode of the driver is required.")
+	}
 
 	if len(*runtimeAddr) == 0 {
 		if len(*containerdSock) == 0 {
@@ -107,15 +119,27 @@ func main() {
 	}
 
 	server := csicommon.NewNonBlockingGRPCServer()
-	server.Start(*endpoint,
-		csicommon.NewDefaultIdentityServer(driver),
-		&controllerServer{csicommon.NewDefaultControllerServer(driver)},
-		&nodeServer{
-			DefaultNodeServer: csicommon.NewDefaultNodeServer(driver),
-			mounter:           mounter,
-			imageSvc:          criClient,
-			secretStore:       secret.CreateStoreOrDie(*icpConf, *icpBin, *enableCache),
-		},
-	)
+
+	switch *mode {
+	case nodeMode:
+		server.Start(*endpoint,
+			NewIdentityServer(driverVersion),
+			nil,
+			NewNodeServer(driver, mounter, criClient, secret.CreateStoreOrDie(*icpConf, *icpBin, *nodePluginSA, *enableCache)))
+	case controllerMode:
+		watcher, err := watcher.New(context.Background(), *watcherResyncPeriod)
+		if err != nil {
+			klog.Fatalf("unable to create PVC watcher: %s", err)
+		}
+
+		defer watcher.Stop()
+
+		server.Start(*endpoint,
+			NewIdentityServer(driverVersion),
+			NewControllerServer(driver, watcher),
+			nil,
+		)
+	}
+
 	server.Wait()
 }

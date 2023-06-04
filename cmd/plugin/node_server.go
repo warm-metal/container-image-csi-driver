@@ -18,13 +18,6 @@ import (
 	k8smount "k8s.io/utils/mount"
 )
 
-type nodeServer struct {
-	*csicommon.DefaultNodeServer
-	mounter     *backend.SnapshotMounter
-	imageSvc    cri.ImageServiceClient
-	secretStore secret.Store
-}
-
 const (
 	ctxKeyVolumeHandle    = "volumeHandle"
 	ctxKeyImage           = "image"
@@ -32,7 +25,23 @@ const (
 	ctxKeyEphemeralVolume = "csi.storage.k8s.io/ephemeral"
 )
 
-func (n nodeServer) NodePublishVolume(ctx context.Context, req *csi.NodePublishVolumeRequest) (resp *csi.NodePublishVolumeResponse, err error) {
+func NewNodeServer(driver *csicommon.CSIDriver, mounter *backend.SnapshotMounter, imageSvc cri.ImageServiceClient, secretStore secret.Store) *NodeServer {
+	return &NodeServer{
+		DefaultNodeServer: csicommon.NewDefaultNodeServer(driver),
+		mounter:           mounter,
+		imageSvc:          imageSvc,
+		secretStore:       secretStore,
+	}
+}
+
+type NodeServer struct {
+	*csicommon.DefaultNodeServer
+	mounter     *backend.SnapshotMounter
+	imageSvc    cri.ImageServiceClient
+	secretStore secret.Store
+}
+
+func (n NodeServer) NodePublishVolume(ctx context.Context, req *csi.NodePublishVolumeRequest) (resp *csi.NodePublishVolumeResponse, err error) {
 	klog.Infof("mount request: %s", req.String())
 	if len(req.VolumeId) == 0 {
 		err = status.Error(codes.InvalidArgument, "VolumeId is missing")
@@ -128,7 +137,7 @@ func (n nodeServer) NodePublishVolume(ctx context.Context, req *csi.NodePublishV
 	return &csi.NodePublishVolumeResponse{}, nil
 }
 
-func (n nodeServer) NodeUnpublishVolume(ctx context.Context, req *csi.NodeUnpublishVolumeRequest) (resp *csi.NodeUnpublishVolumeResponse, err error) {
+func (n NodeServer) NodeUnpublishVolume(ctx context.Context, req *csi.NodeUnpublishVolumeRequest) (resp *csi.NodeUnpublishVolumeResponse, err error) {
 	klog.Infof("unmount request: %s", req.String())
 	if len(req.VolumeId) == 0 {
 		err = status.Error(codes.InvalidArgument, "VolumeId is missing")
@@ -153,14 +162,14 @@ func (n nodeServer) NodeUnpublishVolume(ctx context.Context, req *csi.NodeUnpubl
 	return &csi.NodeUnpublishVolumeResponse{}, nil
 }
 
-func (n nodeServer) NodeStageVolume(ctx context.Context, request *csi.NodeStageVolumeRequest) (*csi.NodeStageVolumeResponse, error) {
+func (n NodeServer) NodeStageVolume(ctx context.Context, _ *csi.NodeStageVolumeRequest) (*csi.NodeStageVolumeResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "")
 }
 
-func (n nodeServer) NodeUnstageVolume(ctx context.Context, request *csi.NodeUnstageVolumeRequest) (*csi.NodeUnstageVolumeResponse, error) {
+func (n NodeServer) NodeUnstageVolume(ctx context.Context, _ *csi.NodeUnstageVolumeRequest) (*csi.NodeUnstageVolumeResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "")
 }
 
-func (n nodeServer) NodeExpandVolume(ctx context.Context, request *csi.NodeExpandVolumeRequest) (*csi.NodeExpandVolumeResponse, error) {
+func (n NodeServer) NodeExpandVolume(ctx context.Context, _ *csi.NodeExpandVolumeRequest) (*csi.NodeExpandVolumeResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "")
 }

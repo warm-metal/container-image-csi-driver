@@ -1,0 +1,58 @@
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: {{ include "warm-metal-csi-driver.fullname" . }}-nodeplugin
+---
+kind: ClusterRole
+apiVersion: rbac.authorization.k8s.io/v1
+metadata:
+  name: {{ include "warm-metal-csi-driver.fullname" . }}-nodeplugin
+rules:
+  - apiGroups: [""]
+    resources: ["events"]
+    verbs: ["get", "list", "watch", "create", "update", "patch"]
+---
+kind: ClusterRoleBinding
+apiVersion: rbac.authorization.k8s.io/v1
+metadata:
+  name: {{ include "warm-metal-csi-driver.fullname" . }}-nodeplugin
+subjects:
+  - kind: ServiceAccount
+    name: {{ include "warm-metal-csi-driver.fullname" . }}-nodeplugin
+    namespace: {{ .Release.Namespace }}
+roleRef:
+  kind: ClusterRole
+  name: {{ include "warm-metal-csi-driver.fullname" . }}-nodeplugin
+  apiGroup: rbac.authorization.k8s.io
+---
+kind: RoleBinding
+apiVersion: rbac.authorization.k8s.io/v1
+metadata:
+  name: {{ include "warm-metal-csi-driver.fullname" . }}-nodeplugin
+  namespace: {{ .Release.Namespace }}
+subjects:
+  - kind: ServiceAccount
+    name: {{ include "warm-metal-csi-driver.fullname" . }}-nodeplugin
+    namespace: {{ .Release.Namespace }}
+roleRef:
+  kind: Role
+  name: {{ include "warm-metal-csi-driver.fullname" . }}-nodeplugin
+  apiGroup: rbac.authorization.k8s.io
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: {{ include "warm-metal-csi-driver.fullname" . }}-nodeplugin
+  namespace: {{ .Release.Namespace }}
+rules:
+  - apiGroups:
+      - ""
+    resourceNames:
+      - {{ include "warm-metal-csi-driver.fullname" . }}-nodeplugin
+    resources:
+      - serviceaccounts
+    verbs:
+      - get
+  - apiGroups: ["coordination.k8s.io"]
+    resources: ["leases"]
+    verbs: ["get", "watch", "list", "delete", "update", "create"]
