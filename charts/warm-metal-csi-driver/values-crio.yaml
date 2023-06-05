@@ -1,8 +1,10 @@
 runtime:
-  engine: containerd
-  socketPath: /run/containerd/containerd.sock
+  engine: cri-o
+  socketPath: /var/run/crio/crio.sock
 kubeletRoot: /var/lib/kubelet
-snapshotRoot: /var/lib/containerd/io.containerd.snapshotter.v1.overlayfs
+snapshotRoot: /var/lib/containers/storage
+crioRuntimeRoot: /run/containers/storage
+crioMountProgram: /usr/local/bin/fuse-overlayfs
 logLevel: 4
 enableDaemonImageCredentialCache:
 pullImageSecretForDaemonset:

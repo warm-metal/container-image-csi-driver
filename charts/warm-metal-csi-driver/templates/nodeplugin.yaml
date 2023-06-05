@@ -67,6 +67,9 @@ spec:
             - --node=$(KUBE_NODE_NAME)
             - --runtime-addr=$(CRI_ADDR)
             - --node-plugin-sa={{ include "warm-metal-csi-driver.fullname" . }}-nodeplugin
+            {{- if .Values.enableDaemonImageCredentialCache }}
+            - --enable-daemon-image-credential-cache
+            {{- end }}
             - "-v={{ .Values.logLevel }}"
             - "--mode=node"
           env:
@@ -104,6 +107,15 @@ spec:
             - mountPath: {{ .Values.snapshotRoot }}
               mountPropagation: Bidirectional
               name: snapshot-root-0
+            {{- if .Values.crioRuntimeRoot }}
+            - mountPath: {{ .Values.crioRuntimeRoot }}
+              mountPropagation: Bidirectional
+              name: crio-runtime-root
+            {{- end }}
+            {{- if .Values.crioMountProgram }}
+            - mountPath: {{ .Values.crioMountProgram }}
+              name: crio-mount-program
+            {{- end }}
       hostNetwork: true
       serviceAccountName: {{ include "warm-metal-csi-driver.fullname" . }}-nodeplugin
       volumes:
@@ -123,6 +135,18 @@ spec:
             path: {{ .Values.runtime.socketPath }}
             type: Socket
           name: runtime-socket
+        {{- if .Values.crioRuntimeRoot }}
+        - hostPath:
+            path: {{ .Values.crioRuntimeRoot }}
+            type: Directory
+          name: crio-runtime-root
+        {{- end }}
+        {{- if .Values.crioMountProgram }}
+        - hostPath:
+            path: {{ .Values.crioMountProgram }}
+            type: File
+          name: crio-mount-program
+        {{- end }}
         - hostPath:
             path: {{ .Values.snapshotRoot }}
             type: Directory

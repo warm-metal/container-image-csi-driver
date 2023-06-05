@@ -10,3 +10,6 @@ spec:
   volumeLifecycleModes:
     - Persistent
     - Ephemeral
+  {{- if (ge (int .Capabilities.KubeVersion.Minor) 20) }}
+  fsGroupPolicy: None
+  {{- end}}

@@ -3,6 +3,7 @@
 source $(dirname "${BASH_SOURCE[0]}")/../../hack/lib/cluster.sh
 
 TestBase=$(dirname "${BASH_SOURCE[0]}")
+IMAGE_TAG=${IMAGE_TAG:=$(git rev-parse --short HEAD)}
 
 set -e
 export REGISTRY_USERNAME=warmmetal
@@ -42,8 +43,16 @@ for i in ${TestBase}/failed-manifests/*.yaml; do
 done
 
 echo "Install secret for daemon and enable secret cache"
-IMG=docker.io/warmmetal/csi-image:$(git rev-parse --short HEAD)
-lib::install_driver "${IMG}" "warmmetal"
+
+helm uninstall -n kube-system ${HELM_NAME} --wait
+helm install ${HELM_NAME} charts/warm-metal-csi-driver -n kube-system \
+  -f ${VALUE_FILE} \
+  --set csiPlugin.image.tag=${IMAGE_TAG} \
+  --set csiNodeDriverRegistrar.image.repository=${REGISTRAR_IMAGE} \
+  --set csiLivenessProbe.image.repository=${LIVENESSPROBE_IMAGE} \
+  --set csiExternalProvisioner.image.repository=${PROVISIONER_IMAGE} \
+  --set pullImageSecretForDaemonset=warmmetal \
+  --wait
 
 for i in ${TestBase}/daemon-dependent-manifests/*.yaml; do
   echo "start job $(basename $i)"
@@ -51,7 +60,17 @@ for i in ${TestBase}/daemon-dependent-manifests/*.yaml; do
 done
 
 echo "Install secret for daemon and disable secret cache"
-lib::install_driver "${IMG}" "warmmetal" "disable"
+
+helm uninstall -n kube-system ${HELM_NAME} --wait
+helm install ${HELM_NAME} charts/warm-metal-csi-driver -n kube-system \
+  -f ${VALUE_FILE} \
+  --set csiPlugin.image.tag=${IMAGE_TAG} \
+  --set csiNodeDriverRegistrar.image.repository=${REGISTRAR_IMAGE} \
+  --set csiLivenessProbe.image.repository=${LIVENESSPROBE_IMAGE} \
+  --set csiExternalProvisioner.image.repository=${PROVISIONER_IMAGE} \
+  --set pullImageSecretForDaemonset=warmmetal \
+  --set enableDaemonImageCredentialCache=true \
+  --wait
 
 for i in ${TestBase}/daemon-dependent-manifests/*.yaml; do
   echo "start job $(basename $i)"

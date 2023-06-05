@@ -1,20 +1,21 @@
 name: backward-compatibility-5mins
 on:
   push:
-    branches: [ master ]
+    branches: [master]
   pull_request:
-    branches: [ master ]
+    branches: [master]
   workflow_dispatch:
 jobs:
   integration:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v2
+      - uses: wahyd4/kubectl-helm-action@master
       - name: Start a kind cluster with containerd
         uses: helm/kind-action@v1.4.0
         with:
           cluster_name: kind-${{ github.run_id }}
-          kubectl_version: 'v1.25.2'
+          kubectl_version: "v1.25.2"
           config: ./hack/ci/containerd-cluster-conf.yaml
       - name: Build image
         run: ./hack/ci/build.sh
