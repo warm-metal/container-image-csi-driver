@@ -10,7 +10,6 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v2
-      - uses: wahyd4/kubectl-helm-action@master
       - name: Start a kind cluster with containerd
         uses: helm/kind-action@v1.4.0
         with:

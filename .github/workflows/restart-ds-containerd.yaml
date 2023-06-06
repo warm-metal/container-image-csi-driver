@@ -10,7 +10,6 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v2
-      - uses: wahyd4/kubectl-helm-action@master
       - name: Start a kind cluster with containerd
         uses: helm/kind-action@v1.4.0
         with:
@@ -23,6 +22,7 @@ jobs:
         run: |
           echo "VALUE_FILE=charts/warm-metal-csi-driver/values.yaml" >> "$GITHUB_ENV"
           echo "IMAGE_TAG=$(git rev-parse --short HEAD)" >> "$GITHUB_ENV"
+          echo "HELM_NAME=wm-csi-integration-tests" >> "$GITHUB_ENV"
       - name: Install the CSI Driver
         run: |
           helm install ${HELM_NAME} charts/warm-metal-csi-driver -n kube-system \
