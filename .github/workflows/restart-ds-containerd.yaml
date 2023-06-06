@@ -28,7 +28,8 @@ jobs:
           helm install ${HELM_NAME} charts/warm-metal-csi-driver -n kube-system \
             -f ${VALUE_FILE} \
             --set csiPlugin.image.tag=${IMAGE_TAG} \
-            --wait
+            --wait \
+            --debug
       - name: Test volumes between the ds restarted
         run: ./test/integration/restart-ds.sh
       - name: Uninstall the CSI Driver

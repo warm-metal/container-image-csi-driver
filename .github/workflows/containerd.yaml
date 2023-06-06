@@ -30,7 +30,8 @@ jobs:
           helm install ${HELM_NAME} charts/warm-metal-csi-driver -n kube-system \
             -f ${VALUE_FILE} \
             --set csiPlugin.image.tag=${IMAGE_TAG} \
-            --wait
+            --wait \
+            --debug
       - name: Run integration Tests
         run: ./hack/ci/test.sh
       - name: Uninstall the CSI Driver

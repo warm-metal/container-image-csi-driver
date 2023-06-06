@@ -11,6 +11,8 @@ kubectlwait default compatible-ephemeral-volume
 kubectl apply -f "${TestBase}/compatible-manifests/pre-provisioned-pv.yaml"
 kubectlwait default compatible-pre-provisioned-pv
 
+kubectl delete --ignore-not-found -f 'https://raw.githubusercontent.com/warm-metal/csi-driver-image/v0.4.2/install/cri-containerd.yaml'
+
 export VALUE_FILE=$(dirname "${BASH_SOURCE[0]}")/../../charts/warm-metal-csi-driver/values.yaml
 export IMAGE_TAG=$(git rev-parse --short HEAD)
 export HELM_NAME="wm-csi-integration-tests"
