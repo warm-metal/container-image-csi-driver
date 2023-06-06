@@ -45,7 +45,6 @@ spec:
           args:
             - --endpoint=$(CSI_ENDPOINT)
             - --node=$(KUBE_NODE_NAME)
-            - --runtime-addr=$(CRI_ADDR)
             - --node-plugin-sa={{ include "warm-metal-csi-driver.fullname" . }}-nodeplugin
             - "-v={{ .Values.logLevel }}"
             - "--mode=controller"
@@ -76,36 +75,11 @@ spec:
           volumeMounts:
             - mountPath: /csi
               name: socket-dir
-            - mountPath: {{ .Values.kubeletRoot }}/pods
-              mountPropagation: Bidirectional
-              name: mountpoint-dir
-            - mountPath: {{ .Values.runtime.socketPath }}
-              name: runtime-socket
-            - mountPath: {{ .Values.snapshotRoot }}
-              mountPropagation: Bidirectional
-              name: snapshot-root-0
       serviceAccountName: {{ include "warm-metal-csi-driver.fullname" . }}-controller
       volumes:
-        - hostPath:
-            path: {{ .Values.kubeletRoot }}/plugins/csi-image.warm-metal.tech
-            type: DirectoryOrCreate
+        - emptyDir:
+            medium: "Memory"
           name: socket-dir
-        - hostPath:
-            path: {{ .Values.kubeletRoot }}/pods
-            type: DirectoryOrCreate
-          name: mountpoint-dir
-        - hostPath:
-            path: {{ .Values.kubeletRoot }}/plugins_registry
-            type: Directory
-          name: registration-dir
-        - hostPath:
-            path: {{ .Values.runtime.socketPath }}
-            type: Socket
-          name: runtime-socket
-        - hostPath:
-            path: {{ .Values.snapshotRoot }}
-            type: Directory
-          name: snapshot-root-0
       {{- with .Values.nodeSelector }}
       nodeSelector:
         {{- toYaml . | nindent 8 }}
