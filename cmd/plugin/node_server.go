@@ -15,7 +15,7 @@ import (
 	"google.golang.org/grpc/status"
 	cri "k8s.io/cri-api/pkg/apis/runtime/v1alpha2"
 	"k8s.io/klog/v2"
-	k8smount "k8s.io/utils/mount"
+	k8smount "k8s.io/mount-utils"
 )
 
 const (
@@ -149,8 +149,8 @@ func (n NodeServer) NodeUnpublishVolume(ctx context.Context, req *csi.NodeUnpubl
 		return
 	}
 
-	notMnt, err := k8smount.New("").IsLikelyNotMountPoint(req.TargetPath)
-	if err != nil || notMnt {
+	mnt, err := k8smount.New("").IsMountPoint(req.TargetPath)
+	if err != nil || !mnt {
 		return &csi.NodeUnpublishVolumeResponse{}, err
 	}
 
