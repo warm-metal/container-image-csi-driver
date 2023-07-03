@@ -127,7 +127,7 @@ func (s keyringStore) GetDockerKeyring(ctx context.Context, secretData map[strin
 		return credentialprovider.UnionDockerKeyring{preferredKeyring, daemonKeyring}, nil
 	}
 
-	return daemonKeyring, err
+	return credentialprovider.UnionDockerKeyring{daemonKeyring, credentialprovider.NewDockerKeyring()}, err
 }
 
 type secretFetcher struct {
