@@ -13,7 +13,8 @@ type Puller interface {
 	Pull(context.Context) error
 }
 
-func NewPuller(imageSvc cri.ImageServiceClient, image docker.Named, keyring credentialprovider.DockerKeyring) Puller {
+func NewPuller(imageSvc cri.ImageServiceClient, image docker.Named,
+	keyring credentialprovider.DockerKeyring) Puller {
 	return &puller{
 		imageSvc: imageSvc,
 		image:    image,
