@@ -25,13 +25,6 @@ spec:
                   fieldPath: spec.nodeName
           image: {{ .Values.csiNodeDriverRegistrar.image.repository }}:{{ .Values.csiNodeDriverRegistrar.image.tag }}
           imagePullPolicy: IfNotPresent
-          lifecycle:
-            preStop:
-              exec:
-                command:
-                  - /bin/sh
-                  - -c
-                  - rm -rf /registration/csi-image.warm-metal.tech /registration/csi-image.warm-metal.tech-reg.sock
           name: node-driver-registrar
           resources: {}
           volumeMounts:
