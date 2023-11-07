@@ -5,7 +5,7 @@ runtime:
 kubeletRoot: /var/lib/kubelet
 snapshotRoot: /var/lib/containerd/io.containerd.snapshotter.v1.overlayfs
 image:
-  tag: v0.6.3
+  tag: v0.6.4
   repository: docker.io/warmmetal/csi-image
 csiNodeDriverRegistrar:
   image:
