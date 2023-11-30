@@ -164,8 +164,7 @@ func (s *SnapshotMounter) unrefROSnapshot(ctx context.Context, target MountTarge
 }
 
 func (s *SnapshotMounter) Mount(
-	ctx context.Context, volumeId string, target MountTarget, image docker.Named, ro bool,
-) (err error) {
+	ctx context.Context, volumeId string, target MountTarget, image docker.Named, ro bool) (err error) {
 	var key SnapshotKey
 	imageID := s.runtime.GetImageIDOrDie(ctx, image)
 	if ro {

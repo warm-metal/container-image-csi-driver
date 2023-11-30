@@ -1,0 +1,9 @@
+services:
+    containerd-workspace:
+        # replace the image here with the image you built using `Dockerfile.containerd`
+        image: containerd-on-mac:0.6
+        privileged: true # to enable mount/unmount operations
+        command: containerd
+        # mount code in the current repo to `/code` path in the container
+        volumes:
+          - ../../../.:/code

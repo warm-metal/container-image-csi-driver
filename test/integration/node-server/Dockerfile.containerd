@@ -1,0 +1,28 @@
+# bookworm is name of the latest debian release at the time of writing this
+FROM golang:1.19-bookworm
+
+# Based on https://docs.docker.com/engine/install/debian/
+
+# Add Docker's official GPG key:
+RUN  apt-get update
+RUN  apt-get install ca-certificates curl gnupg
+RUN  install -m 0755 -d /etc/apt/keyrings
+RUN curl -fsSL https://download.docker.com/linux/debian/gpg |  gpg --dearmor -o /etc/apt/keyrings/docker.gpg
+RUN  chmod a+r /etc/apt/keyrings/docker.gpg
+
+# Add the repository to Apt sources:
+RUN echo "deb [arch="$(dpkg --print-architecture)" signed-by=/etc/apt/keyrings/docker.gpg] https://download.docker.com/linux/debian bookworm stable" |  tee /etc/apt/sources.list.d/docker.list > /dev/null
+RUN  apt-get update
+
+RUN apt-get install docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin -y
+RUN apt-get install libbtrfs-dev libgpgme-dev libdevmapper-dev -y
+
+# Install CNI plugins
+RUN curl -LO https://github.com/containernetworking/plugins/releases/download/v1.3.0/cni-plugins-linux-amd64-v1.3.0.tgz
+RUN mkdir -p /opt/cni/bin
+RUN tar Cxzvf /opt/cni/bin cni-plugins-linux-amd64-v1.3.0.tgz
+# To enable CRI plugin in containerd
+RUN sed -i 's/disabled_plugins/#disabled_plugins/g' /etc/containerd/config.toml
+# Directory for node server's csi socket
+RUN mkdir /csi
+# Fixes https://github.com/containers/buildah/issues/2922
