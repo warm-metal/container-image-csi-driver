@@ -15,6 +15,15 @@ spec:
       {{- if .Values.podMonitor.timeout }}
       scrapeTimeout: {{ .Values.podMonitor.timeout }}
         {{- end }}
+    - path: /metrics
+      port: metrics2
+      scheme: http
+      {{- if .Values.podMonitor.interval }}
+      interval: {{ .Values.podMonitor.interval }}
+      {{- end }}
+      {{- if .Values.podMonitor.timeout }}
+      scrapeTimeout: {{ .Values.podMonitor.timeout }}
+        {{- end }}
   jobLabel: {{ include "warm-metal-csi-driver.fullname" . }}
   namespaceSelector:
     matchNames:

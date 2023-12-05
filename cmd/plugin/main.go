@@ -4,14 +4,18 @@ import (
 	"context"
 	goflag "flag"
 	"fmt"
+	"net/http"
 	"net/url"
 
 	"github.com/container-storage-interface/spec/lib/go/csi"
+	"github.com/prometheus/client_golang/prometheus"
+	"github.com/prometheus/client_golang/prometheus/promhttp"
 	flag "github.com/spf13/pflag"
 	"github.com/warm-metal/csi-driver-image/pkg/backend"
 	"github.com/warm-metal/csi-driver-image/pkg/backend/containerd"
 	"github.com/warm-metal/csi-driver-image/pkg/backend/crio"
 	"github.com/warm-metal/csi-driver-image/pkg/cri"
+	"github.com/warm-metal/csi-driver-image/pkg/metrics"
 	"github.com/warm-metal/csi-driver-image/pkg/secret"
 	"github.com/warm-metal/csi-driver-image/pkg/watcher"
 	csicommon "github.com/warm-metal/csi-drivers/pkg/csi-common"
@@ -80,6 +84,11 @@ func main() {
 		klog.Fatalf("The mode of the driver is required.")
 	}
 
+	reg := prometheus.NewRegistry()
+	reg.MustRegister(metrics.ImagePullTime)
+	reg.MustRegister(metrics.ImageMountTime)
+	reg.MustRegister(metrics.OperationErrorsCount)
+
 	server := csicommon.NewNonBlockingGRPCServer()
 
 	switch *mode {
@@ -144,6 +153,12 @@ func main() {
 			nil,
 		)
 	}
+
+	go func() {
+		http.Handle("/metrics", promhttp.HandlerFor(reg, promhttp.HandlerOpts{Registry: reg}))
+		klog.Info("serving internal metrics at port 8080")
+		klog.Fatal(http.ListenAndServe(":8080", nil))
+	}()
 
 	server.Wait()
 }
