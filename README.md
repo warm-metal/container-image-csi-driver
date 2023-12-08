@@ -1,9 +1,15 @@
+
+<p align="center" width="100%">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="./logo/aqua_horizontal_white.svg">
+    <img src="./logo/logo.svg" alt="logo">
+  </picture>
+</p>
+
 [![containerd](https://github.com/warm-metal/csi-driver-image/actions/workflows/containerd.yaml/badge.svg)](https://github.com/warm-metal/csi-driver-image/actions/workflows/containerd.yaml)
 [![docker-containerd](https://github.com/warm-metal/csi-driver-image/actions/workflows/docker-containerd.yaml/badge.svg)](https://github.com/warm-metal/csi-driver-image/actions/workflows/docker-containerd.yaml)
 [![cri-o](https://github.com/warm-metal/csi-driver-image/actions/workflows/cri-o.yaml/badge.svg)](https://github.com/warm-metal/csi-driver-image/actions/workflows/cri-o.yaml)
 ![Docker Pulls](https://img.shields.io/docker/pulls/warmmetal/csi-image?color=brightgreen&logo=docker&logoColor=lightgrey&labelColor=black)
-
-# csi-driver-image
 
 This is a CSI driver for mounting images as PVs or ephemeral volumes.
 
