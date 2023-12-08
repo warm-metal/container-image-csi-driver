@@ -129,7 +129,6 @@ func (m *MountExecutor) WaitForMount(o *MountOptions) error {
 		mountPollTimeInterval,
 		mountPollTimeout,
 		mountCondFn); err != nil {
-		metrics.OperationErrorsCount.WithLabelValues("WaitForMount").Inc()
 		return fmt.Errorf("waited too long to mount the image: %v", err)
 	}
 

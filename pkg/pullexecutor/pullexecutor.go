@@ -148,7 +148,6 @@ func (m *PullExecutor) WaitForPull(o *PullOptions) error {
 		pullPollTimeInterval,
 		pullPollTimeout,
 		condFn); err != nil {
-		metrics.OperationErrorsCount.WithLabelValues("WaitForPull").Inc()
 		return errors.Errorf("waited too long to download the image: %v", err)
 	}
 
