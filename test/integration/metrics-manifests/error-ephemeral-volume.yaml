@@ -1,0 +1,31 @@
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: error-compatible-ephemeral-volume
+spec:
+  template:
+    metadata:
+      name: error-compatible-ephemeral-volume
+    spec:
+      containers:
+        - name: error-compatible-ephemeral-volume
+          image: docker.io/warmmetal/csi-image-test:check-fs
+          env:
+            - name: TARGET
+              value: /target
+          volumeMounts:
+            - mountPath: /target
+              name: target
+      restartPolicy: Never
+      volumes:
+        - name: target
+          csi:
+            driver: csi-image.warm-metal.tech
+            volumeAttributes:
+              image: "docker.io/warmmetal/csi-image-test:simple-fs-doesnt-exist"
+              # # set pullAlways if you want to ignore local images
+              # pullAlways: "true"
+              # # set secret if the image is private
+              # secret: "name of the ImagePullSecret"
+              # secretNamespace: "namespace of the secret"
+  backoffLimit: 0

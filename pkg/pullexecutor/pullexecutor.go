@@ -60,6 +60,7 @@ func NewPullExecutor(o *PullExecutorOptions) *PullExecutor {
 		imageSvcClient: o.ImageServiceClient,
 		secretStore:    o.SecretStore,
 		mounter:        o.Mounter,
+		asyncErrs:      make(map[docker.Named]error),
 	}
 }
 

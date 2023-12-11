@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"fmt"
 	"os"
 	"strings"
 
@@ -61,9 +62,13 @@ type NodeServer struct {
 func (n NodeServer) NodePublishVolume(ctx context.Context, req *csi.NodePublishVolumeRequest) (resp *csi.NodePublishVolumeResponse, err error) {
 	klog.Infof("mount request: %s", req.String())
 	if len(req.VolumeId) == 0 {
+		fmt.Println("ONE")
+
 		err = status.Error(codes.InvalidArgument, "VolumeId is missing")
 		return
 	}
+
+	fmt.Println("TWO")
 
 	if len(req.TargetPath) == 0 {
 		err = status.Error(codes.InvalidArgument, "TargetPath is missing")

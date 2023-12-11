@@ -297,23 +297,7 @@ func TestMetrics(t *testing.T) {
 
 	// based on kubelet's csi mounter pluginc ode
 	// check https://github.com/kubernetes/kubernetes/blob/b06a31b87235784bad2858be62115049b6eb6bcd/pkg/volume/csi/csi_mounter.go#L111-L112
-	timeout := 200 * time.Millisecond
-
-	volId := "docker.io/library/redis:latest"
-	target := "test-path"
-	req := &csi.NodePublishVolumeRequest{
-		VolumeId:   volId,
-		TargetPath: target,
-		VolumeContext: map[string]string{
-			// so that the test would always attempt to pull an image
-			ctxKeyPullAlways: "true",
-		},
-		VolumeCapability: &csi.VolumeCapability{
-			AccessMode: &csi.VolumeCapability_AccessMode{
-				Mode: csi.VolumeCapability_AccessMode_SINGLE_NODE_READER_ONLY,
-			},
-		},
-	}
+	timeout := 10 * time.Second
 
 	server := csicommon.NewNonBlockingGRPCServer()
 
@@ -369,6 +353,45 @@ func TestMetrics(t *testing.T) {
 	nodeClient := csipbv1.NewNodeClient(conn)
 	assert.NotNil(t, nodeClient)
 
+	ctx, cancel := context.WithTimeout(context.Background(), 3*timeout)
+	defer cancel()
+	// wrong image id
+	wrongVolId := "docker.io-doesnt-exist/library/redis-doesnt-exist:latest"
+	wrongTargetPath := "wrong-test-path"
+	wrongReq := &csi.NodePublishVolumeRequest{
+		VolumeId:   wrongVolId,
+		TargetPath: wrongTargetPath,
+		VolumeContext: map[string]string{
+			// so that the test would always attempt to pull an image
+			ctxKeyPullAlways: "true",
+		},
+		VolumeCapability: &csi.VolumeCapability{
+			AccessMode: &csi.VolumeCapability_AccessMode{
+				Mode: csi.VolumeCapability_AccessMode_SINGLE_NODE_READER_ONLY,
+			},
+		},
+	}
+
+	r, err := nodeClient.NodePublishVolume(ctx, wrongReq)
+	assert.Error(t, err)
+	assert.Nil(t, r)
+
+	volId := "docker.io/library/redis:latest"
+	targetPath := "test-path"
+	req := &csi.NodePublishVolumeRequest{
+		VolumeId:   volId,
+		TargetPath: targetPath,
+		VolumeContext: map[string]string{
+			// so that the test would always attempt to pull an image
+			ctxKeyPullAlways: "true",
+		},
+		VolumeCapability: &csi.VolumeCapability{
+			AccessMode: &csi.VolumeCapability_AccessMode{
+				Mode: csi.VolumeCapability_AccessMode_SINGLE_NODE_READER_ONLY,
+			},
+		},
+	}
+
 	condFn := func() (done bool, err error) {
 		ctx, cancel := context.WithTimeout(context.Background(), timeout)
 		defer cancel()
@@ -389,11 +412,6 @@ func TestMetrics(t *testing.T) {
 		condFn)
 	assert.NoError(t, err)
 
-	ctx, cancel := context.WithTimeout(context.Background(), timeout)
-	defer cancel()
-	r, err := nodeClient.NodePublishVolume(ctx, req)
-	assert.NoError(t, err)
-
 	resp, err := http.Get("http://:8080/metrics")
 	assert.NoError(t, err)
 	assert.NotNil(t, resp)
@@ -401,15 +419,10 @@ func TestMetrics(t *testing.T) {
 
 	b1, err := io.ReadAll(resp.Body)
 	assert.NoError(t, err)
-	assert.Contains(t, string(b1), metrics.ImagePullTimeKey)
-	assert.Contains(t, string(b1), metrics.ImageMountTimeKey)
-
-	// CONTINUE HERE
-
-	defer resp.Body.Close()
-
-	ctx, cancel := context.WithTimeout(context.Background(), timeout)
-	defer cancel()
+	respBody := string(b1)
+	assert.Contains(t, respBody, metrics.ImagePullTimeKey)
+	assert.Contains(t, respBody, metrics.ImageMountTimeKey)
+	assert.Contains(t, respBody, metrics.OperationErrorsCountKey)
 
 	// give some time before stopping the server
 	time.Sleep(5 * time.Second)
@@ -418,7 +431,7 @@ func TestMetrics(t *testing.T) {
 	c, ca := context.WithTimeout(context.Background(), time.Second*10)
 	defer ca()
 
-	err = mounter.Unmount(c, volId, backend.MountTarget(target))
+	err = mounter.Unmount(c, volId, backend.MountTarget(targetPath))
 	assert.NoError(t, err)
 }
 
