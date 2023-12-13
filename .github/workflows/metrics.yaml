@@ -31,6 +31,9 @@ jobs:
             --set csiPlugin.image.tag=${IMAGE_TAG} \
             --wait \
             --debug
+      # setup ssh for debugging
+      - name: Setup upterm session
+        uses: lhotari/action-upterm@v1
       - name: Test metrics
         run: ./test/integration/test-metrics.sh
       - name: Uninstall the CSI Driver
