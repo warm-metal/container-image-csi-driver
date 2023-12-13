@@ -12,7 +12,7 @@ import (
 )
 
 type SnapshotMounter struct {
-	runtime ContainerRuntime
+	runtime ContainerRuntimeMounter
 
 	guard sync.Mutex
 	// mapping from targets to key of read-only snapshots
@@ -21,7 +21,7 @@ type SnapshotMounter struct {
 	roSnapshotTargetsMap map[SnapshotKey]map[MountTarget]struct{}
 }
 
-func NewMounter(runtime ContainerRuntime) *SnapshotMounter {
+func NewMounter(runtime ContainerRuntimeMounter) *SnapshotMounter {
 	mounter := &SnapshotMounter{
 		runtime:              runtime,
 		targetRoSnapshotMap:  make(map[MountTarget]SnapshotKey),
@@ -173,7 +173,7 @@ func (s *SnapshotMounter) Mount(
 			klog.Fatalf("invalid image id of image %q", image)
 		}
 
-		key = genSnapshotKey(imageID)
+		key = GenSnapshotKey(imageID)
 		klog.Infof("refer read-only snapshot of image %q with key %q", image, key)
 		if err := s.refROSnapshot(ctx, target, imageID, key, createSnapshotMetaData(target)); err != nil {
 			return err
@@ -189,7 +189,7 @@ func (s *SnapshotMounter) Mount(
 		}()
 	} else {
 		// For read-write volumes, they must be ephemeral volumes, that which volumeIDs are unique strings.
-		key = genSnapshotKey(volumeId)
+		key = GenSnapshotKey(volumeId)
 		klog.Infof("create read-write snapshot of image %q with key %q", image, key)
 		if err := s.runtime.PrepareRWSnapshot(ctx, imageID, key, nil); err != nil {
 			return err
@@ -221,13 +221,13 @@ func (s *SnapshotMounter) Unmount(ctx context.Context, volumeId string, target M
 
 	klog.Infof("delete the read-write snapshot")
 	// Must be a read-write snapshot
-	return s.runtime.DestroySnapshot(ctx, genSnapshotKey(volumeId))
+	return s.runtime.DestroySnapshot(ctx, GenSnapshotKey(volumeId))
 }
 
 func (s *SnapshotMounter) ImageExists(ctx context.Context, image docker.Named) bool {
 	return s.runtime.ImageExists(ctx, image)
 }
 
-func genSnapshotKey(parent string) SnapshotKey {
+func GenSnapshotKey(parent string) SnapshotKey {
 	return SnapshotKey(fmt.Sprintf("csi-image.warm-metal.tech-%s", parent))
 }

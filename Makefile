@@ -25,6 +25,15 @@ sanity:
 e2e:
 	cd ./test/e2e && KUBECONFIG=~/.kube/config go run .
 
+# to run unit tests
+# PHONY signifies the make recipe is not a file
+# more info: https://stackoverflow.com/questions/2145590/what-is-the-purpose-of-phony-in-a-makefile
+.PHONY: unit-tests
+unit-tests:
+	# -count=1 forces re-test everytime (instead of caching the results)
+	# more info: https://stackoverflow.com/questions/48882691/force-retesting-or-disable-test-caching
+	go test -count=1 ./cmd/plugin
+
 .PHONY: integration
 integration:
 	./test/integration/test-backward-compatability.sh
