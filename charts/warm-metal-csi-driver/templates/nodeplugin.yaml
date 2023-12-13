@@ -73,6 +73,9 @@ spec:
             {{- if .Values.enableAsyncPullMount }}
             - --async-pull-mount=true
             {{- end }}
+            {{- if .Values.csiPlugin.maxInFlightPulls }}
+            - --max-in-flight-pulls={{ .Values.csiPlugin.maxInFlightPulls }}
+            {{- end }}
             - "-v={{ .Values.logLevel }}"
             - "--mode=node"
           env:

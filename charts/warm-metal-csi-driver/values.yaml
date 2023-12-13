@@ -10,6 +10,7 @@ pullImageSecretForDaemonset:
 
 csiPlugin:
   hostNetwork: false
+  maxInFlightPulls: -1 # i.e., no pull limit
   resources: {}
   image:
     tag: ""

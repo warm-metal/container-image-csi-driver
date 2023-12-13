@@ -2,8 +2,6 @@ package pullstatus
 
 import (
 	"sync"
-
-	"github.com/containerd/containerd/reference/docker"
 )
 
 // ImagePullStatus represents pull status of an image
@@ -23,7 +21,7 @@ const (
 
 // ImagePullStatusRecorder records the status of image pulls
 type ImagePullStatusRecorder struct {
-	status map[docker.Named]ImagePullStatus
+	status map[string]ImagePullStatus
 	mutex  sync.Mutex
 }
 
@@ -31,13 +29,13 @@ var i ImagePullStatusRecorder
 
 func init() {
 	i = ImagePullStatusRecorder{
-		status: make(map[docker.Named]ImagePullStatus),
+		status: make(map[string]ImagePullStatus),
 		mutex:  sync.Mutex{},
 	}
 }
 
 // Update updates the pull status of an image
-func Update(imageRef docker.Named, status ImagePullStatus) {
+func Update(imageRef string, status ImagePullStatus) {
 	i.mutex.Lock()
 	defer i.mutex.Unlock()
 
@@ -45,7 +43,7 @@ func Update(imageRef docker.Named, status ImagePullStatus) {
 }
 
 // Delete deletes the pull status of an image
-func Delete(imageRef docker.Named) {
+func Delete(imageRef string) {
 	i.mutex.Lock()
 	defer i.mutex.Unlock()
 
@@ -53,7 +51,7 @@ func Delete(imageRef docker.Named) {
 }
 
 // Get gets the pull status of an image
-func Get(imageRef docker.Named) ImagePullStatus {
+func Get(imageRef string) ImagePullStatus {
 	i.mutex.Lock()
 	defer i.mutex.Unlock()
 

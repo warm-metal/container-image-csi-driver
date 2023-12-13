@@ -30,6 +30,7 @@ type PullExecutorOptions struct {
 	ImageServiceClient cri.ImageServiceClient
 	SecretStore        secret.Store
 	Mounter            backend.Mounter
+	MaxInflightPulls   int
 }
 
 // PullOptions are the options for a single pull request
@@ -47,25 +48,35 @@ type PullExecutor struct {
 	asyncPull      bool
 	imageSvcClient cri.ImageServiceClient
 	mutex          *sync.Mutex
-	asyncErrs      map[docker.Named]error
+	asyncErrs      map[string]error
 	secretStore    secret.Store
 	mounter        backend.Mounter
+	tokens         chan struct{}
 }
 
 // NewPullExecutor initializes a new pull executor object
 func NewPullExecutor(o *PullExecutorOptions) *PullExecutor {
+
+	var tokens chan struct{}
+
+	if o.MaxInflightPulls > 0 {
+		tokens = make(chan struct{}, o.MaxInflightPulls)
+	}
+
 	return &PullExecutor{
 		asyncPull:      o.AsyncPull,
 		mutex:          &sync.Mutex{},
 		imageSvcClient: o.ImageServiceClient,
 		secretStore:    o.SecretStore,
 		mounter:        o.Mounter,
-		asyncErrs:      make(map[docker.Named]error),
+		asyncErrs:      make(map[string]error),
+		tokens:         tokens,
 	}
 }
 
 // StartPulling starts pulling the image
 func (m *PullExecutor) StartPulling(o *PullOptions) error {
+	namedRef := o.NamedRef.String()
 
 	keyring, err := m.secretStore.GetDockerKeyring(o.Context, o.PullSecrets)
 	if err != nil {
@@ -77,52 +88,59 @@ func (m *PullExecutor) StartPulling(o *PullOptions) error {
 		shouldPull := o.PullAlways || !m.mounter.ImageExists(o.Context, o.NamedRef)
 		if shouldPull {
 			klog.Infof("pull image %q ", o.Image)
-			pullstatus.Update(o.NamedRef, pullstatus.StillPulling)
+			pullstatus.Update(namedRef, pullstatus.StillPulling)
 			startTime := time.Now()
 			if err = puller.Pull(o.Context); err != nil {
-				pullstatus.Update(o.NamedRef, pullstatus.Errored)
+				pullstatus.Update(namedRef, pullstatus.Errored)
 				metrics.OperationErrorsCount.WithLabelValues("StartPulling").Inc()
 				return errors.Errorf("unable to pull image %q: %s", o.NamedRef, err)
 			}
 			metrics.ImagePullTime.WithLabelValues(metrics.Sync).Observe(time.Since(startTime).Seconds())
 		}
-		pullstatus.Update(o.NamedRef, pullstatus.Pulled)
+		pullstatus.Update(namedRef, pullstatus.Pulled)
 		return nil
 	}
 
-	if pullstatus.Get(o.NamedRef) == pullstatus.Pulled ||
-		pullstatus.Get(o.NamedRef) == pullstatus.StillPulling {
+	if pullstatus.Get(namedRef) == pullstatus.Pulled ||
+		pullstatus.Get(namedRef) == pullstatus.StillPulling {
 		return nil
 	}
 
 	go func() {
-		if pullstatus.Get(o.NamedRef) == pullstatus.StatusNotFound {
+		if pullstatus.Get(namedRef) == pullstatus.StatusNotFound {
 			m.mutex.Lock()
 			defer m.mutex.Unlock()
 			c, cancel := context.WithTimeout(context.Background(), pullCtxTimeout)
 			defer cancel()
 
-			if pullstatus.Get(o.NamedRef) == pullstatus.StillPulling ||
-				pullstatus.Get(o.NamedRef) == pullstatus.Pulled {
+			if pullstatus.Get(namedRef) == pullstatus.StillPulling ||
+				pullstatus.Get(namedRef) == pullstatus.Pulled {
 				return
 			}
 
 			puller := remoteimage.NewPuller(m.imageSvcClient, o.NamedRef, keyring)
 			shouldPull := o.PullAlways || !m.mounter.ImageExists(o.Context, o.NamedRef)
 			if shouldPull {
+				if m.tokens != nil {
+					m.tokens <- struct{}{}
+					defer func() {
+						<-m.tokens
+					}()
+				}
 				klog.Infof("pull image %q ", o.Image)
-				pullstatus.Update(o.NamedRef, pullstatus.StillPulling)
+				pullstatus.Update(namedRef, pullstatus.StillPulling)
 				startTime := time.Now()
 
 				if err = puller.Pull(c); err != nil {
-					pullstatus.Update(o.NamedRef, pullstatus.Errored)
+					pullstatus.Update(namedRef, pullstatus.Errored)
 					metrics.OperationErrorsCount.WithLabelValues("StartPulling").Inc()
-					m.asyncErrs[o.NamedRef] = fmt.Errorf("unable to pull image %q: %s", o.Image, err)
+					m.asyncErrs[namedRef] = fmt.Errorf("unable to pull image %q: %s", o.Image, err)
 					return
 				}
 				metrics.ImagePullTime.WithLabelValues(metrics.Async).Observe(time.Since(startTime).Seconds())
 			}
-			pullstatus.Update(o.NamedRef, pullstatus.Pulled)
+			klog.Infof("image is ready for use: %q ", o.Image)
+			pullstatus.Update(namedRef, pullstatus.Pulled)
 		}
 	}()
 
@@ -135,13 +153,14 @@ func (m *PullExecutor) WaitForPull(o *PullOptions) error {
 		return nil
 	}
 
+	namedRef := o.NamedRef.String()
 	condFn := func() (done bool, err error) {
-		if pullstatus.Get(o.NamedRef) == pullstatus.Pulled {
+		if pullstatus.Get(namedRef) == pullstatus.Pulled {
 			return true, nil
 		}
 
-		if m.asyncErrs[o.NamedRef] != nil {
-			return false, m.asyncErrs[o.NamedRef]
+		if m.asyncErrs[namedRef] != nil {
+			return false, m.asyncErrs[namedRef]
 		}
 		return false, nil
 	}

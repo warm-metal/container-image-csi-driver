@@ -57,6 +57,7 @@ var (
 	watcherResyncPeriod = flag.Duration("watcher-resync-period", 30*time.Minute, "The resync period of the pvc watcher.")
 	mode                = flag.String("mode", "", "The mode of the driver. Valid values are: node, controller")
 	nodePluginSA        = flag.String("node-plugin-sa", "csi-image-warm-metal", "The name of the ServiceAccount used by the node plugin.")
+	maxInflightPulls    = flag.Int("max-in-flight-pulls", -1, "The maximum number of image pull operations that can happen at the same time. Only works if --async-pull-mount is set to true. (default: -1 which means there is no limit)")
 )
 
 func main() {
@@ -79,6 +80,14 @@ func main() {
 
 	if len(*mode) == 0 {
 		klog.Fatalf("The mode of the driver is required.")
+	}
+
+	if *maxInflightPulls == 0 {
+		klog.Fatalf("--max-in-flight-pulls cannot be zero (current value: '%v')", *maxInflightPulls)
+	}
+
+	if !*asyncImagePullMount && *maxInflightPulls > 0 {
+		klog.Fatalf("--max-in-flight-pulls (current value: '%v') can only be used with --async-pull-mount=true (current value: %v)", *maxInflightPulls, *asyncImagePullMount)
 	}
 
 	server := csicommon.NewNonBlockingGRPCServer()
@@ -130,7 +139,7 @@ func main() {
 		server.Start(*endpoint,
 			NewIdentityServer(driverVersion),
 			nil,
-			NewNodeServer(driver, mounter, criClient, secretStore, *asyncImagePullMount))
+			NewNodeServer(driver, mounter, criClient, secretStore, *asyncImagePullMount, *maxInflightPulls))
 	case controllerMode:
 		watcher, err := watcher.New(context.Background(), *watcherResyncPeriod)
 		if err != nil {

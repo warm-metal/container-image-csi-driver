@@ -30,7 +30,7 @@ const (
 
 type ImagePullStatus int
 
-func NewNodeServer(driver *csicommon.CSIDriver, mounter backend.Mounter, imageSvc cri.ImageServiceClient, secretStore secret.Store, asyncImagePullMount bool) *NodeServer {
+func NewNodeServer(driver *csicommon.CSIDriver, mounter backend.Mounter, imageSvc cri.ImageServiceClient, secretStore secret.Store, asyncImagePullMount bool, maxInflightPulls int) *NodeServer {
 	return &NodeServer{
 		DefaultNodeServer:   csicommon.NewDefaultNodeServer(driver),
 		mounter:             mounter,
@@ -45,6 +45,7 @@ func NewNodeServer(driver *csicommon.CSIDriver, mounter backend.Mounter, imageSv
 			ImageServiceClient: imageSvc,
 			SecretStore:        secretStore,
 			Mounter:            mounter,
+			MaxInflightPulls:   maxInflightPulls,
 		}),
 	}
 }

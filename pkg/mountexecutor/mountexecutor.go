@@ -44,7 +44,7 @@ type MountExecutor struct {
 	asyncMount bool
 	mutex      *sync.Mutex
 	mounter    backend.Mounter
-	asyncErrs  map[docker.Named]error
+	asyncErrs  map[string]error
 }
 
 // NewMountExecutor initializes a new mount executor
@@ -58,11 +58,12 @@ func NewMountExecutor(o *MountExecutorOptions) *MountExecutor {
 
 // StartMounting starts the mounting
 func (m *MountExecutor) StartMounting(o *MountOptions) error {
+	namedRef := o.NamedRef.String()
 
-	if pullstatus.Get(o.NamedRef) != pullstatus.Pulled || mountstatus.Get(o.TargetPath) == mountstatus.StillMounting {
+	if pullstatus.Get(namedRef) != pullstatus.Pulled || mountstatus.Get(o.TargetPath) == mountstatus.StillMounting {
 		klog.Infof("image '%s' hasn't been pulled yet (status: %s) or volume is still mounting (status: %s)",
 			o.NamedRef.Name(),
-			pullstatus.Get(o.NamedRef), mountstatus.Get(o.TargetPath))
+			pullstatus.Get(namedRef), mountstatus.Get(o.TargetPath))
 		return nil
 	}
 
@@ -95,7 +96,7 @@ func (m *MountExecutor) StartMounting(o *MountOptions) error {
 			klog.Errorf("mount err: %v", err.Error())
 			metrics.OperationErrorsCount.WithLabelValues("StartMounting").Inc()
 			mountstatus.Update(o.TargetPath, mountstatus.Errored)
-			m.asyncErrs[o.NamedRef] = fmt.Errorf("err: %v: %v", err, m.asyncErrs[o.NamedRef])
+			m.asyncErrs[namedRef] = fmt.Errorf("err: %v: %v", err, m.asyncErrs[namedRef])
 			return
 		}
 		metrics.ImageMountTime.WithLabelValues(metrics.Async).Observe(time.Since(startTime).Seconds())
@@ -107,7 +108,9 @@ func (m *MountExecutor) StartMounting(o *MountOptions) error {
 
 // WaitForMount waits for the volume to get mounted
 func (m *MountExecutor) WaitForMount(o *MountOptions) error {
-	if pullstatus.Get(o.NamedRef) != pullstatus.Pulled {
+	namedRef := o.NamedRef.String()
+
+	if pullstatus.Get(namedRef) != pullstatus.Pulled {
 		return nil
 	}
 
@@ -119,8 +122,8 @@ func (m *MountExecutor) WaitForMount(o *MountOptions) error {
 		if mountstatus.Get(o.TargetPath) == mountstatus.Mounted {
 			return true, nil
 		}
-		if m.asyncErrs[o.NamedRef] != nil {
-			return false, m.asyncErrs[o.NamedRef]
+		if m.asyncErrs[namedRef] != nil {
+			return false, m.asyncErrs[namedRef]
 		}
 		return false, nil
 	}
