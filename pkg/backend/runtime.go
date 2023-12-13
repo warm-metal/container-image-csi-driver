@@ -13,7 +13,8 @@ type MountOptions struct {
 type SnapshotKey string
 type MountTarget string
 
-type ContainerRuntime interface {
+// ContainerRuntimeMounter is a container runtime specific interface
+type ContainerRuntimeMounter interface {
 	Mount(ctx context.Context, key SnapshotKey, target MountTarget, ro bool) error
 	Unmount(ctx context.Context, target MountTarget) error
 
@@ -42,4 +43,17 @@ type ContainerRuntime interface {
 	// List metadata of all snapshots created by the driver.
 	// The snapshot key must also be saved in the returned map with the key "FakeMetaDataSnapshotKey".
 	ListSnapshots(ctx context.Context) ([]SnapshotMetadata, error)
+}
+
+// Mounter is a generic interface used for mounting images
+type Mounter interface {
+	// Mount mounts a specific image
+	Mount(
+		ctx context.Context, volumeId string, target MountTarget, image docker.Named, ro bool) (err error)
+
+	// Unmount unmounts a specific image
+	Unmount(ctx context.Context, volumeId string, target MountTarget) error
+
+	// ImageExists checks if the image already exists on the local machine
+	ImageExists(ctx context.Context, image docker.Named) bool
 }

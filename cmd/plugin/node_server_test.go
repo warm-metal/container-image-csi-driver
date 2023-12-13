@@ -19,6 +19,7 @@ import (
 	"github.com/warm-metal/csi-driver-image/pkg/backend/containerd"
 	"github.com/warm-metal/csi-driver-image/pkg/cri"
 	"github.com/warm-metal/csi-driver-image/pkg/metrics"
+	"github.com/warm-metal/csi-driver-image/pkg/test/utils"
 	csicommon "github.com/warm-metal/csi-drivers/pkg/csi-common"
 	"google.golang.org/grpc"
 	"k8s.io/apimachinery/pkg/util/wait"
@@ -26,18 +27,16 @@ import (
 	"k8s.io/kubernetes/pkg/credentialprovider"
 )
 
-// Check test/integration/node-server/README.md for how to run this test correctly
 func TestNodePublishVolumeAsync(t *testing.T) {
-	socketAddr := "unix:///run/containerd/containerd.sock"
-	addr, err := url.Parse(socketAddr)
-	assert.NoError(t, err)
+	criClient := &utils.MockImageServiceClient{
+		PulledImages:  make(map[string]bool),
+		ImagePullTime: time.Second * 5,
+	}
 
-	criClient, err := cri.NewRemoteImageService(socketAddr, time.Minute)
-	assert.NoError(t, err)
-	assert.NotNil(t, criClient)
-
-	mounter := containerd.NewMounter(addr.Path)
-	assert.NotNil(t, mounter)
+	mounter := &utils.MockMounter{
+		ImageSvcClient: *criClient,
+		Mounted:        make(map[string]bool),
+	}
 
 	driver := csicommon.NewCSIDriver(driverName, driverVersion, "fake-node")
 	assert.NotNil(t, driver)
@@ -67,20 +66,23 @@ func TestNodePublishVolumeAsync(t *testing.T) {
 
 	server := csicommon.NewNonBlockingGRPCServer()
 
-	addr, err = url.Parse(*endpoint)
-	assert.NoError(t, err)
-
-	os.Remove("/csi/csi.sock")
+	endpoint := "unix:///tmp/csi.sock"
 
 	// automatically deleted when the server is stopped
-	f, err := os.Create("/csi/csi.sock")
+	f, err := os.Create("/tmp/csi.sock")
 	assert.NoError(t, err)
 	assert.NotNil(t, f)
+
+	defer os.Remove("/tmp/csi/csi.sock")
+
+	addr, err := url.Parse("unix:///tmp/csi.sock")
+	assert.NoError(t, err)
 
 	var wg sync.WaitGroup
 	wg.Add(1)
 	go func() {
-		server.Start(*endpoint,
+
+		server.Start(endpoint,
 			nil,
 			nil,
 			ns)
@@ -150,16 +152,14 @@ func TestNodePublishVolumeAsync(t *testing.T) {
 
 // Check test/integration/node-server/README.md for how to run this test correctly
 func TestNodePublishVolumeSync(t *testing.T) {
-	socketAddr := "unix:///run/containerd/containerd.sock"
-	addr, err := url.Parse(socketAddr)
-	assert.NoError(t, err)
-
-	criClient, err := cri.NewRemoteImageService(socketAddr, time.Minute)
-	assert.NoError(t, err)
-	assert.NotNil(t, criClient)
-
-	mounter := containerd.NewMounter(addr.Path)
-	assert.NotNil(t, mounter)
+	criClient := &utils.MockImageServiceClient{
+		PulledImages:  make(map[string]bool),
+		ImagePullTime: time.Second * 5,
+	}
+	mounter := &utils.MockMounter{
+		ImageSvcClient: *criClient,
+		Mounted:        make(map[string]bool),
+	}
 
 	driver := csicommon.NewCSIDriver(driverName, driverVersion, "fake-node")
 	assert.NotNil(t, driver)
@@ -189,20 +189,23 @@ func TestNodePublishVolumeSync(t *testing.T) {
 
 	server := csicommon.NewNonBlockingGRPCServer()
 
-	addr, err = url.Parse(*endpoint)
-	assert.NoError(t, err)
-
-	os.Remove("/csi/csi.sock")
+	endpoint := "unix:///tmp/csi.sock"
 
 	// automatically deleted when the server is stopped
-	f, err := os.Create("/csi/csi.sock")
+	f, err := os.Create("/tmp/csi.sock")
 	assert.NoError(t, err)
 	assert.NotNil(t, f)
+
+	defer os.Remove("/tmp/csi/csi.sock")
+
+	addr, err := url.Parse("unix:///tmp/csi.sock")
+	assert.NoError(t, err)
 
 	var wg sync.WaitGroup
 	wg.Add(1)
 	go func() {
-		server.Start(*endpoint,
+
+		server.Start(endpoint,
 			nil,
 			nil,
 			ns)
