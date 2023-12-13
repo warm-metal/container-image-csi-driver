@@ -1,14 +1,14 @@
 apiVersion: batch/v1
 kind: Job
 metadata:
-  name: error-compatible-ephemeral-volume
+  name: error-ephemeral-volume
 spec:
   template:
     metadata:
-      name: error-compatible-ephemeral-volume
+      name: error-ephemeral-volume
     spec:
       containers:
-        - name: error-compatible-ephemeral-volume
+        - name: error-ephemeral-volume
           image: docker.io/warmmetal/csi-image-test:check-fs
           env:
             - name: TARGET
