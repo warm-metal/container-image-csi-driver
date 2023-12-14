@@ -70,6 +70,9 @@ spec:
             {{- if .Values.enableDaemonImageCredentialCache }}
             - --enable-daemon-image-credential-cache
             {{- end }}
+            {{- if .Values.enableAsyncPullMount }}
+            - --async-pull-mount=true
+            {{- end }}
             - "-v={{ .Values.logLevel }}"
             - "--mode=node"
           env:
