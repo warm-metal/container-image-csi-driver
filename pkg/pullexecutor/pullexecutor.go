@@ -111,9 +111,8 @@ func (m *PullExecutor) StartPulling(o *PullOptions) error {
 					m.asyncErrs[o.NamedRef] = fmt.Errorf("unable to pull image %q: %s", o.Image, err)
 					return
 				}
-				pullstatus.Update(o.NamedRef, pullstatus.Pulled)
-
 			}
+			pullstatus.Update(o.NamedRef, pullstatus.Pulled)
 		}
 	}()
 
