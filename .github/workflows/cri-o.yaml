@@ -37,3 +37,16 @@ jobs:
         run: ./hack/ci/test.sh
       - name: Uninstall the CSI Driver
         run: helm uninstall -n kube-system ${HELM_NAME} --wait
+      - name: Upgrade the CSI Driver with async flag
+        run: |
+          trap "kubectl -n kube-system describe po" ERR
+          helm install ${HELM_NAME} charts/warm-metal-csi-driver -n kube-system \
+            -f ${VALUE_FILE} \
+            --set csiPlugin.image.tag=${IMAGE_TAG} \
+            --set enableAsyncPullMount=true \
+            --wait \
+            --debug
+      - name: Run integration Tests
+        run: ./hack/ci/test.sh
+      - name: Uninstall the CSI Driver
+        run: helm uninstall -n kube-system ${HELM_NAME} --wait

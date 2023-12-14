@@ -35,3 +35,16 @@ jobs:
         run: ./test/integration/restart-ds.sh
       - name: Uninstall the CSI Driver
         run: helm uninstall -n kube-system ${HELM_NAME} --wait
+      - name: Upgrade the CSI Driver with async flag
+        run: |
+          trap "kubectl -n kube-system describe po" ERR
+          helm install ${HELM_NAME} charts/warm-metal-csi-driver -n kube-system \
+            -f ${VALUE_FILE} \
+            --set csiPlugin.image.tag=${IMAGE_TAG} \
+            --set enableAsyncPullMount=true \
+            --wait \
+            --debug      
+      - name: Test volumes between the ds restarted
+        run: ./test/integration/restart-ds.sh
+      - name: Uninstall the CSI Driver
+        run: helm uninstall -n kube-system ${HELM_NAME} --wait
