@@ -141,7 +141,7 @@ func (n NodeServer) NodePublishVolume(ctx context.Context, req *csi.NodePublishV
 	}
 
 	if e := n.pullExecutor.WaitForPull(po); e != nil {
-		err = status.Errorf(codes.DeadlineExceeded, err.Error())
+		err = status.Errorf(codes.DeadlineExceeded, e.Error())
 		return
 	}
 
@@ -158,13 +158,13 @@ func (n NodeServer) NodePublishVolume(ctx context.Context, req *csi.NodePublishV
 		ReadOnly:         req.Readonly,
 	}
 
-	if err = n.mountExecutor.StartMounting(o); err != nil {
-		err = status.Error(codes.Internal, err.Error())
+	if e := n.mountExecutor.StartMounting(o); e != nil {
+		err = status.Error(codes.Internal, e.Error())
 		return
 	}
 
 	if e := n.mountExecutor.WaitForMount(o); e != nil {
-		err = status.Errorf(codes.DeadlineExceeded, err.Error())
+		err = status.Errorf(codes.DeadlineExceeded, e.Error())
 		return
 	}
 
