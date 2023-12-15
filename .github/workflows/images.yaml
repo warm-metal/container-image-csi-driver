@@ -2,6 +2,7 @@
 name: Create and publish the container image.
 
 on:
+  push:
   workflow_dispatch:
 
 env:
