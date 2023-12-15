@@ -3,7 +3,7 @@ name: Create and publish the container image.
 on:
   push:
     branches: [master]
-  tags:
+    tags:
 
 jobs:
   build-and-push-image:
