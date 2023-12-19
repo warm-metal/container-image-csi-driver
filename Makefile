@@ -1,8 +1,8 @@
-VERSION ?= v0.8.1
+VERSION ?= v0.8.2
 
 IMAGE_BUILDER ?= docker
 IMAGE_BUILD_CMD ?= buildx
-REGISTRY ?= ghcr.io/vadasambar
+REGISTRY ?= docker.io/warmmetal
 
 export IMG = $(REGISTRY)/csi-image:$(VERSION)
 
@@ -12,7 +12,7 @@ export IMG = $(REGISTRY)/csi-image:$(VERSION)
 build:
 	go fmt ./...
 	go vet ./...
-	go build -o _output/csi-image-plugin ./cmd/plugin
+	GOOS=linux GOARCH=amd64 go build -o _output/csi-image-plugin ./cmd/plugin
 
 .PHONY: sanity
 sanity:
@@ -35,7 +35,7 @@ integration:
 
 .PHONY: image
 image:
-	$(IMAGE_BUILDER) $(IMAGE_BUILD_CMD) build -t $(REGISTRY)/csi-image:$(VERSION) --push --platform=linux/amd64 .
+	$(IMAGE_BUILDER) $(IMAGE_BUILD_CMD) build -t $(REGISTRY)/csi-image:$(VERSION) --push .
 
 .PHONY: local
 local:
