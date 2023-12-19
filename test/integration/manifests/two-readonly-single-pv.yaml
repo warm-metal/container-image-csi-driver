@@ -1,0 +1,85 @@
+---
+apiVersion: v1
+kind: PersistentVolume
+metadata:
+  name: pv-test-multi-read-simple-fs
+spec:
+  storageClassName: csi-image.warm-metal.tech
+  capacity:
+    storage: 5Mi
+  accessModes:
+    - ReadOnlyMany  # does not force volume to be mounted read only
+  persistentVolumeReclaimPolicy: Delete
+  csi:
+    driver: csi-image.warm-metal.tech
+    volumeHandle: "docker.io/warmmetal/csi-image-test:simple-fs"
+    volumeAttributes:
+      pullAlways: "true"
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: pv-test-multi-read-simple-fs
+spec:
+  storageClassName: csi-image.warm-metal.tech
+  accessModes:
+  - ReadOnlyMany
+  resources:
+    requests:
+      storage: 5Mi
+  volumeName: pv-test-multi-read-simple-fs
+---
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: two-ro-single-pv-read-only-true
+spec:
+  template:
+    metadata:
+      name: two-ro-single-pv-read-only-true
+    spec:
+      containers:
+        - name: two-ro-single-pv-read-only-true
+          image: docker.io/warmmetal/csi-image-test:check-fs
+          env:
+            - name: TARGET
+              value: /target1
+            - name: CHECK_RO
+              value: "true"
+          volumeMounts:
+            - mountPath: /target1
+              readOnly: true
+              name: target1
+      restartPolicy: Never
+      volumes:
+        - name: target1
+          persistentVolumeClaim:
+            claimName: pv-test-multi-read-simple-fs
+  backoffLimit: 0
+---
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: two-ro-single-pv-read-only-false
+spec:
+  template:
+    metadata:
+      name: two-ro-single-pv-read-only-true
+    spec:
+      containers:
+        - name: two-ro-single-pv-read-only-true
+          image: docker.io/warmmetal/csi-image-test:check-fs
+          env:
+            - name: TARGET
+              value: /target1
+            - name: CHECK_RO
+              value: "true"
+          volumeMounts:
+            - mountPath: /target1
+              name: target1
+      restartPolicy: Never
+      volumes:
+        - name: target1
+          persistentVolumeClaim:
+            claimName: pv-test-multi-read-simple-fs
+  backoffLimit: 0

@@ -2,6 +2,7 @@ package mountexecutor
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"sync"
 	"time"
@@ -58,10 +59,10 @@ func NewMountExecutor(o *MountExecutorOptions) *MountExecutor {
 // StartMounting starts the mounting
 func (m *MountExecutor) StartMounting(o *MountOptions) error {
 
-	if pullstatus.Get(o.NamedRef) != pullstatus.Pulled || mountstatus.Get(o.VolumeId) == mountstatus.StillMounting {
+	if pullstatus.Get(o.NamedRef) != pullstatus.Pulled || mountstatus.Get(o.TargetPath) == mountstatus.StillMounting {
 		klog.Infof("image '%s' hasn't been pulled yet (status: %s) or volume is still mounting (status: %s)",
 			o.NamedRef.Name(),
-			pullstatus.Get(o.NamedRef), mountstatus.Get(o.VolumeId))
+			pullstatus.Get(o.NamedRef), mountstatus.Get(o.TargetPath))
 		return nil
 	}
 
@@ -69,13 +70,21 @@ func (m *MountExecutor) StartMounting(o *MountOptions) error {
 		o.VolumeCapability.AccessMode.Mode == csi.VolumeCapability_AccessMode_SINGLE_NODE_READER_ONLY ||
 		o.VolumeCapability.AccessMode.Mode == csi.VolumeCapability_AccessMode_MULTI_NODE_READER_ONLY
 
+	klog.Infof("READ-ONLY: %+v", ro)
+
+	b, err := json.MarshalIndent(o, " ", " ")
+	if err != nil {
+		panic(err)
+	}
+	klog.Infof("MOUNT OPTIONS: %+v", string(b))
+
 	if !m.asyncMount {
-		mountstatus.Update(o.VolumeId, mountstatus.StillMounting)
+		mountstatus.Update(o.TargetPath, mountstatus.StillMounting)
 		if err := m.mounter.Mount(o.Context, o.VolumeId, backend.MountTarget(o.TargetPath), o.NamedRef, ro); err != nil {
-			mountstatus.Update(o.VolumeId, mountstatus.Errored)
+			mountstatus.Update(o.TargetPath, mountstatus.Errored)
 			return err
 		}
-		mountstatus.Update(o.VolumeId, mountstatus.Mounted)
+		mountstatus.Update(o.TargetPath, mountstatus.Mounted)
 		return nil
 	}
 
@@ -85,14 +94,14 @@ func (m *MountExecutor) StartMounting(o *MountOptions) error {
 		ctx, cancel := context.WithTimeout(context.Background(), mountCtxTimeout)
 		defer cancel()
 
-		mountstatus.Update(o.VolumeId, mountstatus.StillMounting)
+		mountstatus.Update(o.TargetPath, mountstatus.StillMounting)
 		if err := m.mounter.Mount(ctx, o.VolumeId, backend.MountTarget(o.TargetPath), o.NamedRef, ro); err != nil {
 			klog.Errorf("mount err: %v", err.Error())
-			mountstatus.Update(o.VolumeId, mountstatus.Errored)
+			mountstatus.Update(o.TargetPath, mountstatus.Errored)
 			m.asyncErrs[o.NamedRef] = fmt.Errorf("err: %v: %v", err, m.asyncErrs[o.NamedRef])
 			return
 		}
-		mountstatus.Update(o.VolumeId, mountstatus.Mounted)
+		mountstatus.Update(o.TargetPath, mountstatus.Mounted)
 	}()
 
 	return nil
@@ -109,7 +118,7 @@ func (m *MountExecutor) WaitForMount(o *MountOptions) error {
 	}
 
 	mountCondFn := func() (done bool, err error) {
-		if mountstatus.Get(o.VolumeId) == mountstatus.Mounted {
+		if mountstatus.Get(o.TargetPath) == mountstatus.Mounted {
 			return true, nil
 		}
 		if m.asyncErrs[o.NamedRef] != nil {
