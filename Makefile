@@ -2,7 +2,7 @@ VERSION ?= v0.8.1
 
 IMAGE_BUILDER ?= docker
 IMAGE_BUILD_CMD ?= buildx
-REGISTRY ?= docker.io/warmmetal
+REGISTRY ?= ghcr.io/vadasambar
 
 export IMG = $(REGISTRY)/csi-image:$(VERSION)
 
@@ -35,7 +35,7 @@ integration:
 
 .PHONY: image
 image:
-	$(IMAGE_BUILDER) $(IMAGE_BUILD_CMD) build -t $(REGISTRY)/csi-image:$(VERSION) --push .
+	$(IMAGE_BUILDER) $(IMAGE_BUILD_CMD) build -t $(REGISTRY)/csi-image:$(VERSION) --push --platform=linux/amd64 .
 
 .PHONY: local
 local:

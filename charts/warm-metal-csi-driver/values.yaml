@@ -11,8 +11,8 @@ pullImageSecretForDaemonset:
 csiPlugin:
   resources: {}
   image:
-    tag: ""
-    repository: docker.io/warmmetal/csi-image
+    tag: v0.8.0-debug
+    repository: ghcr.io/vadasambar/csi-image
     pullPolicy: IfNotPresent
   livenessProbe:
     httpGet:

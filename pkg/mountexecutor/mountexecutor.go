@@ -2,7 +2,6 @@ package mountexecutor
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	"sync"
 	"time"
@@ -69,14 +68,6 @@ func (m *MountExecutor) StartMounting(o *MountOptions) error {
 	ro := o.ReadOnly ||
 		o.VolumeCapability.AccessMode.Mode == csi.VolumeCapability_AccessMode_SINGLE_NODE_READER_ONLY ||
 		o.VolumeCapability.AccessMode.Mode == csi.VolumeCapability_AccessMode_MULTI_NODE_READER_ONLY
-
-	klog.Infof("READ-ONLY: %+v", ro)
-
-	b, err := json.MarshalIndent(o, " ", " ")
-	if err != nil {
-		panic(err)
-	}
-	klog.Infof("MOUNT OPTIONS: %+v", string(b))
 
 	if !m.asyncMount {
 		mountstatus.Update(o.TargetPath, mountstatus.StillMounting)
