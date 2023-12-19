@@ -12,7 +12,7 @@ export IMG = $(REGISTRY)/csi-image:$(VERSION)
 build:
 	go fmt ./...
 	go vet ./...
-	GOOS=linux GOARCH=amd64 go build -o _output/csi-image-plugin ./cmd/plugin
+	go build -o _output/csi-image-plugin ./cmd/plugin
 
 .PHONY: sanity
 sanity:
