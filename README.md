@@ -18,6 +18,19 @@ then mounts images via the snapshot/storage service of the runtime.
     * [Pre-provisioned PV](#pre-provisioned-pv)
     * [Private Image](#private-image)
 
+## Compatibility matrix
+The following is a list of the tested Kubernetes versions.
+
+| warm-metal | Tested on k8s version | containerd     | crio             | docker |
+|------------|-----------------------|----------------|------------------|--------|
+| 0.6.x      | v1.25.2               |                |                  |        |
+| 0.7.x      | v1.25.2               |                |                  |        |
+| 0.8.x      | v1.25.2, v1.26.0      | 1.7.0+, 1.6.4+ | v1.25.2, v1.26.0 |        |
+
+#### References:
+* containerd [releases](https://containerd.io/releases/#kubernetes-support)
+* cri-o [releases](https://github.com/cri-o/cri-o/releases)
+
 ## Installation
 
 The driver requires to mount various host paths for different container runtimes.
