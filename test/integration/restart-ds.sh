@@ -6,10 +6,10 @@ set -e
 
 TestBase=$(dirname "${BASH_SOURCE[0]}")
 kubectl apply -f "${TestBase}/compatible-manifests/ephemeral-volume.yaml"
-kubectlwait kube-system compatible-ephemeral-volume
+kubectlwait default compatible-ephemeral-volume
 
 kubectl apply -f "${TestBase}/compatible-manifests/pre-provisioned-pv.yaml"
-kubectlwait kube-system compatible-pre-provisioned-pv
+kubectlwait default compatible-pre-provisioned-pv
 
 echo "Restart the driver"
 kubectl delete po -n kube-system -l=app.kubernetes.io/name=warm-metal-csi-driver
