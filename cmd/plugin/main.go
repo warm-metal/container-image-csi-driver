@@ -12,6 +12,7 @@ import (
 	"github.com/warm-metal/csi-driver-image/pkg/backend/containerd"
 	"github.com/warm-metal/csi-driver-image/pkg/backend/crio"
 	"github.com/warm-metal/csi-driver-image/pkg/cri"
+	"github.com/warm-metal/csi-driver-image/pkg/metrics"
 	"github.com/warm-metal/csi-driver-image/pkg/secret"
 	"github.com/warm-metal/csi-driver-image/pkg/watcher"
 	csicommon "github.com/warm-metal/csi-drivers/pkg/csi-common"
@@ -145,5 +146,6 @@ func main() {
 		)
 	}
 
+	metrics.StartMetricsServer(metrics.RegisterMetrics())
 	server.Wait()
 }

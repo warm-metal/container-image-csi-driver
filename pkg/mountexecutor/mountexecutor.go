@@ -9,6 +9,7 @@ import (
 	"github.com/container-storage-interface/spec/lib/go/csi"
 	"github.com/containerd/containerd/reference/docker"
 	"github.com/warm-metal/csi-driver-image/pkg/backend"
+	"github.com/warm-metal/csi-driver-image/pkg/metrics"
 	"github.com/warm-metal/csi-driver-image/pkg/mountstatus"
 	"github.com/warm-metal/csi-driver-image/pkg/pullstatus"
 	"k8s.io/apimachinery/pkg/util/wait"
@@ -71,10 +72,13 @@ func (m *MountExecutor) StartMounting(o *MountOptions) error {
 
 	if !m.asyncMount {
 		mountstatus.Update(o.TargetPath, mountstatus.StillMounting)
+		startTime := time.Now()
 		if err := m.mounter.Mount(o.Context, o.VolumeId, backend.MountTarget(o.TargetPath), o.NamedRef, ro); err != nil {
+			metrics.OperationErrorsCount.WithLabelValues("StartMounting").Inc()
 			mountstatus.Update(o.TargetPath, mountstatus.Errored)
 			return err
 		}
+		metrics.ImageMountTime.WithLabelValues(metrics.Sync).Observe(time.Since(startTime).Seconds())
 		mountstatus.Update(o.TargetPath, mountstatus.Mounted)
 		return nil
 	}
@@ -86,12 +90,15 @@ func (m *MountExecutor) StartMounting(o *MountOptions) error {
 		defer cancel()
 
 		mountstatus.Update(o.TargetPath, mountstatus.StillMounting)
+		startTime := time.Now()
 		if err := m.mounter.Mount(ctx, o.VolumeId, backend.MountTarget(o.TargetPath), o.NamedRef, ro); err != nil {
 			klog.Errorf("mount err: %v", err.Error())
+			metrics.OperationErrorsCount.WithLabelValues("StartMounting").Inc()
 			mountstatus.Update(o.TargetPath, mountstatus.Errored)
 			m.asyncErrs[o.NamedRef] = fmt.Errorf("err: %v: %v", err, m.asyncErrs[o.NamedRef])
 			return
 		}
+		metrics.ImageMountTime.WithLabelValues(metrics.Async).Observe(time.Since(startTime).Seconds())
 		mountstatus.Update(o.TargetPath, mountstatus.Mounted)
 	}()
 

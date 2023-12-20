@@ -9,6 +9,7 @@ import (
 	"github.com/containerd/containerd/reference/docker"
 	"github.com/pkg/errors"
 	"github.com/warm-metal/csi-driver-image/pkg/backend"
+	"github.com/warm-metal/csi-driver-image/pkg/metrics"
 	"github.com/warm-metal/csi-driver-image/pkg/pullstatus"
 	"github.com/warm-metal/csi-driver-image/pkg/remoteimage"
 	"github.com/warm-metal/csi-driver-image/pkg/secret"
@@ -59,6 +60,7 @@ func NewPullExecutor(o *PullExecutorOptions) *PullExecutor {
 		imageSvcClient: o.ImageServiceClient,
 		secretStore:    o.SecretStore,
 		mounter:        o.Mounter,
+		asyncErrs:      make(map[docker.Named]error),
 	}
 }
 
@@ -76,10 +78,13 @@ func (m *PullExecutor) StartPulling(o *PullOptions) error {
 		if shouldPull {
 			klog.Infof("pull image %q ", o.Image)
 			pullstatus.Update(o.NamedRef, pullstatus.StillPulling)
+			startTime := time.Now()
 			if err = puller.Pull(o.Context); err != nil {
 				pullstatus.Update(o.NamedRef, pullstatus.Errored)
+				metrics.OperationErrorsCount.WithLabelValues("StartPulling").Inc()
 				return errors.Errorf("unable to pull image %q: %s", o.NamedRef, err)
 			}
+			metrics.ImagePullTime.WithLabelValues(metrics.Sync).Observe(time.Since(startTime).Seconds())
 		}
 		pullstatus.Update(o.NamedRef, pullstatus.Pulled)
 		return nil
@@ -106,11 +111,15 @@ func (m *PullExecutor) StartPulling(o *PullOptions) error {
 			if shouldPull {
 				klog.Infof("pull image %q ", o.Image)
 				pullstatus.Update(o.NamedRef, pullstatus.StillPulling)
+				startTime := time.Now()
+
 				if err = puller.Pull(c); err != nil {
 					pullstatus.Update(o.NamedRef, pullstatus.Errored)
+					metrics.OperationErrorsCount.WithLabelValues("StartPulling").Inc()
 					m.asyncErrs[o.NamedRef] = fmt.Errorf("unable to pull image %q: %s", o.Image, err)
 					return
 				}
+				metrics.ImagePullTime.WithLabelValues(metrics.Async).Observe(time.Since(startTime).Seconds())
 			}
 			pullstatus.Update(o.NamedRef, pullstatus.Pulled)
 		}
