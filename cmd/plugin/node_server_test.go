@@ -46,7 +46,7 @@ func TestNodePublishVolumeAsync(t *testing.T) {
 	asyncImagePulls := true
 	ns := NewNodeServer(driver, mounter, criClient, &testSecretStore{}, asyncImagePulls)
 
-	// based on kubelet's csi mounter pluginc ode
+	// based on kubelet's csi mounter plugin code
 	// check https://github.com/kubernetes/kubernetes/blob/b06a31b87235784bad2858be62115049b6eb6bcd/pkg/volume/csi/csi_mounter.go#L111-L112
 	timeout := 100 * time.Millisecond
 
@@ -169,7 +169,7 @@ func TestNodePublishVolumeSync(t *testing.T) {
 	asyncImagePulls := false
 	ns := NewNodeServer(driver, mounter, criClient, &testSecretStore{}, asyncImagePulls)
 
-	// based on kubelet's csi mounter pluginc ode
+	// based on kubelet's csi mounter plugin code
 	// check https://github.com/kubernetes/kubernetes/blob/b06a31b87235784bad2858be62115049b6eb6bcd/pkg/volume/csi/csi_mounter.go#L111-L112
 	timeout := 100 * time.Millisecond
 
@@ -295,7 +295,7 @@ func TestMetrics(t *testing.T) {
 	asyncImagePulls := true
 	ns := NewNodeServer(driver, mounter, criClient, &testSecretStore{}, asyncImagePulls)
 
-	// based on kubelet's csi mounter pluginc ode
+	// based on kubelet's csi mounter plugin code
 	// check https://github.com/kubernetes/kubernetes/blob/b06a31b87235784bad2858be62115049b6eb6bcd/pkg/volume/csi/csi_mounter.go#L111-L112
 	timeout := 10 * time.Second
 
