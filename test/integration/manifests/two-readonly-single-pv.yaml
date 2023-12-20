@@ -64,10 +64,10 @@ metadata:
 spec:
   template:
     metadata:
-      name: two-ro-single-pv-read-only-true
+      name: two-ro-single-pv-read-only-false
     spec:
       containers:
-        - name: two-ro-single-pv-read-only-true
+        - name: two-ro-single-pv-read-only-false
           image: docker.io/warmmetal/csi-image-test:check-fs
           env:
             - name: TARGET
