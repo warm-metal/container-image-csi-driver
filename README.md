@@ -26,7 +26,7 @@ Tested changes on below mentioned versions -
 | 0.6.x      | v1.25       | 1.6.8      | v1.20.9 |
 | 0.7.x      | v1.25       | 1.6.8      | v1.20.9 |
 | 0.8.x      | v1.25       | 1.6.8      | v1.20.9 |
-| 0.9.x      | v1.25       | 1.6.8      | v1.25.2 |
+| 1.0.x      | v1.25       | 1.6.8      | v1.25.2 |
 
 #### References:
 * containerd [releases](https://containerd.io/releases/#kubernetes-support)
