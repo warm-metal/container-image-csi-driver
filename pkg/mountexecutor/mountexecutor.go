@@ -56,7 +56,7 @@ func NewMountExecutor(o *MountExecutorOptions) *MountExecutor {
 }
 
 // StartMounting starts the mounting
-func (m *MountExecutor) StartMounting(o *MountOptions) error {
+func (m *MountExecutor) StartMounting(o *MountOptions, valuesLogger klog.Logger) error {
 
 	if pullstatus.Get(o.NamedRef) != pullstatus.Pulled || mountstatus.Get(o.VolumeId) == mountstatus.StillMounting {
 		klog.Infof("image '%s' hasn't been pulled yet (status: %s) or volume is still mounting (status: %s)",
@@ -71,11 +71,14 @@ func (m *MountExecutor) StartMounting(o *MountOptions) error {
 
 	if !m.asyncMount {
 		mountstatus.Update(o.VolumeId, mountstatus.StillMounting)
+		start := time.Now()
 		if err := m.mounter.Mount(o.Context, o.VolumeId, backend.MountTarget(o.TargetPath), o.NamedRef, ro); err != nil {
 			mountstatus.Update(o.VolumeId, mountstatus.Errored)
 			return err
 		}
 		mountstatus.Update(o.VolumeId, mountstatus.Mounted)
+		elapsed := time.Since(start)
+		valuesLogger.Info(fmt.Sprintf("mounting %q took %s", o.NamedRef.Name(), elapsed))
 		return nil
 	}
 
@@ -86,6 +89,7 @@ func (m *MountExecutor) StartMounting(o *MountOptions) error {
 		defer cancel()
 
 		mountstatus.Update(o.VolumeId, mountstatus.StillMounting)
+		start := time.Now()
 		if err := m.mounter.Mount(ctx, o.VolumeId, backend.MountTarget(o.TargetPath), o.NamedRef, ro); err != nil {
 			klog.Errorf("mount err: %v", err.Error())
 			mountstatus.Update(o.VolumeId, mountstatus.Errored)
@@ -93,6 +97,8 @@ func (m *MountExecutor) StartMounting(o *MountOptions) error {
 			return
 		}
 		mountstatus.Update(o.VolumeId, mountstatus.Mounted)
+		elapsed := time.Since(start)
+		valuesLogger.Info(fmt.Sprintf("mounting %q took %s", o.NamedRef.Name(), elapsed))
 	}()
 
 	return nil
