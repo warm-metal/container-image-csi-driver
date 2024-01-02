@@ -14,7 +14,7 @@ import (
 	"github.com/warm-metal/csi-driver-image/pkg/remoteimage"
 	"github.com/warm-metal/csi-driver-image/pkg/secret"
 	"k8s.io/apimachinery/pkg/util/wait"
-	cri "k8s.io/cri-api/pkg/apis/runtime/v1alpha2"
+	cri "k8s.io/cri-api/pkg/apis/runtime/v1"
 	"k8s.io/klog/v2"
 )
 

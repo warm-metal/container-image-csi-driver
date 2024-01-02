@@ -14,7 +14,6 @@ import (
 	"time"
 
 	"github.com/container-storage-interface/spec/lib/go/csi"
-	csipbv1 "github.com/container-storage-interface/spec/lib/go/csi"
 	"github.com/stretchr/testify/assert"
 	"github.com/warm-metal/csi-driver-image/pkg/backend"
 	"github.com/warm-metal/csi-driver-image/pkg/backend/containerd"
@@ -116,7 +115,7 @@ func TestNodePublishVolumeAsync(t *testing.T) {
 	assert.NoError(t, err)
 	assert.NotNil(t, conn)
 
-	nodeClient := csipbv1.NewNodeClient(conn)
+	nodeClient := csi.NewNodeClient(conn)
 	assert.NotNil(t, nodeClient)
 
 	condFn := func() (done bool, err error) {
@@ -239,7 +238,7 @@ func TestNodePublishVolumeSync(t *testing.T) {
 	assert.NoError(t, err)
 	assert.NotNil(t, conn)
 
-	nodeClient := csipbv1.NewNodeClient(conn)
+	nodeClient := csi.NewNodeClient(conn)
 	assert.NotNil(t, nodeClient)
 
 	condFn := func() (done bool, err error) {
