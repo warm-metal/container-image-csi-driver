@@ -80,7 +80,6 @@ func TestNodePublishVolumeAsync(t *testing.T) {
 	var wg sync.WaitGroup
 	wg.Add(1)
 	go func() {
-
 		server.Start(*endpoint,
 			nil,
 			nil,
@@ -203,7 +202,6 @@ func TestNodePublishVolumeSync(t *testing.T) {
 	var wg sync.WaitGroup
 	wg.Add(1)
 	go func() {
-
 		server.Start(*endpoint,
 			nil,
 			nil,
@@ -349,7 +347,7 @@ func TestMetrics(t *testing.T) {
 	assert.NoError(t, err)
 	assert.NotNil(t, conn)
 
-	nodeClient := csipbv1.NewNodeClient(conn)
+	nodeClient := csi.NewNodeClient(conn)
 	assert.NotNil(t, nodeClient)
 
 	ctx, cancel := context.WithTimeout(context.Background(), 3*timeout)
@@ -434,8 +432,7 @@ func TestMetrics(t *testing.T) {
 	assert.NoError(t, err)
 }
 
-type testSecretStore struct {
-}
+type testSecretStore struct{}
 
 func (t *testSecretStore) GetDockerKeyring(ctx context.Context, secrets map[string]string) (credentialprovider.DockerKeyring, error) {
 	return credentialprovider.UnionDockerKeyring{credentialprovider.NewDockerKeyring()}, nil
