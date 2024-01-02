@@ -11,6 +11,7 @@ import (
 	"github.com/containerd/containerd/reference/docker"
 	"github.com/google/uuid"
 	"github.com/warm-metal/csi-driver-image/pkg/backend"
+	"github.com/warm-metal/csi-driver-image/pkg/metrics"
 	"github.com/warm-metal/csi-driver-image/pkg/mountexecutor"
 	"github.com/warm-metal/csi-driver-image/pkg/mountstatus"
 	"github.com/warm-metal/csi-driver-image/pkg/pullexecutor"
@@ -196,6 +197,8 @@ func (n NodeServer) NodeUnpublishVolume(ctx context.Context, req *csi.NodeUnpubl
 	}
 
 	if err = n.mounter.Unmount(ctx, req.VolumeId, backend.MountTarget(req.TargetPath)); err != nil {
+		// TODO(vadasambar): move this to mountexecutor once mountexecutor has `StartUnmounting` function
+		metrics.OperationErrorsCount.WithLabelValues("StartUnmounting").Inc()
 		err = status.Error(codes.Internal, err.Error())
 		return
 	}

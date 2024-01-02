@@ -1,0 +1,25 @@
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: test-metrics
+spec:
+  template:
+    metadata:
+      name: test-metrics
+    spec:
+      containers:
+        - name: test-metrics
+          # official curl iamge taken from https://github.com/curl/curl-container
+          image: quay.io/curl/curl:latest
+          command: 
+          - /bin/sh
+          - -c
+          - |
+            (curl $IP:8080/metrics | grep warm_metal_pull_duration_seconds) && \
+            (curl $IP:8080/metrics | grep warm_metal_mount_duration_seconds) && \
+            (curl $IP:8080/metrics | grep warm_metal_operation_errors_total)
+          env:
+            - name: IP
+              value: %IP
+      restartPolicy: Never
+  backoffLimit: 0
