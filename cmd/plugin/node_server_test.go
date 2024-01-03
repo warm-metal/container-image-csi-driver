@@ -58,6 +58,10 @@ func TestNodePublishVolumeAsync(t *testing.T) {
 		VolumeContext: map[string]string{
 			// so that the test would always attempt to pull an image
 			ctxKeyPullAlways: "true",
+			// to see improved logs
+			"pod-name":  "test-pod",
+			"namespace": "test-namespace",
+			"uid":       "test-uid",
 		},
 		VolumeCapability: &csi.VolumeCapability{
 			AccessMode: &csi.VolumeCapability_AccessMode{
@@ -181,6 +185,10 @@ func TestNodePublishVolumeSync(t *testing.T) {
 		VolumeContext: map[string]string{
 			// so that the test would always attempt to pull an image
 			ctxKeyPullAlways: "true",
+			// to see improved logs
+			"pod-name":  "test-pod",
+			"namespace": "test-namespace",
+			"uid":       "test-uid",
 		},
 		VolumeCapability: &csi.VolumeCapability{
 			AccessMode: &csi.VolumeCapability_AccessMode{
@@ -364,6 +372,10 @@ func TestMetrics(t *testing.T) {
 		VolumeContext: map[string]string{
 			// so that the test would always attempt to pull an image
 			ctxKeyPullAlways: "true",
+			// to see improved logs
+			"pod-name":  "test-pod",
+			"namespace": "test-namespace",
+			"uid":       "test-uid",
 		},
 		VolumeCapability: &csi.VolumeCapability{
 			AccessMode: &csi.VolumeCapability_AccessMode{
@@ -384,6 +396,10 @@ func TestMetrics(t *testing.T) {
 		VolumeContext: map[string]string{
 			// so that the test would always attempt to pull an image
 			ctxKeyPullAlways: "true",
+			// to see improved logs
+			"pod-name":  "test-pod",
+			"namespace": "test-namespace",
+			"uid":       "test-uid",
 		},
 		VolumeCapability: &csi.VolumeCapability{
 			AccessMode: &csi.VolumeCapability_AccessMode{

@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"os"
 	"strings"
-	"time"
 
 	"github.com/container-storage-interface/spec/lib/go/csi"
 	"github.com/containerd/containerd/reference/docker"
@@ -64,9 +63,7 @@ type NodeServer struct {
 func (n NodeServer) NodePublishVolume(ctx context.Context, req *csi.NodePublishVolumeRequest) (resp *csi.NodePublishVolumeResponse, err error) {
 	u, _ := uuid.NewRandom()
 	valuesLogger := klog.LoggerWithValues(klog.NewKlogr(), "pod-name", req.VolumeContext["pod-name"], "namespace", req.VolumeContext["namespace"], "uid", req.VolumeContext["uid"], "request-id", u.String())
-	valuesLogger.Info(fmt.Sprintf("mount request: %s", req.String())) // TODO: info(fmt.Sprintf(...)) is messy but Logger doesn't support infof
-	deadline, _ := ctx.Deadline()
-	valuesLogger.Info(fmt.Sprintf("deadline: %f", time.Until(deadline).Seconds()))
+	valuesLogger.Info(fmt.Sprintf("mount request: %s", req.String()))
 	if len(req.VolumeId) == 0 {
 		err = status.Error(codes.InvalidArgument, "VolumeId is missing")
 		return
