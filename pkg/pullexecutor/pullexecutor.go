@@ -127,7 +127,7 @@ func (m *PullExecutor) StartPulling(o *PullOptions, valuesLogger klog.Logger) er
 				metrics.ImagePullTime.WithLabelValues(metrics.Async).Observe(elapsed.Seconds())
 				valuesLogger.Info(fmt.Sprintf("pulling %q took %s", o.Image, elapsed))
 				size, _ := puller.ImageSize(o.Context)
-				valuesLogger.Info(fmt.Sprintf("image size: %d", size))
+				valuesLogger.Info(fmt.Sprintf("image size: %d MB", size))
 			}
 			pullstatus.Update(o.NamedRef, pullstatus.Pulled)
 		}
