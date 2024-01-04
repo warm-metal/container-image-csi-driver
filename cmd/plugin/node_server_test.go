@@ -82,10 +82,7 @@ func TestNodePublishVolumeAsync(t *testing.T) {
 	var wg sync.WaitGroup
 	wg.Add(1)
 	go func() {
-<<<<<<< HEAD
 
-=======
->>>>>>> 0bede4e (feat: max in-flight pulls)
 		server.Start(endpoint,
 			nil,
 			nil,
