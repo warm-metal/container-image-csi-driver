@@ -2,7 +2,6 @@ package main
 
 import (
 	"context"
-	"fmt"
 	"os"
 	"strings"
 
@@ -63,7 +62,7 @@ type NodeServer struct {
 func (n NodeServer) NodePublishVolume(ctx context.Context, req *csi.NodePublishVolumeRequest) (resp *csi.NodePublishVolumeResponse, err error) {
 	u, _ := uuid.NewRandom()
 	valuesLogger := klog.LoggerWithValues(klog.NewKlogr(), "pod-name", req.VolumeContext["pod-name"], "namespace", req.VolumeContext["namespace"], "uid", req.VolumeContext["uid"], "request-id", u.String())
-	valuesLogger.Info(fmt.Sprintf("mount request: %s", req.String()))
+	valuesLogger.Info("Incoming mount request", "request string", req.String())
 	if len(req.VolumeId) == 0 {
 		err = status.Error(codes.InvalidArgument, "VolumeId is missing")
 		return
@@ -138,9 +137,10 @@ func (n NodeServer) NodePublishVolume(ctx context.Context, req *csi.NodePublishV
 		PullAlways:  pullAlways,
 		Image:       image,
 		PullSecrets: req.Secrets,
+		Logger:      valuesLogger,
 	}
 
-	if e := n.pullExecutor.StartPulling(po, valuesLogger); e != nil {
+	if e := n.pullExecutor.StartPulling(po); e != nil {
 		err = status.Errorf(codes.Aborted, "unable to pull image %q: %s", image, e)
 		return
 	}
@@ -161,9 +161,10 @@ func (n NodeServer) NodePublishVolume(ctx context.Context, req *csi.NodePublishV
 		TargetPath:       req.TargetPath,
 		VolumeCapability: req.VolumeCapability,
 		ReadOnly:         req.Readonly,
+		Logger:           valuesLogger,
 	}
 
-	if e := n.mountExecutor.StartMounting(o, valuesLogger); e != nil {
+	if e := n.mountExecutor.StartMounting(o); e != nil {
 		err = status.Error(codes.Internal, e.Error())
 		return
 	}

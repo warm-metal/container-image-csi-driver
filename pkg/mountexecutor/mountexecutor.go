@@ -37,6 +37,7 @@ type MountOptions struct {
 	TargetPath       string
 	VolumeCapability *csi.VolumeCapability
 	ReadOnly         bool
+	Logger           klog.Logger
 }
 
 // MountExecutor executes mount
@@ -57,12 +58,14 @@ func NewMountExecutor(o *MountExecutorOptions) *MountExecutor {
 }
 
 // StartMounting starts the mounting
-func (m *MountExecutor) StartMounting(o *MountOptions, valuesLogger klog.Logger) error {
+func (m *MountExecutor) StartMounting(o *MountOptions) error {
 
+	o.Logger.Info("Mounting image", "image", o.NamedRef.Name())
 	if pullstatus.Get(o.NamedRef) != pullstatus.Pulled || mountstatus.Get(o.TargetPath) == mountstatus.StillMounting {
-		klog.Infof("image '%s' hasn't been pulled yet (status: %s) or volume is still mounting (status: %s)",
-			o.NamedRef.Name(),
-			pullstatus.Get(o.NamedRef), mountstatus.Get(o.TargetPath))
+		o.Logger.Info("Could not mount image because image hasn't finshed pulling or volume is still mounting",
+			"image", o.NamedRef.Name(),
+			"pull-status", pullstatus.Get(o.NamedRef),
+			"mount-status", mountstatus.Get(o.TargetPath))
 		return nil
 	}
 
@@ -74,13 +77,14 @@ func (m *MountExecutor) StartMounting(o *MountOptions, valuesLogger klog.Logger)
 		mountstatus.Update(o.TargetPath, mountstatus.StillMounting)
 		startTime := time.Now()
 		if err := m.mounter.Mount(o.Context, o.VolumeId, backend.MountTarget(o.TargetPath), o.NamedRef, ro); err != nil {
+			o.Logger.Error(err, "mount error")
 			metrics.OperationErrorsCount.WithLabelValues("StartMounting").Inc()
 			mountstatus.Update(o.TargetPath, mountstatus.Errored)
 			return err
 		}
 		elapsed := time.Since(startTime)
 		metrics.ImageMountTime.WithLabelValues(metrics.Sync).Observe(elapsed.Seconds())
-		valuesLogger.Info(fmt.Sprintf("mounting %q took %s", o.NamedRef.Name(), elapsed))
+		o.Logger.Info("Finished mounting", "image", o.NamedRef.Name(), "mount-duration", elapsed)
 		mountstatus.Update(o.TargetPath, mountstatus.Mounted)
 		return nil
 	}
@@ -94,7 +98,7 @@ func (m *MountExecutor) StartMounting(o *MountOptions, valuesLogger klog.Logger)
 		mountstatus.Update(o.TargetPath, mountstatus.StillMounting)
 		startTime := time.Now()
 		if err := m.mounter.Mount(ctx, o.VolumeId, backend.MountTarget(o.TargetPath), o.NamedRef, ro); err != nil {
-			klog.Errorf("mount err: %v", err.Error())
+			o.Logger.Error(err, "mount error")
 			metrics.OperationErrorsCount.WithLabelValues("StartMounting").Inc()
 			mountstatus.Update(o.TargetPath, mountstatus.Errored)
 			m.asyncErrs[o.NamedRef] = fmt.Errorf("err: %v: %v", err, m.asyncErrs[o.NamedRef])
@@ -102,7 +106,7 @@ func (m *MountExecutor) StartMounting(o *MountOptions, valuesLogger klog.Logger)
 		}
 		elapsed := time.Since(startTime)
 		metrics.ImageMountTime.WithLabelValues(metrics.Async).Observe(elapsed.Seconds())
-		valuesLogger.Info(fmt.Sprintf("mounting %q took %s", o.NamedRef.Name(), elapsed))
+		o.Logger.Info("Finished mounting", "image", o.NamedRef.Name(), "mount-duration", elapsed)
 		mountstatus.Update(o.TargetPath, mountstatus.Mounted)
 	}()
 
