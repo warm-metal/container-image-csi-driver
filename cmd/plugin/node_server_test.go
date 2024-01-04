@@ -14,6 +14,7 @@ import (
 	"time"
 
 	"github.com/container-storage-interface/spec/lib/go/csi"
+	csipbv1 "github.com/container-storage-interface/spec/lib/go/csi"
 	"github.com/stretchr/testify/assert"
 	"github.com/warm-metal/csi-driver-image/pkg/backend"
 	"github.com/warm-metal/csi-driver-image/pkg/backend/containerd"
@@ -395,10 +396,6 @@ func TestNodePublishVolumeSync(t *testing.T) {
 	var wg sync.WaitGroup
 	wg.Add(1)
 	go func() {
-<<<<<<< HEAD
-
-=======
->>>>>>> 0bede4e (feat: max in-flight pulls)
 		server.Start(endpoint,
 			nil,
 			nil,
@@ -487,7 +484,8 @@ func TestMetrics(t *testing.T) {
 	assert.NotNil(t, driver)
 
 	asyncImagePulls := true
-	ns := NewNodeServer(driver, mounter, criClient, &testSecretStore{}, asyncImagePulls)
+	maxInflightPulls := -1 // no limit on in flight pulls
+	ns := NewNodeServer(driver, mounter, criClient, &testSecretStore{}, asyncImagePulls, maxInflightPulls)
 
 	// based on kubelet's csi mounter plugin code
 	// check https://github.com/kubernetes/kubernetes/blob/b06a31b87235784bad2858be62115049b6eb6bcd/pkg/volume/csi/csi_mounter.go#L111-L112
