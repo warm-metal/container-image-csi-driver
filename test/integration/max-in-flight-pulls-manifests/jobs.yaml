@@ -1,0 +1,51 @@
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: inflight-reqs-mount-ephemeral-volume-1
+spec:
+  template:
+    metadata:
+      name: inflight-reqs-mount-ephemeral-volume-1
+    spec:
+      containers:
+        - name: inflight-reqs-mount-ephemeral-volume
+          image: ubuntu:latest
+          volumeMounts:
+            - mountPath: /target
+              readOnly: true
+              name: target
+      restartPolicy: Never
+      volumes:
+        - name: target
+          csi:
+            driver: csi-image.warm-metal.tech
+            volumeAttributes:
+              image: "ubuntu:latest"
+              pullAlways: "true"
+  backoffLimit: 0
+---
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: inflight-reqs-mount-ephemeral-volume-2
+spec:
+  template:
+    metadata:
+      name: inflight-reqs-mount-ephemeral-volume-2
+    spec:
+      containers:
+        - name: inflight-reqs-mount-ephemeral-volume
+          image: debian:latest
+          volumeMounts:
+            - mountPath: /target
+              readOnly: true
+              name: target
+      restartPolicy: Never
+      volumes:
+        - name: target
+          csi:
+            driver: csi-image.warm-metal.tech
+            volumeAttributes:
+              image: "debian:latest"
+              pullAlways: "true"
+  backoffLimit: 0

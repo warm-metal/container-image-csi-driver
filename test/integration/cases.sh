@@ -82,5 +82,8 @@ for i in ${TestBase}/daemon-dependent-manifests/*.yaml; do
   lib::run_test_job $i
 done
 
+echo "Test metrics"
+./test-metrics.sh
+
 echo "Testing Done!"
 set +e

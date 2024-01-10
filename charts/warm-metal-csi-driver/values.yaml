@@ -5,12 +5,13 @@ kubeletRoot: /var/lib/kubelet
 snapshotRoot: /var/lib/containerd/io.containerd.snapshotter.v1.overlayfs
 logLevel: 4
 enableDaemonImageCredentialCache:
-enableAsyncPullMount: false
 pullImageSecretForDaemonset:
 
 csiPlugin:
   hostNetwork: false
   maxInFlightPulls: -1 # i.e., no pull limit
+  asyncPullTimeout:
+  enableAsyncPullMount: false
   resources: {}
   image:
     tag: ""

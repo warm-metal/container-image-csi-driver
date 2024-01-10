@@ -13,6 +13,7 @@ import (
 	"github.com/warm-metal/csi-driver-image/pkg/backend/crio"
 	"github.com/warm-metal/csi-driver-image/pkg/cri"
 	"github.com/warm-metal/csi-driver-image/pkg/metrics"
+	"github.com/warm-metal/csi-driver-image/pkg/pullexecutor"
 	"github.com/warm-metal/csi-driver-image/pkg/secret"
 	"github.com/warm-metal/csi-driver-image/pkg/watcher"
 	csicommon "github.com/warm-metal/csi-drivers/pkg/csi-common"
@@ -58,6 +59,7 @@ var (
 	mode                = flag.String("mode", "", "The mode of the driver. Valid values are: node, controller")
 	nodePluginSA        = flag.String("node-plugin-sa", "csi-image-warm-metal", "The name of the ServiceAccount used by the node plugin.")
 	maxInflightPulls    = flag.Int("max-in-flight-pulls", -1, "The maximum number of image pull operations that can happen at the same time. Only works if --async-pull-mount is set to true. (default: -1 which means there is no limit)")
+	asyncPullTimeout    = flag.Duration("async-pull-timeout", pullexecutor.DefaultPullPollTimeout, "(EXPERIMENTAL) Synchronous wait timeout for image to get pulled after which a response is returned and image pull happens in the background. Only works if --async-pull-mount is set to true. (default: 2 minutes)")
 )
 
 func main() {
@@ -88,6 +90,12 @@ func main() {
 
 	if !*asyncImagePullMount && *maxInflightPulls > 0 {
 		klog.Fatalf("--max-in-flight-pulls (current value: '%v') can only be used with --async-pull-mount=true (current value: %v)", *maxInflightPulls, *asyncImagePullMount)
+	}
+
+	// `.Changed` is used to check if the flag was specified by the user
+	// more info: https://github.com/spf13/pflag/issues/293#issuecomment-719996662
+	if !*asyncImagePullMount && flag.Lookup("async-pull-timeout").Changed {
+		klog.Fatalf("--async-pull-timeout (current value: '%v') can only be used with --async-pull-mount=true (current value: %v)", *asyncPullTimeout, *asyncImagePullMount)
 	}
 
 	server := csicommon.NewNonBlockingGRPCServer()
@@ -139,7 +147,8 @@ func main() {
 		server.Start(*endpoint,
 			NewIdentityServer(driverVersion),
 			nil,
-			NewNodeServer(driver, mounter, criClient, secretStore, *asyncImagePullMount, *maxInflightPulls))
+			NewNodeServer(driver, mounter, criClient, secretStore,
+				*asyncImagePullMount, *maxInflightPulls, *asyncPullTimeout))
 	case controllerMode:
 		watcher, err := watcher.New(context.Background(), *watcherResyncPeriod)
 		if err != nil {

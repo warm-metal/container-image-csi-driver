@@ -19,9 +19,9 @@ import (
 )
 
 const (
-	pullPollTimeInterval = 100 * time.Millisecond
-	pullPollTimeout      = 2 * time.Minute
-	pullCtxTimeout       = 10 * time.Minute
+	pullPollTimeInterval   = 100 * time.Millisecond
+	DefaultPullPollTimeout = 2 * time.Minute
+	pullCtxTimeout         = 10 * time.Minute
 )
 
 // PullExecutorOptions are the options passed to the pull executor
@@ -31,6 +31,7 @@ type PullExecutorOptions struct {
 	SecretStore        secret.Store
 	Mounter            backend.Mounter
 	MaxInflightPulls   int
+	AsyncPullTimeout   time.Duration
 }
 
 // PullOptions are the options for a single pull request
@@ -52,6 +53,8 @@ type PullExecutor struct {
 	secretStore    secret.Store
 	mounter        backend.Mounter
 	tokens         chan struct{}
+	// only valid for async pulls
+	pullTimeout time.Duration
 }
 
 // NewPullExecutor initializes a new pull executor object
@@ -71,6 +74,7 @@ func NewPullExecutor(o *PullExecutorOptions) *PullExecutor {
 		mounter:        o.Mounter,
 		asyncErrs:      make(map[string]error),
 		tokens:         tokens,
+		pullTimeout:    o.AsyncPullTimeout,
 	}
 }
 
@@ -121,11 +125,14 @@ func (m *PullExecutor) StartPulling(o *PullOptions) error {
 			puller := remoteimage.NewPuller(m.imageSvcClient, o.NamedRef, keyring)
 			shouldPull := o.PullAlways || !m.mounter.ImageExists(o.Context, o.NamedRef)
 			if shouldPull {
-				if m.tokens != nil {
-					m.tokens <- struct{}{}
-					defer func() {
-						<-m.tokens
-					}()
+				// i.e., if max-in-flight-pulls is set to a non-zero value
+				if len(m.tokens) > 0 {
+					if m.tokens != nil {
+						m.tokens <- struct{}{}
+						defer func() {
+							<-m.tokens
+						}()
+					}
 				}
 				klog.Infof("pull image %q ", o.Image)
 				pullstatus.Update(namedRef, pullstatus.StillPulling)
@@ -167,7 +174,7 @@ func (m *PullExecutor) WaitForPull(o *PullOptions) error {
 
 	if err := wait.PollImmediate(
 		pullPollTimeInterval,
-		pullPollTimeout,
+		m.pullTimeout,
 		condFn); err != nil {
 		return errors.Errorf("waited too long to download the image: %v", err)
 	}

@@ -4,6 +4,7 @@ import (
 	"context"
 	"os"
 	"strings"
+	"time"
 
 	"github.com/container-storage-interface/spec/lib/go/csi"
 	"github.com/containerd/containerd/reference/docker"
@@ -30,7 +31,7 @@ const (
 
 type ImagePullStatus int
 
-func NewNodeServer(driver *csicommon.CSIDriver, mounter backend.Mounter, imageSvc cri.ImageServiceClient, secretStore secret.Store, asyncImagePullMount bool, maxInflightPulls int) *NodeServer {
+func NewNodeServer(driver *csicommon.CSIDriver, mounter backend.Mounter, imageSvc cri.ImageServiceClient, secretStore secret.Store, asyncImagePullMount bool, maxInflightPulls int, asyncPullTimeout time.Duration) *NodeServer {
 	return &NodeServer{
 		DefaultNodeServer:   csicommon.NewDefaultNodeServer(driver),
 		mounter:             mounter,
@@ -46,6 +47,7 @@ func NewNodeServer(driver *csicommon.CSIDriver, mounter backend.Mounter, imageSv
 			SecretStore:        secretStore,
 			Mounter:            mounter,
 			MaxInflightPulls:   maxInflightPulls,
+			AsyncPullTimeout:   asyncPullTimeout,
 		}),
 	}
 }

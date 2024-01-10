@@ -20,6 +20,7 @@ import (
 	"github.com/warm-metal/csi-driver-image/pkg/backend/containerd"
 	"github.com/warm-metal/csi-driver-image/pkg/cri"
 	"github.com/warm-metal/csi-driver-image/pkg/metrics"
+	"github.com/warm-metal/csi-driver-image/pkg/pullexecutor"
 	"github.com/warm-metal/csi-driver-image/pkg/test/utils"
 	csicommon "github.com/warm-metal/csi-drivers/pkg/csi-common"
 	"google.golang.org/grpc"
@@ -44,7 +45,8 @@ func TestNodePublishVolumeAsync(t *testing.T) {
 
 	asyncImagePulls := true
 	maxInflightPulls := -1
-	ns := NewNodeServer(driver, mounter, criClient, &testSecretStore{}, asyncImagePulls, maxInflightPulls)
+	ns := NewNodeServer(driver, mounter, criClient, &testSecretStore{},
+		asyncImagePulls, maxInflightPulls, pullexecutor.DefaultPullPollTimeout)
 
 	// based on kubelet's csi mounter plugin code
 	// check https://github.com/kubernetes/kubernetes/blob/b06a31b87235784bad2858be62115049b6eb6bcd/pkg/volume/csi/csi_mounter.go#L111-L112
@@ -168,7 +170,8 @@ func TestNodePublishVolumeAsyncInFlightPulls(t *testing.T) {
 
 	asyncImagePulls := true
 	maxInflightPulls := 1
-	ns := NewNodeServer(driver, mounter, criClient, &testSecretStore{}, asyncImagePulls, maxInflightPulls)
+	ns := NewNodeServer(driver, mounter, criClient, &testSecretStore{},
+		asyncImagePulls, maxInflightPulls, pullexecutor.DefaultPullPollTimeout)
 
 	// based on kubelet's csi mounter pluginc ode
 	// check https://github.com/kubernetes/kubernetes/blob/b06a31b87235784bad2858be62115049b6eb6bcd/pkg/volume/csi/csi_mounter.go#L111-L112
@@ -357,7 +360,8 @@ func TestNodePublishVolumeSync(t *testing.T) {
 
 	asyncImagePulls := false
 	maxInflightPulls := -1
-	ns := NewNodeServer(driver, mounter, criClient, &testSecretStore{}, asyncImagePulls, maxInflightPulls)
+	ns := NewNodeServer(driver, mounter, criClient, &testSecretStore{},
+		asyncImagePulls, maxInflightPulls, pullexecutor.DefaultPullPollTimeout)
 
 	// based on kubelet's csi mounter plugin code
 	// check https://github.com/kubernetes/kubernetes/blob/b06a31b87235784bad2858be62115049b6eb6bcd/pkg/volume/csi/csi_mounter.go#L111-L112
@@ -485,7 +489,8 @@ func TestMetrics(t *testing.T) {
 
 	asyncImagePulls := true
 	maxInflightPulls := -1 // no limit on in flight pulls
-	ns := NewNodeServer(driver, mounter, criClient, &testSecretStore{}, asyncImagePulls, maxInflightPulls)
+	ns := NewNodeServer(driver, mounter, criClient, &testSecretStore{},
+		asyncImagePulls, maxInflightPulls, pullexecutor.DefaultPullPollTimeout)
 
 	// based on kubelet's csi mounter plugin code
 	// check https://github.com/kubernetes/kubernetes/blob/b06a31b87235784bad2858be62115049b6eb6bcd/pkg/volume/csi/csi_mounter.go#L111-L112

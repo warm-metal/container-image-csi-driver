@@ -1,4 +1,4 @@
-name: containerd-11mins
+name: containerd-16mins
 on:
   push:
     branches: [master]
@@ -36,3 +36,18 @@ jobs:
         run: ./hack/ci/test.sh
       - name: Uninstall the CSI Driver
         run: helm uninstall -n kube-system ${HELM_NAME} --wait
+      - name: Install the CSI Driver (for `--max-in-flight-pulls`)
+        run: |
+          helm install ${HELM_NAME} charts/warm-metal-csi-driver -n kube-system \
+            -f ${VALUE_FILE} \
+            --set csiPlugin.image.tag=${IMAGE_TAG} \
+            --set csiPlugin.maxInFlightPulls=1 \
+            --set csiPlugin.asyncPullTimeout=1ms \
+            --set csiPlugin.enableAsyncPullMount=true \
+            --wait \
+            --debug
+      - name: Run Tests
+        run: test/integration/test-max-in-flight-pulls.sh
+      - name: Uninstall the CSI Driver (for `--max-in-flight-pulls`)
+        run: helm uninstall -n kube-system ${HELM_NAME} --wait
+        

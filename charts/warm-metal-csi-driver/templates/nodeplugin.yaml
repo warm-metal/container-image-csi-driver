@@ -70,8 +70,11 @@ spec:
             {{- if .Values.enableDaemonImageCredentialCache }}
             - --enable-daemon-image-credential-cache
             {{- end }}
-            {{- if .Values.enableAsyncPullMount }}
+            {{- if .Values.csiPlugin.enableAsyncPullMount }}
             - --async-pull-mount=true
+            {{- end }}
+            {{- if .Values.csiPlugin.asyncPullTimeout }}
+            - --async-pull-timeout={{ .Values.csiPlugin.asyncPullTimeout }}
             {{- end }}
             {{- if .Values.csiPlugin.maxInFlightPulls }}
             - --max-in-flight-pulls={{ .Values.csiPlugin.maxInFlightPulls }}
