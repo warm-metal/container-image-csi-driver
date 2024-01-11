@@ -5,18 +5,22 @@ import (
 	goflag "flag"
 	"fmt"
 	"net/url"
+	"strings"
 	"time"
 
 	"github.com/container-storage-interface/spec/lib/go/csi"
 	flag "github.com/spf13/pflag"
 	"github.com/warm-metal/container-image-csi-driver/pkg/backend"
 	"github.com/warm-metal/container-image-csi-driver/pkg/backend/containerd"
+	"github.com/warm-metal/container-image-csi-driver/pkg/imagesize"
+
 	"github.com/warm-metal/container-image-csi-driver/pkg/backend/crio"
 	"github.com/warm-metal/container-image-csi-driver/pkg/cri"
 	"github.com/warm-metal/container-image-csi-driver/pkg/metrics"
 	"github.com/warm-metal/container-image-csi-driver/pkg/secret"
 	"github.com/warm-metal/container-image-csi-driver/pkg/watcher"
 	csicommon "github.com/warm-metal/csi-drivers/pkg/csi-common"
+	"k8s.io/apimachinery/pkg/api/resource"
 	"k8s.io/klog/v2"
 )
 
@@ -56,6 +60,7 @@ var (
 	watcherResyncPeriod = flag.Duration("watcher-resync-period", 30*time.Minute, "The resync period of the pvc watcher.")
 	mode                = flag.String("mode", "", "The mode of the driver. Valid values are: node, controller")
 	nodePluginSA        = flag.String("node-plugin-sa", "csi-image-warm-metal", "The name of the ServiceAccount used by the node plugin.")
+	maxImageSize        = flag.String("max-image-size", "", "if warm metal finds an image exceeding max image size it creates a warning event on the pod (empty or unset means no event should be logged)")
 )
 
 func main() {
@@ -78,6 +83,13 @@ func main() {
 
 	if len(*mode) == 0 {
 		klog.Fatalf("The mode of the driver is required.")
+	}
+	var size *resource.Quantity
+	size = nil
+	if flag.CommandLine.Changed("max-image-size") {
+		// remove beginning and trailing `"` if it is present
+		s := resource.MustParse(strings.Trim(*maxImageSize, "\""))
+		size = &s
 	}
 
 	server := csicommon.NewNonBlockingGRPCServer()
@@ -145,6 +157,11 @@ func main() {
 		)
 	}
 
+	if size != nil {
+		klog.Infof("'--max-image-size' is set to '%v'", size.String())
+		imagesize.Initialize(size)
+		defer imagesize.Warner.Cleanup()
+	}
 	metrics.StartMetricsServer(metrics.RegisterMetrics())
 	server.Wait()
 }
