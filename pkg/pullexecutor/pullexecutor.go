@@ -114,7 +114,7 @@ func (m *PullExecutor) StartPulling(o *PullOptions) error {
 			puller := remoteimage.NewPuller(m.imageSvcClient, o.NamedRef, keyring)
 			shouldPull := o.PullAlways || !m.mounter.ImageExists(o.Context, o.NamedRef)
 			if shouldPull {
-				o.Logger.Info("Pulling image", "image", o.Image)
+				o.Logger.Info("Pulling image asynchronously", "image", o.Image)
 				pullstatus.Update(o.NamedRef, pullstatus.StillPulling)
 				startTime := time.Now()
 
