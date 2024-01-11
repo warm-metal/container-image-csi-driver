@@ -31,7 +31,7 @@ type puller struct {
 
 // Returns the size of the image that was pulled in MB(I think?) **TODO: check**
 func (p puller) ImageSize(ctx context.Context) (int, error) {
-	info, err := p.imageSvc.ImageFsInfo(ctx, &cri.ImageFsInfoRequest{})
+	info, err := p.ImageSize(ctx)
 	if err != nil {
 		return 0, err
 	}
