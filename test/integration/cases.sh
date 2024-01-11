@@ -83,7 +83,7 @@ for i in ${TestBase}/daemon-dependent-manifests/*.yaml; do
 done
 
 echo "Test metrics"
-./test-metrics.sh
+${TestBase}/test-metrics.sh
 
 echo "Testing Done!"
 set +e
