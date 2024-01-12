@@ -126,7 +126,7 @@ spec:
             - mountPath: /run/containers/storage
               mountPropagation: Bidirectional
               name: crio-run-root
-      hostNetwork: true
+      hostNetwork: false
       serviceAccountName: csi-image-warm-metal
       volumes:
         - hostPath:

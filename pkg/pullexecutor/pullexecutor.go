@@ -102,7 +102,8 @@ func (m *PullExecutor) StartPulling(o *PullOptions) error {
 			c, cancel := context.WithTimeout(context.Background(), pullCtxTimeout)
 			defer cancel()
 
-			if pullstatus.Get(o.NamedRef) == pullstatus.StillPulling {
+			if pullstatus.Get(o.NamedRef) == pullstatus.StillPulling ||
+				pullstatus.Get(o.NamedRef) == pullstatus.Pulled {
 				return
 			}
 
