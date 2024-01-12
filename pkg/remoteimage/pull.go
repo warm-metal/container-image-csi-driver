@@ -11,7 +11,7 @@ import (
 
 type Puller interface {
 	Pull(context.Context) error
-	ImageSize(context.Context) (int, error)
+	ImageSize(context.Context) int
 }
 
 func NewPuller(imageSvc cri.ImageServiceClient, image docker.Named,
@@ -30,13 +30,15 @@ type puller struct {
 }
 
 // Returns the size of the image that was pulled in MB(I think?) **TODO: check**
-func (p puller) ImageSize(ctx context.Context) (int, error) {
-	info, err := p.ImageSize(ctx)
-	if err != nil {
-		return 0, err
-	}
+func (p puller) ImageSize(ctx context.Context) int {
+	imageSpec := &cri.ImageSpec{Image: p.image.String()}
+	return imageSpec.Size()
+	// info, err := p.imageSvc.ImageFsInfo(ctx, &cri.ImageFsInfoRequest{})
+	// if err != nil {
+	// 	return 0, err
+	// }
 
-	return info.Size(), nil
+	// return info.Size(), nil
 }
 
 func (p puller) Pull(ctx context.Context) (err error) {
