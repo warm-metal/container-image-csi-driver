@@ -6,7 +6,7 @@ on:
     tags:
 
 env:
-  BASE_REPOSITORY: warmmetal/csi-driver-image
+  BASE_REPOSITORY: warm-metal/csi-driver-image
   BASE_DEFAULT_BRANCH: master
   BASE_IMAGE_NAME: warmmetal/csi-image
   FORK_IMAGE_NAME: ghcr.io/${{ github.repository }}
