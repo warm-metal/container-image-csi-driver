@@ -20,6 +20,9 @@ jobs:
     steps:
       - uses: actions/stale@v9
         with:
+          # Setting this variable to 'true' will cause the
+          # action to run in a dry-run mode
+          debug-only: ${{ vars.DEBUG_ONLY == 'true' }}
           stale-issue-message: >
             This issue has been automatically marked as stale because it has not had
             recent activity. It will be closed if no further activity occurs.
@@ -37,4 +40,3 @@ jobs:
           exempt-pr-labels: 'awaiting-approval,work-in-progress,help-wanted'
           days-before-stale: 30
           days-before-close: 7
-          debug-only: true
