@@ -89,7 +89,7 @@ func (m *PullExecutor) StartPulling(o *PullOptions) error {
 			elapsed := time.Since(startTime)
 			metrics.ImagePullTime.WithLabelValues(metrics.Sync).Observe(elapsed.Seconds())
 			size := puller.ImageSize(o.Context)
-			o.Logger.Info("Finished pulling image", "image", o.Image, "pull-duration", elapsed, "image-size", size)
+			o.Logger.Info("Finished pulling image", "image", o.Image, "pull-duration", elapsed, "uncompressed-image-size", fmt.Sprintf("%.2f MiB", float64(size)/(1024.0*1024.0)))
 		}
 		pullstatus.Update(o.NamedRef, pullstatus.Pulled)
 		return nil
@@ -128,7 +128,8 @@ func (m *PullExecutor) StartPulling(o *PullOptions) error {
 				elapsed := time.Since(startTime)
 				metrics.ImagePullTime.WithLabelValues(metrics.Async).Observe(elapsed.Seconds())
 				size := puller.ImageSize(o.Context)
-				o.Logger.Info("Finished pulling image", "image", o.Image, "pull-duration", elapsed, "image-size", size)
+				o.Logger.Info("Finished pulling image", "image", o.Image, "pull-duration", elapsed, "uncompressed-image-size", fmt.Sprintf("%.2f MiB", float64(size)/(1024.0*1024.0)))
+
 			}
 			pullstatus.Update(o.NamedRef, pullstatus.Pulled)
 		}

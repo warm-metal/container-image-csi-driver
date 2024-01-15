@@ -29,16 +29,13 @@ type puller struct {
 	keyring  credentialprovider.DockerKeyring
 }
 
-// Returns the size of the image that was pulled in MB(I think?) **TODO: check**
+// Returns the uncompressed size of the image that was pulled in bytes
 func (p puller) ImageSize(ctx context.Context) int {
 	imageSpec := &cri.ImageSpec{Image: p.image.String()}
-	return imageSpec.Size()
-	// info, err := p.imageSvc.ImageFsInfo(ctx, &cri.ImageFsInfoRequest{})
-	// if err != nil {
-	// 	return 0, err
-	// }
-
-	// return info.Size(), nil
+	imageStatusResponse, _ := p.imageSvc.ImageStatus(ctx, &cri.ImageStatusRequest{
+		Image: imageSpec,
+	})
+	return int(imageStatusResponse.Image.Size_)
 }
 
 func (p puller) Pull(ctx context.Context) (err error) {
