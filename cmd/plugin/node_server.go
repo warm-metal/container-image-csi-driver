@@ -78,7 +78,7 @@ func (n NodeServer) NodePublishVolume(ctx context.Context, req *csi.NodePublishV
 		return
 	}
 
-	// to trigger CI
+	// to trigger CI again
 
 	if _, isBlock := req.VolumeCapability.AccessType.(*csi.VolumeCapability_Block); isBlock {
 		err = status.Error(codes.InvalidArgument, "unable to mount as a block device")

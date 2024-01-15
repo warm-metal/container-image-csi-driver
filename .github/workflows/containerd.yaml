@@ -46,8 +46,8 @@ jobs:
             --set csiPlugin.enableAsyncPullMount=true \
             --wait \
             --debug
-      - name: debug using ssh
-        uses: lhotari/action-upterm@v1
+      # - name: debug using ssh
+      #   uses: lhotari/action-upterm@v1
       - name: Run Tests
         run: test/integration/test-max-in-flight-pulls.sh
       - name: Uninstall the CSI Driver (for `--max-in-flight-pulls`)
