@@ -29,7 +29,8 @@ type puller struct {
 	keyring  credentialprovider.DockerKeyring
 }
 
-// Returns the uncompressed size of the image that was pulled in bytes
+// Returns the compressed size of the image that was pulled in bytes
+// see https://github.com/containerd/containerd/issues/9261
 func (p puller) ImageSize(ctx context.Context) int {
 	imageSpec := &cri.ImageSpec{Image: p.image.String()}
 	imageStatusResponse, _ := p.imageSvc.ImageStatus(ctx, &cri.ImageStatusRequest{
