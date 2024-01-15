@@ -1,4 +1,4 @@
-name: 'Close stale issues and PRs'
+name: Close stale issues and PRs
 
 on:
   push:
@@ -6,6 +6,7 @@ on:
       - .github/workflows/stale.yml
     branches-ignore:
       - dependabot/**
+      - releases/**
   schedule:
     # Once every day at midnight UTC. Source: https://crontab.guru/every-day
     - cron: '0 0 * * *'
@@ -25,14 +26,14 @@ jobs:
           debug-only: ${{ vars.DEBUG_ONLY == 'true' }}
           stale-issue-message: >
             This issue has been automatically marked as stale because it has not had
-            recent activity. It will be closed if no further activity occurs.
+            recent activity. It will be closed in 7 days if no further activity occurs.
           close-issue-message: >
             Closing this issue after a prolonged period of inactivity. If this
             issue is still present in the latest release, please feel free to
             create a new issue with up-to-date information.
           stale-pr-message: >
             This pull request has been automatically marked as stale because it has not had
-            recent activity. It will be closed if no further activity occurs.
+            recent activity. It will be closed in 7 days if no further activity occurs.
           close-pr-message: >
             Closing this PR after a prolonged period of inactivity. Please create a new PR
             if the changes of the PR are still relevant.
