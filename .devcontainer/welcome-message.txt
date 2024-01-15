@@ -5,8 +5,8 @@ This debian dev container image contains all tools needed for development.
 
 Quickstart steps
 
-kind create cluster
-helm install wm-csi \
+$ kind create cluster
+$ helm install wm-csi \
      charts/warm-metal-csi-driver \
      -n kube-system \
      -f charts/warm-metal-csi-driver/values.yaml \
