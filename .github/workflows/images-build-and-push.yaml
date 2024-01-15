@@ -1,4 +1,4 @@
-name: Create and publish the container image.
+name: Create and publish the container image
 
 on:
   push:
