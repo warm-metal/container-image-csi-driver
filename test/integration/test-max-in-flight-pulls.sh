@@ -19,8 +19,6 @@ t2="$(kubectl logs -nkube-system $warmmetalpod csi-plugin | grep 'image is ready
 t3="$(kubectl logs -nkube-system $warmmetalpod csi-plugin | grep 'pull image "debian:latest"' | awk '{print $2}' | xargs -I{} date -d '{}' +'%s')"
 t4="$(kubectl logs -nkube-system $warmmetalpod csi-plugin | grep 'image is ready for use: "debian:latest"' | awk '{print $2}' | xargs -I{} date -d '{}' +'%s')"
 
-kubectl delete --ignore-not-found -f "${TestBase}/compatible-manifests/pre-provisioned-pv.yaml"
-
 if [ "${t1}" -lt "${t2}" -a "${t2}" -le "${t3}" -a "${t3}" -lt "${t4}" ]; then
     echo 'Test succeeded'
 else
