@@ -22,7 +22,7 @@ There are a few [GitHub Workflows](https://docs.github.com/en/actions/using-work
     - Deletes all `ghcr.io/<repository-name>` image tags, expect `latest` or any semver tags. This workflow will run on forks only.
 - [![Close stale issues and PRs](https://github.com/warm-metal/csi-driver-image/actions/workflows/stale.yaml/badge.svg)](https://github.com/warm-metal/csi-driver-image/actions/workflows/stale.yaml)
     - [Create a repository variable](https://docs.github.com/en/actions/learn-github-actions/variables#creating-configuration-variables-for-a-repository) `DEBUG_ONLY` with value `true` to run the action in dry-run mode.
-    - Marks issues or PRs as stale after 30 days and closes them after 7 days, expect those labeled with any of of the following
+    - Marks issues or PRs as stale after 30 days and closes them after 7 days, except those labeled with any of of the following
         - `awaiting-approval`
         - `work-in-progress`
         - `help-wanted`
