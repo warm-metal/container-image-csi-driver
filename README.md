@@ -160,3 +160,6 @@ See [test/sanity](https://github.com/warm-metal/csi-driver-image/tree/master/tes
 ### E2E test
 
 See [test/e2e](https://github.com/warm-metal/csi-driver-image/tree/master/test/e2e).
+
+## Note on logging image size
+Image sizes are logged after they finish pulling. We've noticed that for smaller images, usually under 1KiB, containerd may report an incorrect image size. An issue has been raised in the containerd github repository: https://github.com/containerd/containerd/issues/9641.
