@@ -15,7 +15,7 @@ import (
 	"github.com/BurntSushi/toml"
 	"google.golang.org/grpc"
 	corev1 "k8s.io/api/core/v1"
-	criapis "k8s.io/cri-api/pkg/apis/runtime/v1alpha2"
+	criapis "k8s.io/cri-api/pkg/apis/runtime/v1"
 )
 
 var typeDir = corev1.HostPathDirectory

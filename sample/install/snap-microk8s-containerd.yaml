@@ -117,7 +117,7 @@ spec:
             - mountPath: /var/snap/microk8s/common/var/lib/containerd/io.containerd.snapshotter.v1.overlayfs
               mountPropagation: Bidirectional
               name: snapshot-root-0
-      hostNetwork: true
+      hostNetwork: false
       serviceAccountName: csi-image-warm-metal
       volumes:
         - hostPath:

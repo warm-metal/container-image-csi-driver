@@ -123,7 +123,7 @@ spec:
             - mountPath: /mnt/vda1/var/lib/containerd/io.containerd.snapshotter.v1.overlayfs
               mountPropagation: Bidirectional
               name: snapshot-root-0
-      hostNetwork: true
+      hostNetwork: false
       serviceAccountName: csi-image-warm-metal
       volumes:
         - hostPath:

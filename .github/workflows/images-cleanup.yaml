@@ -1,0 +1,27 @@
+name: Delete old container images
+
+on:
+  schedule:
+    - cron: "0 0 * * *"  # Source: https://crontab.guru/every-day
+
+permissions:
+  packages: write
+
+env:
+  BASE_REPOSITORY: warm-metal/csi-driver-image
+
+jobs:
+  clean-ghcr:
+    name: Delete old unused container images
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/delete-package-versions@v4
+        if: github.repository != env.BASE_REPOSITORY
+        with:
+          owner: ${{ github.repository_owner }}
+          package-name: ${{ github.event.repository.name }}
+          package-type: 'container'
+          min-versions-to-keep: 1
+          # https://semver.org/#is-there-a-suggested-regular-expression-regex-to-check-a-semver-string
+          # Ignore any semver or 'latest'
+          ignore-versions: '^(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)(?:-((?:0|[1-9]\d*|\d*[a-zA-Z-][0-9a-zA-Z-]*)(?:\.(?:0|[1-9]\d*|\d*[a-zA-Z-][0-9a-zA-Z-]*))*))?(?:\+([0-9a-zA-Z-]+(?:\.[0-9a-zA-Z-]+)*))?|latest$'

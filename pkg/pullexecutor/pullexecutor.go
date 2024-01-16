@@ -14,7 +14,7 @@ import (
 	"github.com/warm-metal/csi-driver-image/pkg/remoteimage"
 	"github.com/warm-metal/csi-driver-image/pkg/secret"
 	"k8s.io/apimachinery/pkg/util/wait"
-	cri "k8s.io/cri-api/pkg/apis/runtime/v1alpha2"
+	cri "k8s.io/cri-api/pkg/apis/runtime/v1"
 	"k8s.io/klog/v2"
 )
 
@@ -107,7 +107,8 @@ func (m *PullExecutor) StartPulling(o *PullOptions) error {
 			c, cancel := context.WithTimeout(context.Background(), pullCtxTimeout)
 			defer cancel()
 
-			if pullstatus.Get(o.NamedRef) == pullstatus.StillPulling {
+			if pullstatus.Get(o.NamedRef) == pullstatus.StillPulling ||
+				pullstatus.Get(o.NamedRef) == pullstatus.Pulled {
 				return
 			}
 

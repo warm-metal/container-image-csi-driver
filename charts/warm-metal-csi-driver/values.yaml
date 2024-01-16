@@ -9,6 +9,7 @@ enableAsyncPullMount: false
 pullImageSecretForDaemonset:
 
 csiPlugin:
+  hostNetwork: false
   resources: {}
   image:
     tag: ""
