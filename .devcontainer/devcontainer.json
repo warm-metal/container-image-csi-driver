@@ -8,7 +8,5 @@
 	"workspaceMount": "source=${localWorkspaceFolder},target=/go/src/github.com/warm-metal/csi-driver-image,type=bind,consistency=cached",
 
 	// Copy over welcome message
-	"onCreateCommand": "bash .devcontainer/setup.sh",
-
-	"remoteUser": "root"
+	"postCreateCommand": "bash .devcontainer/setup.sh"
 }
