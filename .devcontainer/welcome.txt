@@ -1,9 +1,8 @@
-👋 Welcome to your development environment!
-     Works in GitHub Codespaces, VS Code, or in docker using the devcontainer cli
+👋 Welcome to your development environment for CSI Driver Image!
 
 This debian dev container image contains all tools needed for development.
 
-Quickstart steps
+Get started right away! 🚀
 
 $ kind create cluster
 $ helm install wm-csi \
