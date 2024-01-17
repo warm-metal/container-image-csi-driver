@@ -5,3 +5,6 @@ updates:
     directory: "/"
     schedule:
       interval: "daily"
+    commit-message:
+      prefix: "[skip ci]"
+      include: "scope"
