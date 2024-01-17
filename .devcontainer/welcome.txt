@@ -4,10 +4,4 @@ This debian dev container image contains all tools needed for development.
 
 Get started right away! 🚀
 
-$ kind create cluster
-$ helm install wm-csi \
-     charts/warm-metal-csi-driver \
-     -n kube-system \
-     -f charts/warm-metal-csi-driver/values.yaml \
-     --set csiPlugin.image.tag=v1.0.1 \
-     --wait
+Check out the guide in docs/running-locally.md
