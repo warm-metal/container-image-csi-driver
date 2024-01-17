@@ -26,3 +26,4 @@ There are a few [GitHub Workflows](https://docs.github.com/en/actions/using-work
         - `awaiting-approval`
         - `work-in-progress`
         - `help-wanted`
+- [Dependabot](../.github/dependabot.yml) - [Dependabot](https://docs.github.com/en/code-security/getting-started/dependabot-quickstart-guide#about-dependabot) is currently being used to [keep the GitHub Actions up to date](https://docs.github.com/en/code-security/dependabot/working-with-dependabot/keeping-your-actions-up-to-date-with-dependabot)
