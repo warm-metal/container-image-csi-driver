@@ -5,8 +5,5 @@
 
 	// Setup the go environment and mount into the dev container at the expected location
 	"workspaceFolder": "/go/src/github.com/warm-metal/csi-driver-image",
-	"workspaceMount": "source=${localWorkspaceFolder},target=/go/src/github.com/warm-metal/csi-driver-image,type=bind,consistency=cached",
-
-	// Copy over welcome message
-	"postCreateCommand": "bash .devcontainer/setup.sh"
+	"workspaceMount": "source=${localWorkspaceFolder},target=/go/src/github.com/warm-metal/csi-driver-image,type=bind,consistency=cached"
 }
