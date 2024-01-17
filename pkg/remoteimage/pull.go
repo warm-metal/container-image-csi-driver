@@ -11,6 +11,7 @@ import (
 
 type Puller interface {
 	Pull(context.Context) error
+	ImageSize(context.Context) int
 }
 
 func NewPuller(imageSvc cri.ImageServiceClient, image docker.Named,
@@ -26,6 +27,16 @@ type puller struct {
 	imageSvc cri.ImageServiceClient
 	image    docker.Named
 	keyring  credentialprovider.DockerKeyring
+}
+
+// Returns the compressed size of the image that was pulled in bytes
+// see https://github.com/containerd/containerd/issues/9261
+func (p puller) ImageSize(ctx context.Context) int {
+	imageSpec := &cri.ImageSpec{Image: p.image.String()}
+	imageStatusResponse, _ := p.imageSvc.ImageStatus(ctx, &cri.ImageStatusRequest{
+		Image: imageSpec,
+	})
+	return int(imageStatusResponse.Image.Size_)
 }
 
 func (p puller) Pull(ctx context.Context) (err error) {

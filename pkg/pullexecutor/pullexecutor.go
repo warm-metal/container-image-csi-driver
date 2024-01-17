@@ -40,6 +40,7 @@ type PullOptions struct {
 	PullAlways  bool
 	PullSecrets map[string]string
 	Image       string
+	Logger      klog.Logger
 }
 
 // PullExecutor executes the pulls
@@ -76,15 +77,19 @@ func (m *PullExecutor) StartPulling(o *PullOptions) error {
 		puller := remoteimage.NewPuller(m.imageSvcClient, o.NamedRef, keyring)
 		shouldPull := o.PullAlways || !m.mounter.ImageExists(o.Context, o.NamedRef)
 		if shouldPull {
-			klog.Infof("pull image %q ", o.Image)
+			o.Logger.Info("Pulling image", "image", o.Image)
 			pullstatus.Update(o.NamedRef, pullstatus.StillPulling)
 			startTime := time.Now()
 			if err = puller.Pull(o.Context); err != nil {
 				pullstatus.Update(o.NamedRef, pullstatus.Errored)
 				metrics.OperationErrorsCount.WithLabelValues("StartPulling").Inc()
+				o.Logger.Error(err, "Unable to pull image", "image", o.NamedRef)
 				return errors.Errorf("unable to pull image %q: %s", o.NamedRef, err)
 			}
-			metrics.ImagePullTime.WithLabelValues(metrics.Sync).Observe(time.Since(startTime).Seconds())
+			elapsed := time.Since(startTime)
+			metrics.ImagePullTime.WithLabelValues(metrics.Sync).Observe(elapsed.Seconds())
+			size := puller.ImageSize(o.Context)
+			o.Logger.Info("Finished pulling image", "image", o.Image, "pull-duration", elapsed, "image-size", fmt.Sprintf("%.2f MiB", float64(size)/(1024.0*1024.0)))
 		}
 		pullstatus.Update(o.NamedRef, pullstatus.Pulled)
 		return nil
@@ -110,17 +115,22 @@ func (m *PullExecutor) StartPulling(o *PullOptions) error {
 			puller := remoteimage.NewPuller(m.imageSvcClient, o.NamedRef, keyring)
 			shouldPull := o.PullAlways || !m.mounter.ImageExists(o.Context, o.NamedRef)
 			if shouldPull {
-				klog.Infof("pull image %q ", o.Image)
+				o.Logger.Info("Pulling image asynchronously", "image", o.Image)
 				pullstatus.Update(o.NamedRef, pullstatus.StillPulling)
 				startTime := time.Now()
 
 				if err = puller.Pull(c); err != nil {
 					pullstatus.Update(o.NamedRef, pullstatus.Errored)
 					metrics.OperationErrorsCount.WithLabelValues("StartPulling").Inc()
+					o.Logger.Error(err, "Unable to pull image", "image", o.Image)
 					m.asyncErrs[o.NamedRef] = fmt.Errorf("unable to pull image %q: %s", o.Image, err)
 					return
 				}
-				metrics.ImagePullTime.WithLabelValues(metrics.Async).Observe(time.Since(startTime).Seconds())
+				elapsed := time.Since(startTime)
+				metrics.ImagePullTime.WithLabelValues(metrics.Async).Observe(elapsed.Seconds())
+				size := puller.ImageSize(o.Context)
+				o.Logger.Info("Finished pulling image", "image", o.Image, "pull-duration", elapsed, "image-size", fmt.Sprintf("%.2f MiB", float64(size)/(1024.0*1024.0)))
+
 			}
 			pullstatus.Update(o.NamedRef, pullstatus.Pulled)
 		}
