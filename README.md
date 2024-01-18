@@ -177,3 +177,10 @@ See [test/e2e](https://github.com/warm-metal/csi-driver-image/tree/master/test/e
 
 ## Note on logging image size
 Image sizes are logged after they finish pulling. We've noticed that for smaller images, usually under 1KiB, containerd may report an incorrect image size. An issue has been raised in the containerd github repository: https://github.com/containerd/containerd/issues/9641.
+
+## Community meetings
+We host online meetings every other week on Thursday's at 15:30 UTC.
+
+Feel free to join us on [this](https://acquia.zoom.us/j/3839666297?omn=96846917396) link, and refer [Google sheet](https://docs.google.com/document/d/1nDiRtj85ZpWMH57joUmbtGG3aLkfeqFt6OWdkf8_Aaw/edit?usp=sharing) for MoMs.
+
+**Note:** Anyone interested in the meeting but isn't able to attend can still start a discussion under `Discussions/queries/suggestions` section in the above mentioned sheet.
