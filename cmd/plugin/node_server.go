@@ -27,6 +27,7 @@ const (
 	ctxKeyImage           = "image"
 	ctxKeyPullAlways      = "pullAlways"
 	ctxKeyEphemeralVolume = "csi.storage.k8s.io/ephemeral"
+	ctxKeyPodUid          = "csi.storage.k8s.io/pod.uid"
 )
 
 type ImagePullStatus int
@@ -78,7 +79,10 @@ func (n NodeServer) NodePublishVolume(ctx context.Context, req *csi.NodePublishV
 		return
 	}
 
-	// to trigger CI again
+	if len(req.VolumeContext[ctxKeyPodUid]) == 0 {
+		err = status.Error(codes.InvalidArgument, "Pod Uid is missing")
+		return
+	}
 
 	if _, isBlock := req.VolumeCapability.AccessType.(*csi.VolumeCapability_Block); isBlock {
 		err = status.Error(codes.InvalidArgument, "unable to mount as a block device")
@@ -139,6 +143,7 @@ func (n NodeServer) NodePublishVolume(ctx context.Context, req *csi.NodePublishV
 		PullAlways:  pullAlways,
 		Image:       image,
 		PullSecrets: req.Secrets,
+		PodUid:      req.VolumeContext[ctxKeyPodUid],
 	}
 
 	if e := n.pullExecutor.StartPulling(po); e != nil {

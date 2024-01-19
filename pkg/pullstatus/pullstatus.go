@@ -1,6 +1,7 @@
 package pullstatus
 
 import (
+	"fmt"
 	"sync"
 )
 
@@ -60,4 +61,8 @@ func Get(imageRef string) ImagePullStatus {
 	}
 
 	return i.status[imageRef]
+}
+
+func Key(namedRef string, podUid string) string {
+	return fmt.Sprintf("%s-%s", namedRef, podUid)
 }
