@@ -9,6 +9,8 @@ import (
 	"github.com/container-storage-interface/spec/lib/go/csi"
 	"github.com/containerd/containerd/reference/docker"
 	"github.com/warm-metal/csi-driver-image/pkg/backend"
+	"github.com/warm-metal/csi-driver-image/pkg/constants"
+	"github.com/warm-metal/csi-driver-image/pkg/errorstore"
 	"github.com/warm-metal/csi-driver-image/pkg/metrics"
 	"github.com/warm-metal/csi-driver-image/pkg/mountstatus"
 	"github.com/warm-metal/csi-driver-image/pkg/pullstatus"
@@ -42,25 +44,32 @@ type MountOptions struct {
 // MountExecutor executes mount
 type MountExecutor struct {
 	asyncMount bool
-	mutex      *sync.Mutex
+	mutexes    map[string]*sync.Mutex
 	mounter    backend.Mounter
-	asyncErrs  map[docker.Named]error
+	errorStore *errorstore.ErrorStore
 }
 
 // NewMountExecutor initializes a new mount executor
 func NewMountExecutor(o *MountExecutorOptions) *MountExecutor {
 	return &MountExecutor{
 		asyncMount: o.AsyncMount,
-		mutex:      &sync.Mutex{},
+		mutexes:    make(map[string]*sync.Mutex),
 		mounter:    o.Mounter,
+		errorStore: errorstore.New(),
 	}
 }
 
 // StartMounting starts the mounting
 func (m *MountExecutor) StartMounting(o *MountOptions) error {
+	namedRef := o.NamedRef.String()
+	if m.mutexes[o.TargetPath] == nil {
+		m.mutexes[o.TargetPath] = &sync.Mutex{}
+	}
 
-	if pullstatus.Get(o.NamedRef) != pullstatus.Pulled || mountstatus.Get(o.TargetPath) == mountstatus.StillMounting {
-		klog.Infof("image '%s' hasn't been pulled yet (status: %s) or volume is still mounting (status: %s)",
+	if pullstatus.Get(namedRef) != pullstatus.Pulled ||
+		mountstatus.Get(o.TargetPath) == mountstatus.StillMounting ||
+		mountstatus.Get(o.TargetPath) == mountstatus.Mounted {
+		klog.Infof("can't mount the image '%s' (image pull status: %q; volume mount status: %q)",
 			o.NamedRef.Name(),
 			pullstatus.Get(o.NamedRef), mountstatus.Get(o.TargetPath))
 		return nil
@@ -71,37 +80,40 @@ func (m *MountExecutor) StartMounting(o *MountOptions) error {
 		o.VolumeCapability.AccessMode.Mode == csi.VolumeCapability_AccessMode_MULTI_NODE_READER_ONLY
 
 	if !m.asyncMount {
-		mountstatus.Update(o.TargetPath, mountstatus.StillMounting)
-		startTime := time.Now()
-		if err := m.mounter.Mount(o.Context, o.VolumeId, backend.MountTarget(o.TargetPath), o.NamedRef, ro); err != nil {
-			metrics.OperationErrorsCount.WithLabelValues("StartMounting").Inc()
-			mountstatus.Update(o.TargetPath, mountstatus.Errored)
-			return err
-		}
-		metrics.ImageMountTime.WithLabelValues(metrics.Sync).Observe(time.Since(startTime).Seconds())
-		mountstatus.Update(o.TargetPath, mountstatus.Mounted)
-		return nil
+		return m.mount(o, constants.Sync, ro)
 	}
 
-	go func() {
-		m.mutex.Lock()
-		defer m.mutex.Unlock()
-		ctx, cancel := context.WithTimeout(context.Background(), mountCtxTimeout)
-		defer cancel()
-
-		mountstatus.Update(o.TargetPath, mountstatus.StillMounting)
-		startTime := time.Now()
-		if err := m.mounter.Mount(ctx, o.VolumeId, backend.MountTarget(o.TargetPath), o.NamedRef, ro); err != nil {
-			klog.Errorf("mount err: %v", err.Error())
-			metrics.OperationErrorsCount.WithLabelValues("StartMounting").Inc()
-			mountstatus.Update(o.TargetPath, mountstatus.Errored)
-			m.asyncErrs[o.NamedRef] = fmt.Errorf("err: %v: %v", err, m.asyncErrs[o.NamedRef])
-			return
-		}
-		metrics.ImageMountTime.WithLabelValues(metrics.Async).Observe(time.Since(startTime).Seconds())
-		mountstatus.Update(o.TargetPath, mountstatus.Mounted)
+	go func() error {
+		return m.mount(o, constants.Async, ro)
 	}()
 
+	return nil
+}
+
+func (m *MountExecutor) mount(o *MountOptions, mountType string, ro bool) error {
+
+	ctx := o.Context
+	var cancel context.CancelFunc
+
+	if mountType == constants.Async {
+		ctx, cancel = context.WithTimeout(context.Background(), mountCtxTimeout)
+		defer cancel()
+	}
+
+	m.mutexes[o.TargetPath].Lock()
+	defer m.mutexes[o.TargetPath].Unlock()
+	mountstatus.Update(o.TargetPath, mountstatus.StillMounting)
+
+	startTime := time.Now()
+	if err := m.mounter.Mount(ctx, o.VolumeId, backend.MountTarget(o.TargetPath), o.NamedRef, ro); err != nil {
+		klog.Errorf("mount err: %v", err.Error())
+		metrics.OperationErrorsCount.WithLabelValues("StartMounting").Inc()
+		mountstatus.Update(o.TargetPath, mountstatus.Errored)
+		return m.errorStore.Put(o.TargetPath, err)
+	}
+	metrics.ImageMountTime.WithLabelValues(mountType).Observe(time.Since(startTime).Seconds())
+	mountstatus.Update(o.TargetPath, mountstatus.Mounted)
+	m.errorStore.Remove(o.TargetPath)
 	return nil
 }
 
@@ -119,8 +131,8 @@ func (m *MountExecutor) WaitForMount(o *MountOptions) error {
 		if mountstatus.Get(o.TargetPath) == mountstatus.Mounted {
 			return true, nil
 		}
-		if m.asyncErrs[o.NamedRef] != nil {
-			return false, m.asyncErrs[o.NamedRef]
+		if m.errorStore.Get(o.TargetPath) != nil {
+			return false, m.errorStore.Get(o.TargetPath)
 		}
 		return false, nil
 	}

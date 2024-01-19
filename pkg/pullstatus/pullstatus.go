@@ -1,6 +1,7 @@
 package pullstatus
 
 import (
+	"fmt"
 	"sync"
 
 	"github.com/containerd/containerd/reference/docker"
@@ -62,4 +63,8 @@ func Get(imageRef docker.Named) ImagePullStatus {
 	}
 
 	return i.status[imageRef]
+}
+
+func Key(namedRef string, podUid string) string {
+	return fmt.Sprintf("%s-%s", namedRef, podUid)
 }
