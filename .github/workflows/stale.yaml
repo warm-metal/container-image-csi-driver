@@ -37,7 +37,10 @@ jobs:
           close-pr-message: >
             Closing this PR after a prolonged period of inactivity. Please create a new PR
             if the changes of the PR are still relevant.
+          exempt-all-milestones: true
           exempt-issue-labels: 'awaiting-approval,work-in-progress,help-wanted'
           exempt-pr-labels: 'awaiting-approval,work-in-progress,help-wanted'
-          days-before-stale: 30
-          days-before-close: 7
+          days-before-issue-stale: 90
+          days-before-issue-close: 15
+          days-before-pr-stale: 30
+          days-before-pr-close: 7
