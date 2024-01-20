@@ -18,7 +18,7 @@ Below are key responsibilities and guidelines to help you manage the project eff
 
 1. Labelling Issues
     - Add appropriate labels to convey the status of each issue.
-    - Stalebot ignores issues labeled `awaiting-inputs`, `work-in-progress`, and `help-wanted`.
+    - Stalebot ignores issues labeled `awaiting-inputs`, `work-in-progress`, and `help-wanted`. See [automation docs](docs/automation.md)
     - Guidelines for specific labels:
         - [ help-wanted ]: Use for issues that we want to work on but haven't been picked up.
         - [ work-in-progress ]: Indicate ongoing work without a corresponding pull request.
