@@ -38,6 +38,7 @@ Below are key responsibilities and guidelines to help you manage the project eff
 1. PR approval and merge
     - Contributors cannot merge PRs, assist them in the merging process.
     - Ensure Continuous Integration (CI) passes before merging, except for non-code/test changes.
+    - Approve CI builds for first time contributors.
 
 1. Labeling PRs
     - Stalebot ignores PRs labeled `awaiting-inputs`, `work-in-progress`, and `help-wanted`.
