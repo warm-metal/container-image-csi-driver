@@ -38,15 +38,12 @@ _**Note:** Unless specified otherwise, you need to run all commands after changi
 
 1. Install the csi-driver-image using the helm chart.
   ```
-  helm install wm-csi \
+  helm upgrade --install wm-csi \
       charts/warm-metal-csi-driver \
-      -n kube-system \
-      -f charts/warm-metal-csi-driver/values.yaml \
-      --set csiPlugin.image.tag=v1.0.1 \
       --wait
   ```
 
-1. You can submit a workflow for testing using `kubectl`:
+1. You can submit an example for testing using `kubectl`:
   ```bash
   kubectl create -f sample/ephemeral-volume.yaml
   ```
