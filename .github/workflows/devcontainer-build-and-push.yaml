@@ -1,16 +1,16 @@
 name: Dev Container Build and Push Image
 
-on: [pull_request]
-  #push:
-  #  branches:
-  #    master
-  #  paths:
-  #    - .github/workflows/devcontainer-build-and-push.yml
-  #    - '.github/.devcontainer/**'
-  #pull_request:
-  #  paths:
-  #    - .github/workflows/devcontainer-build-and-push.yml
-  #    - '.github/.devcontainer/**'
+on:
+  push:
+    branches:
+      master
+    paths:
+      - .github/workflows/devcontainer-build-and-push.yml
+      - '.github/.devcontainer/**'
+  pull_request:
+    paths:
+      - .github/workflows/devcontainer-build-and-push.yml
+      - '.github/.devcontainer/**'
 
 permissions:
   contents: read
