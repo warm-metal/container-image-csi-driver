@@ -3,6 +3,15 @@
 [![cri-o](https://github.com/warm-metal/csi-driver-image/actions/workflows/cri-o.yaml/badge.svg)](https://github.com/warm-metal/csi-driver-image/actions/workflows/cri-o.yaml)
 ![Docker Pulls](https://img.shields.io/docker/pulls/warmmetal/csi-image?color=brightgreen&logo=docker&logoColor=lightgrey&labelColor=black)
 
+# :construction_worker_man: :wrench: :construction: RENAMING THE REPOSITORY :construction: :wrench: :construction_worker_man:
+
+We are currently in the process of [changing the repository name](https://github.com/warm-metal/csi-driver-image/issues/105). This alteration may potentially introduce issues during Continuous Integration (CI) runs or while building packages locally. If you encounter any problems, we encourage you to promptly create an issue so that we can assist you in resolving them.
+
+### Note for Forked Repositories:
+If you have forked this repository before January 21, 2024, we kindly request that you follow the steps outlined in the [GitHub documentation](https://docs.github.com/en/repositories/creating-and-managing-repositories/renaming-a-repository) to update your remote. This ensures that your fork remains synchronized with the latest changes and avoids any disruption to your workflow.
+
+We appreciate your cooperation and understanding as we work to improve our repository.
+
 # csi-driver-image
 
 This is a CSI driver for mounting images as PVs or ephemeral volumes.
@@ -179,8 +188,8 @@ See [test/e2e](https://github.com/warm-metal/csi-driver-image/tree/master/test/e
 Image sizes are logged after they finish pulling. We've noticed that for smaller images, usually under 1KiB, containerd may report an incorrect image size. An issue has been raised in the containerd github repository: https://github.com/containerd/containerd/issues/9641.
 
 ## Community meetings
-We host online meetings every other week on Thursday's at 15:30 UTC.
+We conduct online meetings every 1st, 3rd, and 5th week of the month on Thursdays at 15:30 UTC.
 
-Feel free to join us on [this](https://acquia.zoom.us/j/3839666297?omn=96846917396) link, and refer [Google sheet](https://docs.google.com/document/d/1nDiRtj85ZpWMH57joUmbtGG3aLkfeqFt6OWdkf8_Aaw/edit?usp=sharing) for MoMs.
+Feel free to join us through [this Zoom link](https://acquia.zoom.us/j/94346685583) and refer to the [Google document](https://docs.google.com/document/d/1nDiRtj85ZpWMH57joUmbtGG3aLkfeqFt6OWdkf8_Aaw/edit?usp=sharing) for Minutes of Meetings (MoMs).
 
-**Note:** Anyone interested in the meeting but isn't able to attend can still start a discussion under `Discussions/queries/suggestions` section in the above mentioned sheet.
+Note: If you are unable to attend the meeting but still interested, you can initiate a discussion under Discussions/Queries/Suggestions in the aforementioned Google document.
