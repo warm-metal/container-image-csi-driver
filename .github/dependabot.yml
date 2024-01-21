@@ -6,5 +6,5 @@ updates:
     schedule:
       interval: "daily"
     commit-message:
-      prefix: "[skip ci]"
+      prefix: "chore: [skip ci]"
       include: "scope"
