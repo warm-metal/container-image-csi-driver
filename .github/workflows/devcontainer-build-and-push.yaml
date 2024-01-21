@@ -12,7 +12,9 @@ on:
       - .github/workflows/devcontainer-build-and-push.yml
       - '.github/.devcontainer/**'
 
-permissions: write-all
+permissions:
+  contents: read
+  packages: write
 
 jobs:
   build-and-push-image:
