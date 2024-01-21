@@ -34,6 +34,6 @@ jobs:
         uses: devcontainers/ci@v0.3
         with:
           subFolder: .github
-          imageName: ghcr.io/warm-metal/csi-driver-image/devcontainer
-          cacheFrom: ghcr.io/warm-metal/csi-driver-image/devcontainer
+          imageName: ghcr.io/${{ github.repository }}/devcontainer
+          cacheFrom: ghcr.io/${{ github.repository }}/devcontainer
           push: always
