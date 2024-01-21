@@ -10,6 +10,14 @@ We are currently in the process of [changing the repository name](https://github
 ### Note for Forked Repositories:
 If you have forked this repository before January 21, 2024, we kindly request that you follow the steps outlined in the [GitHub documentation](https://docs.github.com/en/repositories/creating-and-managing-repositories/renaming-a-repository) to update your remote. This ensures that your fork remains synchronized with the latest changes and avoids any disruption to your workflow.
 
+Also the default branch has been updated to `main` from `master`. Please run below commands for updating your local setup.
+```
+git branch -m master main
+git fetch origin
+git branch -u main main
+git remote set-head origin -a
+```
+
 We appreciate your cooperation and understanding as we work to improve our repository.
 
 # csi-driver-image
