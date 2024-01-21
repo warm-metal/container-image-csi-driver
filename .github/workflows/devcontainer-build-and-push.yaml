@@ -12,6 +12,9 @@ on:
       - .github/workflows/devcontainer-build-and-push.yml
       - '.github/.devcontainer/**'
 
+permissions:
+  packages: write
+
 jobs:
   build-and-push-image:
     runs-on: ubuntu-latest
