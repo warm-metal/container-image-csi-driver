@@ -21,7 +21,7 @@ import (
 )
 
 const (
-	driverName    = "csi-image.warm-metal.tech"
+	driverName    = "container-image.warm-metal.tech"
 	driverVersion = "v1.0.0"
 
 	containerdScheme = "containerd"
@@ -55,7 +55,7 @@ var (
 		"Whether to pull images asynchronously (helps prevent timeout for larger images)")
 	watcherResyncPeriod = flag.Duration("watcher-resync-period", 30*time.Minute, "The resync period of the pvc watcher.")
 	mode                = flag.String("mode", "", "The mode of the driver. Valid values are: node, controller")
-	nodePluginSA        = flag.String("node-plugin-sa", "csi-image-warm-metal", "The name of the ServiceAccount used by the node plugin.")
+	nodePluginSA        = flag.String("node-plugin-sa", "container-image-warm-metal", "The name of the ServiceAccount used by the node plugin.")
 )
 
 func main() {

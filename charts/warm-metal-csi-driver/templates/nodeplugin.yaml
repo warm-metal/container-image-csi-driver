@@ -21,7 +21,7 @@ spec:
         - name: node-driver-registrar
           args:
             - "--csi-address=/csi/csi.sock"
-            - --kubelet-registration-path={{ .Values.kubeletRoot }}/plugins/csi-image.warm-metal.tech/csi.sock
+            - --kubelet-registration-path={{ .Values.kubeletRoot }}/plugins/container-image.warm-metal.tech/csi.sock
             - "-v={{ .Values.logLevel }}"
           env:
             - name: KUBE_NODE_NAME
@@ -37,7 +37,7 @@ spec:
                 command:
                   - /bin/sh
                   - -c
-                  - rm -rf /registration/csi-image.warm-metal.tech /registration/csi-image.warm-metal.tech-reg.sock
+                  - rm -rf /registration/container-image.warm-metal.tech /registration/container-image.warm-metal.tech-reg.sock
           {{- with .Values.csiNodeDriverRegistrar.resources }}
           resources:
           {{- toYaml . | nindent 12 }}
@@ -126,7 +126,7 @@ spec:
       serviceAccountName: {{ include "warm-metal-csi-driver.fullname" . }}-nodeplugin
       volumes:
         - hostPath:
-            path: {{ .Values.kubeletRoot }}/plugins/csi-image.warm-metal.tech
+            path: {{ .Values.kubeletRoot }}/plugins/container-image.warm-metal.tech
             type: DirectoryOrCreate
           name: socket-dir
         - hostPath:

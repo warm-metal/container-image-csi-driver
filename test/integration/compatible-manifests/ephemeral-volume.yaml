@@ -17,13 +17,13 @@ spec:
   volumes:
     - name: rw
       csi:
-        driver: csi-image.warm-metal.tech
+        driver: container-image.warm-metal.tech
         volumeAttributes:
           image: "docker.io/warmmetal/container-image-csi-driver-test:simple-fs"
           pullAlways: "true"
     - name: ro
       csi:
-        driver: csi-image.warm-metal.tech
+        driver: container-image.warm-metal.tech
         readOnly: true
         volumeAttributes:
           image: "docker.io/warmmetal/container-image-csi-driver-test:simple-fs"
