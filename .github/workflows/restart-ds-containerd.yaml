@@ -1,9 +1,9 @@
 name: restart-ds-containerd-5mins
 on:
   push:
-    branches: [master]
+    branches: [main]
   pull_request:
-    branches: [master]
+    branches: [main]
   workflow_dispatch:
 jobs:
   integration:
