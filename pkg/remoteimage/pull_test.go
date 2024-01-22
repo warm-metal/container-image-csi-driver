@@ -6,7 +6,7 @@ import (
 	"time"
 
 	"github.com/stretchr/testify/assert"
-	"github.com/warm-metal/csi-driver-image/pkg/cri"
+	"github.com/warm-metal/container-image-csi-driver/pkg/cri"
 	v1 "k8s.io/cri-api/pkg/apis/runtime/v1"
 )
 

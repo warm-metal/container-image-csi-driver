@@ -8,10 +8,10 @@ import (
 
 	"github.com/container-storage-interface/spec/lib/go/csi"
 	"github.com/containerd/containerd/reference/docker"
-	"github.com/warm-metal/csi-driver-image/pkg/backend"
-	"github.com/warm-metal/csi-driver-image/pkg/metrics"
-	"github.com/warm-metal/csi-driver-image/pkg/mountstatus"
-	"github.com/warm-metal/csi-driver-image/pkg/pullstatus"
+	"github.com/warm-metal/container-image-csi-driver/pkg/backend"
+	"github.com/warm-metal/container-image-csi-driver/pkg/metrics"
+	"github.com/warm-metal/container-image-csi-driver/pkg/mountstatus"
+	"github.com/warm-metal/container-image-csi-driver/pkg/pullstatus"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/klog/v2"
 )
@@ -59,7 +59,6 @@ func NewMountExecutor(o *MountExecutorOptions) *MountExecutor {
 
 // StartMounting starts the mounting
 func (m *MountExecutor) StartMounting(o *MountOptions) error {
-
 	o.Logger.Info("Mounting image", "image", o.NamedRef.Name())
 	if pullstatus.Get(o.NamedRef) != pullstatus.Pulled || mountstatus.Get(o.TargetPath) == mountstatus.StillMounting {
 		o.Logger.Info("Could not mount image because image hasn't finshed pulling or volume is still mounting",

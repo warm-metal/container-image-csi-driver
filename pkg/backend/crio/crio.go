@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 	"io"
-
 	"net"
 	"net/http"
 	"reflect"
@@ -14,7 +13,7 @@ import (
 	"github.com/containerd/containerd/reference/docker"
 	"github.com/containers/storage"
 	"github.com/containers/storage/types"
-	"github.com/warm-metal/csi-driver-image/pkg/backend"
+	"github.com/warm-metal/container-image-csi-driver/pkg/backend"
 	"k8s.io/klog/v2"
 	k8smount "k8s.io/utils/mount"
 )
