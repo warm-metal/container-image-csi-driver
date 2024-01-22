@@ -4,7 +4,7 @@ set -e
 
 export IMAGE_TAG=v0.7.0
 export GITHUB_RUN_ID=1
-export NODE_IMAGE=docker.io/warmmetal/kindest-node-crio:v1.25.2-csi-driver-image
+export NODE_IMAGE=docker.io/warmmetal/kindest-node-crio:v1.25.2-container-image-csi-driver
 export VALUE_FILE=$(dirname "${BASH_SOURCE[0]}")/crio-helm-values.yaml
 
 HELM_NAME='wm-csi-integration-tests'
