@@ -8,7 +8,7 @@ spec:
     metadata:
       name: container-image-csi-driver-sanity-test
     spec:
-      serviceAccountName: ccontainer-image-warm-metal
+      serviceAccountName: container-image-warm-metal
       containers:
         - name: container-image-csi-driver-sanity-test
           image: local.test/container-image-csi-driver-test:sanity
