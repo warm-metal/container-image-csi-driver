@@ -20,7 +20,7 @@ spec:
       restartPolicy: Never
       volumes:
         - hostPath:
-            path: /var/lib/kubelet/plugins/ccontainer-image.warm-metal.tech
+            path: /var/lib/kubelet/plugins/container-image.warm-metal.tech
             type: DirectoryOrCreate
           name: socket-dir
   backoffLimit: 0
