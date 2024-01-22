@@ -10,7 +10,7 @@ on:
 env:
   BASE_REPOSITORY: warm-metal/container-image-csi-driver
   BASE_DEFAULT_BRANCH: main
-  BASE_IMAGE_NAME: warmmetal/container-image-csi-driver
+  BASE_IMAGE_NAME: warmmetal/csi-image
   FORK_IMAGE_NAME: ghcr.io/${{ github.repository }}
 
 permissions:

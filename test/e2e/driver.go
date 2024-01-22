@@ -9,10 +9,11 @@ import (
 	"k8s.io/kubernetes/test/e2e/storage/testsuites"
 )
 
-type driver struct{}
+type driver struct {
+}
 
 func (d driver) GetVolume(config *testsuites.PerTestConfig, volumeNumber int) (attributes map[string]string, shared bool, readOnly bool) {
-	return map[string]string{"image": "docker.io/warmmetal/container-image-csi-driver-test:simple-fs"}, true, false
+	return map[string]string{"image": "docker.io/warmmetal/csi-image-test:simple-fs"}, true, false
 }
 
 func (d driver) GetCSIDriverName(config *testsuites.PerTestConfig) string {
@@ -27,7 +28,7 @@ func (d driver) GetPersistentVolumeSource(readOnly bool, fsType string, testVolu
 	return &v1.PersistentVolumeSource{
 			CSI: &v1.CSIPersistentVolumeSource{
 				Driver:       "csi-image.warm-metal.tech",
-				VolumeHandle: "docker.io/warmmetal/container-image-csi-driver-test:simple-fs",
+				VolumeHandle: "docker.io/warmmetal/csi-image-test:simple-fs",
 				ReadOnly:     true,
 			},
 		}, &v1.VolumeNodeAffinity{
@@ -54,13 +55,14 @@ func (d driver) GetVolumeSource(readOnly bool, fsType string, testVolume testsui
 			Driver:   "csi-image.warm-metal.tech",
 			ReadOnly: &ro,
 			VolumeAttributes: map[string]string{
-				"image": "docker.io/warmmetal/container-image-csi-driver-test:simple-fs",
+				"image": "docker.io/warmmetal/csi-image-test:simple-fs",
 			},
 		},
 	}
 }
 
-type imageVol struct{}
+type imageVol struct {
+}
 
 func (i imageVol) DeleteVolume() {
 }

@@ -13,7 +13,7 @@ csiPlugin:
   resources: {}
   image:
     tag: ""
-    repository: docker.io/warmmetal/container-image-csi-driver
+    repository: docker.io/warmmetal/csi-image
     pullPolicy: IfNotPresent
   livenessProbe:
     httpGet:

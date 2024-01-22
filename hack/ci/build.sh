@@ -3,7 +3,7 @@
 set -e
 set -x
 VERSION=$(git rev-parse --short HEAD)
-IMG=docker.io/warmmetal/container-image-csi-driver:${VERSION}
+IMG=docker.io/warmmetal/csi-image:${VERSION}
 BUILDER=$(docker buildx ls | grep ci-builderx || true)
 [ "${BUILDER}" != "" ] || docker buildx create \
     --name ci-builderx --driver docker-container \

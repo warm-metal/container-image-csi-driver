@@ -9,7 +9,7 @@ spec:
     spec:
       containers:
         - name: two-readonly-ephemeral-volume
-          image: docker.io/warmmetal/container-image-csi-driver-test:stat-fs
+          image: docker.io/warmmetal/csi-image-test:stat-fs
           env:
           - name: TARGET1
             value: /target1
@@ -27,13 +27,13 @@ spec:
             driver: csi-image.warm-metal.tech
             readOnly: true
             volumeAttributes:
-              image: "docker.io/warmmetal/container-image-csi-driver-test:simple-fs"
+              image: "docker.io/warmmetal/csi-image-test:simple-fs"
               pullAlways: "true"
         - name: target2
           csi:
             driver: csi-image.warm-metal.tech
             readOnly: true
             volumeAttributes:
-              image: "docker.io/warmmetal/container-image-csi-driver-test:simple-fs"
+              image: "docker.io/warmmetal/csi-image-test:simple-fs"
               pullAlways: "true"
   backoffLimit: 0

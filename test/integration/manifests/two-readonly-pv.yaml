@@ -17,7 +17,7 @@ spec:
   persistentVolumeReclaimPolicy: Retain
   csi:
     driver: csi-image.warm-metal.tech
-    volumeHandle: "docker.io/warmmetal/container-image-csi-driver-test:simple-fs"
+    volumeHandle: "docker.io/warmmetal/csi-image-test:simple-fs"
     volumeAttributes:
       pullAlways: "true"
 ---
@@ -47,7 +47,7 @@ spec:
 #   persistentVolumeReclaimPolicy: Retain
 #   csi:
 #     driver: csi-image.warm-metal.tech
-#     volumeHandle: "docker.io/warmmetal/container-image-csi-driver-test:simple-fs"
+#     volumeHandle: "docker.io/warmmetal/csi-image-test:simple-fs"
 #     volumeAttributes:
 #       pullAlways: "true"
 ---
@@ -75,7 +75,7 @@ spec:
     spec:
       containers:
         - name: two-ro-pre-provisioned-pv
-          image: docker.io/warmmetal/container-image-csi-driver-test:check-fs
+          image: docker.io/warmmetal/csi-image-test:check-fs
           env:
             - name: TARGET
               value: /target1
