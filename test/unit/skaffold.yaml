@@ -7,7 +7,7 @@ build:
     - image: warmmetal/csi-image
       docker:
         dockerfile: Dockerfile
-    - image: warmmetal/container-image-csi-driver-test
+    - image: warmmetal/csi-driver-image-test
       docker:
         dockerfile: "test.dockerfile"
 #      custom:

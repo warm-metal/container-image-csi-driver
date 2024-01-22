@@ -15,7 +15,7 @@ jobs:
         with:
           cluster_name: kind-${{ github.run_id }}
           kubectl_version: "v1.25.2"
-          node_image: "docker.io/warmmetal/kindest-node-crio:v1.25.2-container-image-csi-driver"
+          node_image: "docker.io/warmmetal/kindest-node-crio:v1.25.2-csi-driver-image"
       - name: Install private registry
         run: ./hack/ci/setup_private_registry.sh
       - name: Build image

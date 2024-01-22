@@ -1,6 +1,6 @@
 // For format details, see https://containers.dev
 {
-	"name": "container-image-csi-driver dev container",
+	"name": "csi-driver-image dev container",
 	"image": "mcr.microsoft.com/devcontainers/base:ubuntu",
 
 	"otherPortsAttributes": {

@@ -1,17 +1,17 @@
 apiVersion: batch/v1
 kind: Job
 metadata:
-  name: container-image-csi-driver-test
+  name: csi-driver-image-test
   namespace: kube-system
 spec:
   template:
     metadata:
-      name: container-image-csi-driver-test
+      name: csi-driver-image-test
     spec:
       serviceAccountName: csi-image-warm-metal
       containers:
-        - name: container-image-csi-driver-test
-          image: warmmetal/container-image-csi-driver-test
+        - name: csi-driver-image-test
+          image: warmmetal/csi-driver-image-test
           env:
             - name: HTTP_PROXY
               value: http://192.168.64.1:1087

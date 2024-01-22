@@ -16,10 +16,10 @@ build:
 
 .PHONY: sanity
 sanity:
-	$(IMAGE_BUILDER) $(IMAGE_BUILD_CMD) build -t local.test/container-image-csi-driver-test:sanity test/sanity
+	$(IMAGE_BUILDER) $(IMAGE_BUILD_CMD) build -t local.test/csi-driver-image-test:sanity test/sanity
 	kubectl delete --ignore-not-found -f test/sanity/manifest.yaml
 	kubectl apply --wait -f test/sanity/manifest.yaml
-	kubectl -n cliapp-system wait --for=condition=complete job/container-image-csi-driver-sanity-test
+	kubectl -n cliapp-system wait --for=condition=complete job/csi-driver-image-sanity-test
 
 .PHONY: e2e
 e2e:
