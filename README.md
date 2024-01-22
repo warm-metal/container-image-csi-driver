@@ -20,7 +20,7 @@ git remote set-head origin -a
 
 We appreciate your cooperation and understanding as we work to improve our repository.
 
-# container-image-csi-driver
+# container-image-csi-driver (previously csi-driver-image)
 
 This is a CSI driver for mounting images as PVs or ephemeral volumes.
 
