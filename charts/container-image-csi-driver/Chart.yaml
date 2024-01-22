@@ -1,5 +1,5 @@
 apiVersion: v2
-name: warm-metal-csi-driver
+name: container-image-csi-driver
 description: A Helm chart for warm meta driver
 
 # A chart can be either an 'application' or a 'library' chart.

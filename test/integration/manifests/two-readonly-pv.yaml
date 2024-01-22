@@ -7,7 +7,7 @@ provisioner: csi-image.warm-metal.tech
 apiVersion: v1
 kind: PersistentVolume
 metadata:
-  name: pv-test-csi-image-test-simple-fs-1
+  name: pv-test-docker.io/warmmetal/container-image-csi-driver-test-simple-fs-1
 spec:
   storageClassName: csi-image.warm-metal.tech
   capacity:
@@ -24,7 +24,7 @@ spec:
 apiVersion: v1
 kind: PersistentVolumeClaim
 metadata:
-  name: pvc-test-csi-image-test-simple-fs-1
+  name: pvc-test-docker.io/warmmetal/container-image-csi-driver-test-simple-fs-1
 spec:
   storageClassName: csi-image.warm-metal.tech
   accessModes:
@@ -32,12 +32,12 @@ spec:
   resources:
     requests:
       storage: 5Gi
-  volumeName: pv-test-csi-image-test-simple-fs-1
+  volumeName: pv-test-docker.io/warmmetal/container-image-csi-driver-test-simple-fs-1
 ---
 # apiVersion: v1
 # kind: PersistentVolume
 # metadata:
-#   name: pv-test-csi-image-test-simple-fs-2
+#   name: pv-test-docker.io/warmmetal/container-image-csi-driver-test-simple-fs-2
 # spec:
 #   storageClassName: csi-image.warm-metal.tech
 #   capacity:
@@ -54,7 +54,7 @@ spec:
 # apiVersion: v1
 # kind: PersistentVolumeClaim
 # metadata:
-#   name: pvc-test-csi-image-test-simple-fs-2
+#   name: pvc-test-docker.io/warmmetal/container-image-csi-driver-test-simple-fs-2
 # spec:
 #   storageClassName: csi-image.warm-metal.tech
 #   accessModes:
@@ -62,7 +62,7 @@ spec:
 #   resources:
 #     requests:
 #       storage: 5Gi
-#   volumeName: pv-test-csi-image-test-simple-fs-2
+#   volumeName: pv-test-docker.io/warmmetal/container-image-csi-driver-test-simple-fs-2
 ---
 apiVersion: batch/v1
 kind: Job
@@ -94,8 +94,8 @@ spec:
       volumes:
         - name: target1
           persistentVolumeClaim:
-            claimName: pvc-test-csi-image-test-simple-fs-1
+            claimName: pvc-test-docker.io/warmmetal/container-image-csi-driver-test-simple-fs-1
         # - name: target2
         #   persistentVolumeClaim:
-        #     claimName: pvc-test-csi-image-test-simple-fs-2
+        #     claimName: pvc-test-docker.io/warmmetal/container-image-csi-driver-test-simple-fs-2
   backoffLimit: 0
