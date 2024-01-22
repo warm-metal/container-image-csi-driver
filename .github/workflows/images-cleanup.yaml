@@ -8,7 +8,7 @@ permissions:
   packages: write
 
 env:
-  BASE_REPOSITORY: warm-metal/csi-driver-image
+  BASE_REPOSITORY: warm-metal/container-image-csi-driver
 
 jobs:
   clean-ghcr:

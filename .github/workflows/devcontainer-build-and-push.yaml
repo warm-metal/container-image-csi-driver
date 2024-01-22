@@ -2,8 +2,7 @@ name: Dev Container Build and Push Image
 
 on:
   push:
-    branches:
-      master
+    branches: [master]
     paths:
       - .github/workflows/devcontainer-build-and-push.yml
       - '.github/.devcontainer/**'
