@@ -9,7 +9,7 @@ spec:
     spec:
       containers:
         - name: readonly-ephemeral-volume
-          image: docker.io/warmmetal/csi-image-test:check-fs
+          image: docker.io/warmmetal/container-image-csi-driver-test:check-fs
           env:
             - name: TARGET
               value: /target
@@ -25,6 +25,6 @@ spec:
             driver: csi-image.warm-metal.tech
             readOnly: true
             volumeAttributes:
-              image: "docker.io/warmmetal/csi-image-test:simple-fs"
+              image: "docker.io/warmmetal/container-image-csi-driver-test:simple-fs"
               pullAlways: "true"
   backoffLimit: 0
