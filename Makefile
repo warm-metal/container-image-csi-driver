@@ -35,7 +35,7 @@ integration:
 
 .PHONY: image
 image:
-	$(IMAGE_BUILDER) $(IMAGE_BUILD_CMD) build --platform=linux/amd64 -t $(REGISTRY)/container-image-csi-driver:$(VERSION) --push .
+	$(IMAGE_BUILDER) $(IMAGE_BUILD_CMD) build -t $(REGISTRY)/csi-image:$(VERSION) --push .
 
 .PHONY: local
 local:
@@ -43,10 +43,9 @@ local:
 
 .PHONY: test-deps
 test-deps:
-	$(IMAGE_BUILDER) $(IMAGE_BUILD_CMD) build --platform=linux/amd64 -t $(REGISTRY)/container-image-csi-driver-test:simple-fs -f hack/integration-test-image/container-image-csi-driver-test:simple-fs.dockerfile --push hack/integration-test-image
-	$(IMAGE_BUILDER) $(IMAGE_BUILD_CMD) build --platform=linux/amd64 -t $(REGISTRY)/container-image-csi-driver-test:stat-fs -f hack/integration-test-image/container-image-csi-driver-test:stat-fs.dockerfile --push hack/integration-test-image
-	$(IMAGE_BUILDER) $(IMAGE_BUILD_CMD) build --platform=linux/amd64 -t $(REGISTRY)/container-image-csi-driver-test:check-fs -f hack/integration-test-image/container-image-csi-driver-test:check-fs.dockerfile --push hack/integration-test-image
-	$(IMAGE_BUILDER) $(IMAGE_BUILD_CMD) build --platform=linux/amd64 -t $(REGISTRY)/container-image-csi-driver-test:write-check -f hack/integration-test-image/container-image-csi-driver-test:write-check.dockerfile --push hack/integration-test-image
+	$(IMAGE_BUILDER) $(IMAGE_BUILD_CMD) build --push -t $(REGISTRY)/csi-image-test:stat-fs -f csi-image-test:stat-fs.dockerfile hack/integration-test-image
+	$(IMAGE_BUILDER) $(IMAGE_BUILD_CMD) build --push -t $(REGISTRY)/csi-image-test:check-fs -f csi-image-test:check-fs.dockerfile hack/integration-test-image
+	$(IMAGE_BUILDER) $(IMAGE_BUILD_CMD) build --push -t $(REGISTRY)/csi-image-test:write-check -f csi-image-test:write-check.dockerfile hack/integration-test-image
 
 .PHONY: install-util
 install-util:

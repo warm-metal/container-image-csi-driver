@@ -4,7 +4,7 @@ source $(dirname "${BASH_SOURCE[0]}")/utils.sh
 
 function lib::start_cluster_containerd() {
   local version=${1:-stable}
-  minikube start -p docker.io/warmmetal/container-image-csi-driver-test \
+  minikube start -p csi-image-test \
     --kubernetes-version=${version} \
     --container-runtime=containerd \
     --insecure-registry=localhost:31000
@@ -12,7 +12,7 @@ function lib::start_cluster_containerd() {
 
 function lib::start_cluster_crio() {
   local version=${1:-stable}
-  minikube start -p docker.io/warmmetal/container-image-csi-driver-test \
+  minikube start -p csi-image-test \
     --kubernetes-version=${version} \
     --container-runtime=cri-o \
     --insecure-registry=localhost:31000
@@ -20,7 +20,7 @@ function lib::start_cluster_crio() {
 
 function lib::start_cluster_docker() {
   local version=${1:-stable}
-  minikube start -p docker.io/warmmetal/container-image-csi-driver-test \
+  minikube start -p csi-image-test \
     --kubernetes-version=${version} \
     --container-runtime=docker \
     --insecure-registry=localhost:31000

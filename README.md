@@ -133,7 +133,7 @@ For pre-provisioned PVs, `volumeHandle` instead of the attribute **image**, spec
 apiVersion: v1
 kind: PersistentVolume
 metadata:
-  name: pv-test-docker.io/warmmetal/container-image-csi-driver-test-simple-fs
+  name: pv-test-csi-image-test-simple-fs
 spec:
   storageClassName: csi-image.warm-metal.tech
   capacity:

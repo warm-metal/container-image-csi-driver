@@ -15,7 +15,7 @@ $(dirname "${BASH_SOURCE[0]}")/../../hack/helper/kind_bed.sh 'k8s'
 trap "docker rm -f kind-${GITHUB_RUN_ID}-control-plane" ERR EXIT INT TERM
 
 $(dirname "${BASH_SOURCE[0]}")/../../hack/ci/setup_private_registry.sh
-trap "docker rm -f private-registry; docker rmi localhost:5000/warmmetal/docker.io/warmmetal/container-image-csi-driver-test:simple-fs" ERR EXIT INT TERM
+trap "docker rm -f private-registry; docker rmi localhost:5000/warmmetal/csi-image-test:simple-fs" ERR EXIT INT TERM
 
 helm install ${HELM_NAME} $(dirname "${BASH_SOURCE[0]}")/../../charts/warm-metal-csi-driver -n kube-system \
   -f ${VALUE_FILE} \

@@ -7,6 +7,6 @@ source $(dirname "${BASH_SOURCE[0]}")/../../hack/helper/prepare_containerd_clust
 source $(dirname "${BASH_SOURCE[0]}")/cases.sh
 lib::uninstall_driver
 echo "Destroying cluster"
-minikube delete -p docker.io/warmmetal/container-image-csi-driver-test
+minikube delete -p csi-image-test
 
 set +e

@@ -11,9 +11,9 @@ lib::install_driver
 
 echo "Install a private registry"
 lib::install_private_registry
-minikube ssh -p docker.io/warmmetal/container-image-csi-driver-test -- sudo ctr -n k8s.io i pull docker.io/warmmetal/container-image-csi-driver-test:simple-fs
-minikube ssh -p docker.io/warmmetal/container-image-csi-driver-test -- sudo ctr -n k8s.io i tag --force docker.io/warmmetal/container-image-csi-driver-test:simple-fs localhost:31000/warmmetal/docker.io/warmmetal/container-image-csi-driver-test:simple-fs
-minikube ssh -p docker.io/warmmetal/container-image-csi-driver-test -- sudo ctr -n k8s.io i push localhost:31000/warmmetal/docker.io/warmmetal/container-image-csi-driver-test:simple-fs --plain-http --user warmmetal:warmmetal
+minikube ssh -p csi-image-test -- sudo ctr -n k8s.io i pull docker.io/warmmetal/container-image-csi-driver-test:simple-fs
+minikube ssh -p csi-image-test -- sudo ctr -n k8s.io i tag --force docker.io/warmmetal/container-image-csi-driver-test:simple-fs localhost:31000/warmmetal/csi-image-test:simple-fs
+minikube ssh -p csi-image-test -- sudo ctr -n k8s.io i push localhost:31000/warmmetal/csi-image-test:simple-fs --plain-http --user warmmetal:warmmetal
 
 set +x
 set +e

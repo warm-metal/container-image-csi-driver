@@ -22,6 +22,6 @@ spec:
           csi:
             driver: csi-image.warm-metal.tech
             volumeAttributes:
-              image: "warmmetal/docker.io/warmmetal/container-image-csi-driver-test:simple-fs"
+              image: "warmmetal/csi-image-test:simple-fs"
               pullAlways: "true"
   backoffLimit: 0
