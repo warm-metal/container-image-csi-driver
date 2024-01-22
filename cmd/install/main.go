@@ -41,7 +41,7 @@ func main() {
 	}
 
 	conf.EnableCache = *enableCache
-	conf.Image = fmt.Sprintf("%s/container-image:%s", Registry, Version)
+	conf.Image = fmt.Sprintf("%s/container-image-csi-driver:%s", Registry, Version)
 
 	vols := detectImageSvcVolumes(conf.ImageSocketPath)
 	if len(vols) == 0 {
