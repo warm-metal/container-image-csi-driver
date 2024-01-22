@@ -10,10 +10,10 @@ RUN make build
 RUN make install-util
 
 FROM scratch as install-util
-COPY --from=builder /go/src/container-image-csi-driver/_output/warm-metal-csi-image-install /
+COPY --from=builder /go/src/container-image-csi-driver/_output/warm-metal-container-image-csi-driver-install /
 
 FROM alpine:3.19
 RUN apk add --no-cache btrfs-progs-dev lvm2-dev
 WORKDIR /
-COPY --from=builder /go/src/container-image-csi-driver/_output/csi-image-plugin /usr/bin/
-ENTRYPOINT ["csi-image-plugin"]
+COPY --from=builder /go/src/container-image-csi-driver/_output/container-image-csi-driver /usr/bin/
+ENTRYPOINT ["container-image-csi-driver"]
