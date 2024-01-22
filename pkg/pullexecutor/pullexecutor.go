@@ -8,11 +8,11 @@ import (
 
 	"github.com/containerd/containerd/reference/docker"
 	"github.com/pkg/errors"
-	"github.com/warm-metal/csi-driver-image/pkg/backend"
-	"github.com/warm-metal/csi-driver-image/pkg/metrics"
-	"github.com/warm-metal/csi-driver-image/pkg/pullstatus"
-	"github.com/warm-metal/csi-driver-image/pkg/remoteimage"
-	"github.com/warm-metal/csi-driver-image/pkg/secret"
+	"github.com/warm-metal/container-image-csi-driver/pkg/backend"
+	"github.com/warm-metal/container-image-csi-driver/pkg/metrics"
+	"github.com/warm-metal/container-image-csi-driver/pkg/pullstatus"
+	"github.com/warm-metal/container-image-csi-driver/pkg/remoteimage"
+	"github.com/warm-metal/container-image-csi-driver/pkg/secret"
 	"k8s.io/apimachinery/pkg/util/wait"
 	cri "k8s.io/cri-api/pkg/apis/runtime/v1"
 	"k8s.io/klog/v2"
@@ -67,7 +67,6 @@ func NewPullExecutor(o *PullExecutorOptions) *PullExecutor {
 
 // StartPulling starts pulling the image
 func (m *PullExecutor) StartPulling(o *PullOptions) error {
-
 	keyring, err := m.secretStore.GetDockerKeyring(o.Context, o.PullSecrets)
 	if err != nil {
 		return errors.Errorf("unable to fetch keyring: %s", err)
