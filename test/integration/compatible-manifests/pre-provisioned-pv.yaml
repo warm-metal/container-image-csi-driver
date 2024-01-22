@@ -17,7 +17,7 @@ spec:
   persistentVolumeReclaimPolicy: Retain
   csi:
     driver: csi-image.warm-metal.tech
-    volumeHandle: "docker.io/warmmetal/csi-image-test:simple-fs"
+    volumeHandle: "docker.io/warmmetal/container-image-csi-driver-test:simple-fs"
 ---
 apiVersion: v1
 kind: PersistentVolumeClaim

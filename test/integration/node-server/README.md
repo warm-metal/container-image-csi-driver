@@ -1,4 +1,4 @@
-## What is this? 
+## What is this?
 This directory contains two files:
 1. `docker-compose.yaml`: used to mount workspace on image built using `Dockerfile.containerd`
 2. `Dockerfile.containerd`: used to run containerd
@@ -26,7 +26,7 @@ For example:
 $ docker-compose up
 [+] Building 0.0s (0/0)                                                                                                              docker:desktop-linux
 [+] Running 1/0
- ✔ Container node-server-containerd-workspace-1  Recreated                                                                                           0.0s 
+ ✔ Container node-server-containerd-workspace-1  Recreated                                                                                           0.0s
 Attaching to node-server-containerd-workspace-1
 node-server-containerd-workspace-1  | time="2023-11-08T09:03:00Z" level=warning msg="containerd config version `1` has been deprecated and will be removed in containerd v2.0, please switch to version `2`, see https://github.com/containerd/containerd/blob/main/docs/PLUGINS.md#version-header"
 node-server-containerd-workspace-1  | time="2023-11-08T09:03:00.484125750Z" level=info msg="starting containerd" revision=61f9fd88f79f081d64d6fa3bb1a0dc71ec870523 version=1.6.24
@@ -51,7 +51,7 @@ $ docker exec -it <CONTAINER ID> bash
 ```
 For example:
 ```shell
-$ docker exec -it 7769b9e621f1 bash                                                                                    ~ 
+$ docker exec -it 7769b9e621f1 bash                                                                                    ~
 root@7769b9e621f1:/go#
 ```
 
@@ -69,7 +69,7 @@ I1108 10:27:13.225907   19936 mounter.go:45] load 0 snapshots from runtime
 I1108 10:27:13.235697   19936 server.go:108] Listening for connections on address: &net.UnixAddr{Name:"//csi/csi.sock", Net:"unix"}
 ...
 PASS
-ok  	github.com/warm-metal/csi-driver-image/cmd/plugin	46.711s
+ok  	github.com/warm-metal/container-image-csi-driver/cmd/plugin	46.711s
 ```
 
 **To test `TestPull`**:
@@ -78,6 +78,6 @@ ok  	github.com/warm-metal/csi-driver-image/cmd/plugin	46.711s
 root@cdf7ee254501:~# cd /code/pkg/remoteimage
 root@cdf7ee254501:/code/pkg/remoteimage# go test -run 'TestPull'
 PASS
-ok  	github.com/warm-metal/csi-driver-image/pkg/remoteimage	2.247s
+ok  	github.com/warm-metal/container-image-csi-driver/pkg/remoteimage	2.247s
 root@cdf7ee254501:/code/pkg/remoteimage#
 ```

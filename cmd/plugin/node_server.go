@@ -8,12 +8,12 @@ import (
 	"github.com/container-storage-interface/spec/lib/go/csi"
 	"github.com/containerd/containerd/reference/docker"
 	"github.com/google/uuid"
-	"github.com/warm-metal/csi-driver-image/pkg/backend"
-	"github.com/warm-metal/csi-driver-image/pkg/metrics"
-	"github.com/warm-metal/csi-driver-image/pkg/mountexecutor"
-	"github.com/warm-metal/csi-driver-image/pkg/mountstatus"
-	"github.com/warm-metal/csi-driver-image/pkg/pullexecutor"
-	"github.com/warm-metal/csi-driver-image/pkg/secret"
+	"github.com/warm-metal/container-image-csi-driver/pkg/backend"
+	"github.com/warm-metal/container-image-csi-driver/pkg/metrics"
+	"github.com/warm-metal/container-image-csi-driver/pkg/mountexecutor"
+	"github.com/warm-metal/container-image-csi-driver/pkg/mountstatus"
+	"github.com/warm-metal/container-image-csi-driver/pkg/pullexecutor"
+	"github.com/warm-metal/container-image-csi-driver/pkg/secret"
 	csicommon "github.com/warm-metal/csi-drivers/pkg/csi-common"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
@@ -101,7 +101,7 @@ func (n NodeServer) NodePublishVolume(ctx context.Context, req *csi.NodePublishV
 			return
 		}
 
-		if err = os.MkdirAll(req.TargetPath, 0755); err != nil {
+		if err = os.MkdirAll(req.TargetPath, 0o755); err != nil {
 			err = status.Error(codes.Internal, err.Error())
 			return
 		}

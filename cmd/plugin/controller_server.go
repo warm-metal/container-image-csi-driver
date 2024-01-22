@@ -5,7 +5,7 @@ import (
 
 	"github.com/container-storage-interface/spec/lib/go/csi"
 	"github.com/pkg/errors"
-	"github.com/warm-metal/csi-driver-image/pkg/watcher"
+	"github.com/warm-metal/container-image-csi-driver/pkg/watcher"
 	csicommon "github.com/warm-metal/csi-drivers/pkg/csi-common"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"

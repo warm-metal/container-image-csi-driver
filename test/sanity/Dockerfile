@@ -1,6 +1,6 @@
 FROM docker.io/library/golang:1.16
 
-WORKDIR /go/src/csi-driver-image
+WORKDIR /go/src/container-image-csi-driver
 COPY go.mod go.sum ./
 
 RUN go mod download

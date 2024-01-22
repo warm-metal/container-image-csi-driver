@@ -80,7 +80,7 @@ function lib::install_driver() {
   local manifest=$(lib::gen_manifests $2)
   echo "${manifest}" | kubectl delete --ignore-not-found -f -
   if [ "${image}" != "" ]; then
-    echo "${manifest}" | sed "s|image: docker.io/warmmetal/csi-image.*|image: ${image}|" | kubectl apply -f -
+    echo "${manifest}" | sed "s|image: docker.io/warmmetal/container-image-csi-driver.*|image: ${image}|" | kubectl apply -f -
   else
     echo "${manifest}" | kubectl apply -f -
   fi
@@ -101,7 +101,7 @@ function lib::install_private_registry() {
   if [ "$(docker inspect -f='{{json .NetworkSettings.Networks.kind}}' 'private-registry')" = 'null' ]; then
     docker network connect "kind" "private-registry"
   fi
-  
+
   cat <<EOF | kubectl apply -f -
 apiVersion: v1
 kind: ConfigMap
