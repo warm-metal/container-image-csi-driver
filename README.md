@@ -105,7 +105,7 @@ spec:
     spec:
       containers:
         - name: ephemeral-volume
-          image: docker.io/warmmetal/csi-image-test:check-fs
+          image: docker.io/warmmetal/container-image-csi-driver-test:check-fs
           env:
             - name: TARGET
               value: /target
@@ -120,7 +120,7 @@ spec:
             # nodePublishSecretRef:
             #  name: "ImagePullSecret name in the same namespace"
             volumeAttributes:
-              image: "docker.io/warmmetal/csi-image-test:simple-fs"
+              image: "docker.io/warmmetal/container-image-csi-driver-test:simple-fs"
               # # set pullAlways if you want to ignore local images
               # pullAlways: "true"
   backoffLimit: 0
@@ -143,7 +143,7 @@ spec:
   persistentVolumeReclaimPolicy: Retain
   csi:
     driver: csi-image.warm-metal.tech
-    volumeHandle: "docker.io/warmmetal/csi-image-test:simple-fs"
+    volumeHandle: "docker.io/warmmetal/container-image-csi-driver-test:simple-fs"
     # nodePublishSecretRef:
     #  name: "name of the ImagePullSecret"
     #  namespace: "namespace of the secret"
