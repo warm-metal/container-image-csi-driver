@@ -12,10 +12,9 @@ import (
 	"github.com/warm-metal/csi-driver-image/pkg/constants"
 	"github.com/warm-metal/csi-driver-image/pkg/errorstore"
 	"github.com/warm-metal/csi-driver-image/pkg/metrics"
-	"github.com/warm-metal/csi-driver-image/pkg/pullstatus"
 	"github.com/warm-metal/csi-driver-image/pkg/remoteimage"
 	"github.com/warm-metal/csi-driver-image/pkg/secret"
-	"k8s.io/apimachinery/pkg/util/wait"
+	s "github.com/warm-metal/csi-driver-image/pkg/status"
 	cri "k8s.io/cri-api/pkg/apis/runtime/v1"
 	"k8s.io/klog/v2"
 	"k8s.io/kubernetes/pkg/credentialprovider"
@@ -65,15 +64,13 @@ func NewPullExecutor(o *PullExecutorOptions) *PullExecutor {
 		secretStore:    o.SecretStore,
 		mounter:        o.Mounter,
 		errorStore:     errorstore.New(),
-		tokens:         tokens,
-		pullTimeout:    o.AsyncPullTimeout,
 	}
 }
 
 // StartPulling starts pulling the image
 func (m *PullExecutor) StartPulling(o *PullOptions) error {
-	namedRef := o.NamedRef.String()
-	pullStatusKey := pullstatus.Key(namedRef, o.PodUid)
+	nref := o.NamedRef.String()
+	pullStatusKey := s.CompositeKey(nref, o.PodUid)
 	if m.mutexes[pullStatusKey] == nil {
 		m.mutexes[pullStatusKey] = &sync.Mutex{}
 	}
@@ -83,37 +80,30 @@ func (m *PullExecutor) StartPulling(o *PullOptions) error {
 		return errors.Errorf("unable to fetch keyring: %s", err)
 	}
 
-	if !m.asyncPull {
-		return m.pullImage(o, keyring, constants.Sync, namedRef, pullStatusKey)
-	}
-
-	if pullstatus.Get(pullStatusKey) == pullstatus.Pulled ||
-		pullstatus.Get(pullStatusKey) == pullstatus.StillPulling {
+	if s.PullStatus.Get(pullStatusKey) == s.Processed ||
+		s.PullStatus.Get(pullStatusKey) == s.StillProcessing {
 		return nil
 	}
 
-	go func() error {
-		return m.pullImage(o, keyring, constants.Sync, namedRef, pullStatusKey)
-	}()
-
-	return nil
+	return m.pullImage(o, keyring, constants.Sync, nref, pullStatusKey)
 }
 
 func (m *PullExecutor) pullImage(o *PullOptions,
 	keyring credentialprovider.DockerKeyring,
 	pullType, namedRef, pullStatusKey string) error {
+
+	m.mutexes[pullStatusKey].Lock()
+	defer m.mutexes[pullStatusKey].Unlock()
+
 	c := o.Context
 	var cancel context.CancelFunc
-	if pullstatus.Get(pullStatusKey) == pullstatus.StatusNotFound {
+	if s.PullStatus.Get(pullStatusKey) == s.StatusNotFound {
 		if pullType == constants.Async {
 			c, cancel = context.WithTimeout(context.Background(), pullCtxTimeout)
 			defer cancel()
 		}
 
-		m.mutexes[pullStatusKey].Lock()
-		defer m.mutexes[pullStatusKey].Unlock()
-
-		if pullstatus.Get(pullStatusKey) == pullstatus.StillPulling {
+		if s.PullStatus.Get(pullStatusKey) == s.StillProcessing {
 			klog.Infof("image %q for pod uid %q is already being pulled", namedRef, o.PodUid)
 			return nil
 		}
@@ -121,58 +111,20 @@ func (m *PullExecutor) pullImage(o *PullOptions,
 		puller := remoteimage.NewPuller(m.imageSvcClient, o.NamedRef, keyring)
 		shouldPull := o.PullAlways || !m.mounter.ImageExists(o.Context, o.NamedRef)
 		if shouldPull {
-			// i.e., if max-in-flight-pulls is set to a non-zero value
-			if len(m.tokens) > 0 {
-				if m.tokens != nil {
-					m.tokens <- struct{}{}
-					defer func() {
-						<-m.tokens
-					}()
-				}
-			}
 			klog.Infof("pull image %q ", o.Image)
-			pullstatus.Update(pullStatusKey, pullstatus.StillPulling)
+			s.PullStatus.Update(pullStatusKey, s.StillProcessing)
 			startTime := time.Now()
 			if err := puller.Pull(c); err != nil {
-				pullstatus.Update(pullStatusKey, pullstatus.Errored)
+				s.PullStatus.Update(pullStatusKey, s.Errored)
 				metrics.OperationErrorsCount.WithLabelValues("StartPulling").Inc()
 				return m.errorStore.Put(pullStatusKey, fmt.Errorf("unable to pull image %q: %s", o.NamedRef, err))
 			}
 			metrics.ImagePullTime.WithLabelValues(pullType).Observe(time.Since(startTime).Seconds())
 		}
 		klog.Infof("image is ready for use: %q ", o.NamedRef)
-		pullstatus.Update(pullStatusKey, pullstatus.Pulled)
+		s.PullStatus.Update(pullStatusKey, s.Processed)
 		m.errorStore.Remove(pullStatusKey)
 		return nil
 	}
-	return nil
-}
-
-// WaitForPull waits until the image pull succeeds or errors or timeout is exceeded
-func (m *PullExecutor) WaitForPull(o *PullOptions) error {
-	if !m.asyncPull {
-		return nil
-	}
-
-	namedRef := o.NamedRef.String()
-	pullStatusKey := pullstatus.Key(namedRef, o.PodUid)
-	condFn := func() (done bool, err error) {
-		if pullstatus.Get(pullStatusKey) == pullstatus.Pulled {
-			return true, nil
-		}
-
-		if m.errorStore.Get(pullStatusKey) != nil {
-			return false, m.errorStore.Get(pullStatusKey)
-		}
-		return false, nil
-	}
-
-	if err := wait.PollImmediate(
-		pullPollTimeInterval,
-		pullPollTimeout,
-		condFn); err != nil {
-		return errors.Errorf("waited too long to download the image: %v", err)
-	}
-
 	return nil
 }

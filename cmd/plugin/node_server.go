@@ -10,9 +10,9 @@ import (
 	"github.com/warm-metal/csi-driver-image/pkg/backend"
 	"github.com/warm-metal/csi-driver-image/pkg/metrics"
 	"github.com/warm-metal/csi-driver-image/pkg/mountexecutor"
-	"github.com/warm-metal/csi-driver-image/pkg/mountstatus"
 	"github.com/warm-metal/csi-driver-image/pkg/pullexecutor"
 	"github.com/warm-metal/csi-driver-image/pkg/secret"
+	s "github.com/warm-metal/csi-driver-image/pkg/status"
 	csicommon "github.com/warm-metal/csi-drivers/pkg/csi-common"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
@@ -31,18 +31,15 @@ const (
 
 type ImagePullStatus int
 
-func NewNodeServer(driver *csicommon.CSIDriver, mounter backend.Mounter, imageSvc cri.ImageServiceClient, secretStore secret.Store, asyncImagePullMount bool) *NodeServer {
+func NewNodeServer(driver *csicommon.CSIDriver, mounter backend.Mounter, imageSvc cri.ImageServiceClient, secretStore secret.Store) *NodeServer {
 	return &NodeServer{
-		DefaultNodeServer:   csicommon.NewDefaultNodeServer(driver),
-		mounter:             mounter,
-		secretStore:         secretStore,
-		asyncImagePullMount: asyncImagePullMount,
+		DefaultNodeServer: csicommon.NewDefaultNodeServer(driver),
+		mounter:           mounter,
+		secretStore:       secretStore,
 		mountExecutor: mountexecutor.NewMountExecutor(&mountexecutor.MountExecutorOptions{
-			AsyncMount: asyncImagePullMount,
-			Mounter:    mounter,
+			Mounter: mounter,
 		}),
 		pullExecutor: pullexecutor.NewPullExecutor(&pullexecutor.PullExecutorOptions{
-			AsyncPull:          asyncImagePullMount,
 			ImageServiceClient: imageSvc,
 			SecretStore:        secretStore,
 			Mounter:            mounter,
@@ -144,16 +141,11 @@ func (n NodeServer) NodePublishVolume(ctx context.Context, req *csi.NodePublishV
 	}
 
 	if e := n.pullExecutor.StartPulling(po); e != nil {
-		err = status.Errorf(codes.Aborted, "unable to pull image %q: %s", image, e)
+		err = status.Errorf(codes.Internal, "unable to pull image %q: %s", image, e)
 		return
 	}
 
-	if e := n.pullExecutor.WaitForPull(po); e != nil {
-		err = status.Errorf(codes.DeadlineExceeded, e.Error())
-		return
-	}
-
-	if mountstatus.Get(req.VolumeId) == mountstatus.Mounted {
+	if s.MountStatus.Get(req.VolumeId) == s.Processed {
 		return &csi.NodePublishVolumeResponse{}, nil
 	}
 
@@ -164,15 +156,11 @@ func (n NodeServer) NodePublishVolume(ctx context.Context, req *csi.NodePublishV
 		TargetPath:       req.TargetPath,
 		VolumeCapability: req.VolumeCapability,
 		ReadOnly:         req.Readonly,
+		PodUid:           req.VolumeContext[ctxKeyPodUid],
 	}
 
 	if e := n.mountExecutor.StartMounting(o); e != nil {
 		err = status.Error(codes.Internal, e.Error())
-		return
-	}
-
-	if e := n.mountExecutor.WaitForMount(o); e != nil {
-		err = status.Errorf(codes.DeadlineExceeded, e.Error())
 		return
 	}
 
@@ -206,7 +194,7 @@ func (n NodeServer) NodeUnpublishVolume(ctx context.Context, req *csi.NodeUnpubl
 	// Clear the mountstatus since the volume has been unmounted
 	// Not doing this will make mount not work properly if the same volume is
 	// attempted to mount twice
-	mountstatus.Delete(req.VolumeId)
+	s.MountStatus.Delete(req.VolumeId)
 
 	return &csi.NodeUnpublishVolumeResponse{}, nil
 }

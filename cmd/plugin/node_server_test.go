@@ -27,7 +27,7 @@ import (
 	"k8s.io/kubernetes/pkg/credentialprovider"
 )
 
-func TestNodePublishVolumeAsync(t *testing.T) {
+func TestNodePublishVolume(t *testing.T) {
 	criClient := &utils.MockImageServiceClient{
 		PulledImages:  make(map[string]bool),
 		ImagePullTime: time.Second * 5,
@@ -41,8 +41,7 @@ func TestNodePublishVolumeAsync(t *testing.T) {
 	driver := csicommon.NewCSIDriver(driverName, driverVersion, "fake-node")
 	assert.NotNil(t, driver)
 
-	asyncImagePulls := true
-	ns := NewNodeServer(driver, mounter, criClient, &testSecretStore{}, asyncImagePulls)
+	ns := NewNodeServer(driver, mounter, criClient, &testSecretStore{})
 
 	// based on kubelet's csi mounter plugin code
 	// check https://github.com/kubernetes/kubernetes/blob/b06a31b87235784bad2858be62115049b6eb6bcd/pkg/volume/csi/csi_mounter.go#L111-L112
@@ -164,8 +163,7 @@ func TestNodePublishVolumeSync(t *testing.T) {
 	driver := csicommon.NewCSIDriver(driverName, driverVersion, "fake-node")
 	assert.NotNil(t, driver)
 
-	asyncImagePulls := false
-	ns := NewNodeServer(driver, mounter, criClient, &testSecretStore{}, asyncImagePulls)
+	ns := NewNodeServer(driver, mounter, criClient, &testSecretStore{})
 
 	// based on kubelet's csi mounter plugin code
 	// check https://github.com/kubernetes/kubernetes/blob/b06a31b87235784bad2858be62115049b6eb6bcd/pkg/volume/csi/csi_mounter.go#L111-L112
@@ -292,8 +290,7 @@ func TestMetrics(t *testing.T) {
 	driver := csicommon.NewCSIDriver(driverName, driverVersion, "fake-node")
 	assert.NotNil(t, driver)
 
-	asyncImagePulls := true
-	ns := NewNodeServer(driver, mounter, criClient, &testSecretStore{}, asyncImagePulls)
+	ns := NewNodeServer(driver, mounter, criClient, &testSecretStore{})
 
 	// based on kubelet's csi mounter plugin code
 	// check https://github.com/kubernetes/kubernetes/blob/b06a31b87235784bad2858be62115049b6eb6bcd/pkg/volume/csi/csi_mounter.go#L111-L112
