@@ -47,19 +47,19 @@ function lib::start_cluster_docker() {
 function lib::gen_manifests() {
   local secret=$1
   local disableCache=$2
-  docker cp _output/warm-metal-csi-image-install kind-${GITHUB_RUN_ID}-control-plane:/usr/bin/warm-metal-csi-image-install
+  docker cp _output/container-image-csi-driver-install kind-${GITHUB_RUN_ID}-control-plane:/usr/bin/container-image-csi-driver-install
   if [[ "${secret}" != "" ]]; then
     if [[ "${disableCache}" != "" ]]; then
       docker exec kind-${GITHUB_RUN_ID}-control-plane \
-        warm-metal-csi-image-install \
+        container-image-csi-driver-install \
         --enable-daemon-image-credential-cache=false \
         --pull-image-secret-for-daemonset=${secret} 2>/dev/null
     else
       docker exec kind-${GITHUB_RUN_ID}-control-plane \
-        warm-metal-csi-image-install --pull-image-secret-for-daemonset=${secret} 2>/dev/null
+        container-image-csi-driver-install --pull-image-secret-for-daemonset=${secret} 2>/dev/null
     fi
   else
-    docker exec kind-${GITHUB_RUN_ID}-control-plane warm-metal-csi-image-install 2>/dev/null
+    docker exec kind-${GITHUB_RUN_ID}-control-plane container-image-csi-driver-install 2>/dev/null
   fi
 }
 
@@ -72,7 +72,6 @@ function lib::install_driver_from_manifest_file() {
   local manifest=$1
   kubectl delete --ignore-not-found -f ${manifest}
   kubectl apply -f ${manifest}
-  kubectlwait kube-system -l=app=csi-image-warm-metal
 }
 
 function lib::install_driver() {
@@ -80,11 +79,11 @@ function lib::install_driver() {
   local manifest=$(lib::gen_manifests $2)
   echo "${manifest}" | kubectl delete --ignore-not-found -f -
   if [ "${image}" != "" ]; then
-    echo "${manifest}" | sed "s|image: docker.io/warmmetal/csi-image.*|image: ${image}|" | kubectl apply -f -
+    echo "${manifest}" | sed "s|image: docker.io/warmmetal/container-image-csi-driver.*|image: ${image}|" | kubectl apply -f -
   else
     echo "${manifest}" | kubectl apply -f -
   fi
-  kubectlwait kube-system -l=app=csi-image-warm-metal
+  kubectlwait kube-system -l=app=container-image-csi-driver
 }
 
 function lib::install_private_registry() {

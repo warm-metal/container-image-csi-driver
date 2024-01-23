@@ -1,22 +1,22 @@
 kind: StorageClass
 apiVersion: storage.k8s.io/v1
 metadata:
-  name: csi-image.warm-metal.tech
-provisioner: csi-image.warm-metal.tech
+  name: container-image.csi.k8s.io
+provisioner: container-image.csi.k8s.io
 ---
 apiVersion: v1
 kind: PersistentVolume
 metadata:
   name: pv-test-container-image-csi-driver-test-simple-fs-1
 spec:
-  storageClassName: csi-image.warm-metal.tech
+  storageClassName: container-image.csi.k8s.io
   capacity:
     storage: 5Gi
   accessModes:
     - ReadOnlyMany
   persistentVolumeReclaimPolicy: Retain
   csi:
-    driver: csi-image.warm-metal.tech
+    driver: container-image.csi.k8s.io
     volumeHandle: "docker.io/warmmetal/container-image-csi-driver-test:simple-fs"
     volumeAttributes:
       pullAlways: "true"
@@ -26,7 +26,7 @@ kind: PersistentVolumeClaim
 metadata:
   name: pvc-test-container-image-csi-driver-test-simple-fs-1
 spec:
-  storageClassName: csi-image.warm-metal.tech
+  storageClassName: container-image.csi.k8s.io
   accessModes:
     - ReadOnlyMany
   resources:
@@ -39,14 +39,14 @@ spec:
 # metadata:
 #   name: pv-test-container-image-csi-driver-test-simple-fs-2
 # spec:
-#   storageClassName: csi-image.warm-metal.tech
+#   storageClassName: container-image.csi.k8s.io
 #   capacity:
 #     storage: 5Gi
 #   accessModes:
 #     - ReadOnlyMany
 #   persistentVolumeReclaimPolicy: Retain
 #   csi:
-#     driver: csi-image.warm-metal.tech
+#     driver: container-image.csi.k8s.io
 #     volumeHandle: "docker.io/warmmetal/container-image-csi-driver-test:simple-fs"
 #     volumeAttributes:
 #       pullAlways: "true"
@@ -56,7 +56,7 @@ spec:
 # metadata:
 #   name: pvc-test-container-image-csi-driver-test-simple-fs-2
 # spec:
-#   storageClassName: csi-image.warm-metal.tech
+#   storageClassName: container-image.csi.k8s.io
 #   accessModes:
 #     - ReadOnlyMany
 #   resources:

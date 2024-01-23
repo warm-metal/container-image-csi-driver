@@ -20,7 +20,7 @@ spec:
       volumes:
         - name: target
           csi:
-            driver: csi-image.warm-metal.tech
+            driver: container-image.csi.k8s.io
             volumeAttributes:
               image: "docker.io/warmmetal/container-image-csi-driver-test:simple-fs"
               # # set pullAlways if you want to ignore local images

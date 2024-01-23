@@ -4,7 +4,7 @@ There are a few [GitHub Workflows](https://docs.github.com/en/actions/using-work
 
 ## Build
 - [![Create and publish the container image.](https://github.com/warm-metal/container-image-csi-driver/actions/workflows/images-build-and-push.yaml/badge.svg)](https://github.com/warm-metal/container-image-csi-driver/actions/workflows/images-build-and-push.yaml)
-    - On the main repository - `warm-metal/container-image-csi-driver`, builds and pushes the container image to Docker Hub [`warmmetal/csi-image`](https://hub.docker.com/r/warmmetal/csi-image)
+    - On the main repository - `warm-metal/container-image-csi-driver`, builds and pushes the container image to Docker Hub [`warmmetal/container-image-csi-driver`](https://hub.docker.com/r/warmmetal/container-image-csi-driver)
     - On any forks, builds and pushes the container image to `ghcr.io/<repository-name>`
 
 ## Tests
