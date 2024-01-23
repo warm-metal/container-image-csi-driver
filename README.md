@@ -126,7 +126,7 @@ spec:
       volumes:
         - name: target
           csi:
-            driver: container-image.csi.tech
+            driver: container-image.csi.k8s.io
             # nodePublishSecretRef:
             #  name: "ImagePullSecret name in the same namespace"
             volumeAttributes:
@@ -145,14 +145,14 @@ kind: PersistentVolume
 metadata:
   name: pv-test-container-image-csi-driver-test-simple-fs
 spec:
-  storageClassName: container-image.csi.tech
+  storageClassName: container-image.csi.k8s.io
   capacity:
     storage: 5Gi
   accessModes:
     - ReadOnlyMany
   persistentVolumeReclaimPolicy: Retain
   csi:
-    driver: container-image.csi.tech
+    driver: container-image.csi.k8s.io
     volumeHandle: "docker.io/warmmetal/container-image-csi-driver-test:simple-fs"
     # nodePublishSecretRef:
     #  name: "name of the ImagePullSecret"
