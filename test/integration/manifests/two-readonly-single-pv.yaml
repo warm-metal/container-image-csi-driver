@@ -4,14 +4,14 @@ kind: PersistentVolume
 metadata:
   name: pv-test-multi-read-simple-fs
 spec:
-  storageClassName: container-image.warm-metal.tech
+  storageClassName: container-image.csi.tech
   capacity:
     storage: 5Mi
   accessModes:
     - ReadOnlyMany  # does not force volume to be mounted read only
   persistentVolumeReclaimPolicy: Delete
   csi:
-    driver: container-image.warm-metal.tech
+    driver: container-image.csi.tech
     volumeHandle: "docker.io/warmmetal/container-image-csi-driver-test:simple-fs"
     volumeAttributes:
       pullAlways: "true"
@@ -21,7 +21,7 @@ kind: PersistentVolumeClaim
 metadata:
   name: pv-test-multi-read-simple-fs
 spec:
-  storageClassName: container-image.warm-metal.tech
+  storageClassName: container-image.csi.tech
   accessModes:
   - ReadOnlyMany
   resources:

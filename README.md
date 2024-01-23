@@ -48,7 +48,7 @@ then mounts images via the snapshot/storage service of the runtime.
 ## Compatibility matrix
 Tested changes on below mentioned versions -
 
-| warm-metal | k8s version | containerd | crio    |
+| CSI driver | k8s version | containerd | crio    |
 |------------|-------------|------------|---------|
 | 0.6.x      | v1.25       | 1.6.8      | v1.20.9 |
 | 0.7.x      | v1.25       | 1.6.8      | v1.20.9 |
@@ -62,26 +62,26 @@ Tested changes on below mentioned versions -
 ## Installation
 
 The driver requires to mount various host paths for different container runtimes.
-So, I build a binary utility, `warm-metal-container-image-csi-driver-install`, to reduce the installation complexity.
+So, I build a binary utility, `container-image-csi-driver-install`, to reduce the installation complexity.
 It supports kubernetes, microk8s and k3s clusters with container runtime **cri-o**, **containerd** or **docker**.
 Users can run this utility on any nodes in their clusters to generate proper manifests to install the driver.
 The download link is available on the [release page](https://github.com/warm-metal/container-image-csi-driver/releases).
 
 ```shell script
 # To print manifests
-warm-metal-container-image-csi-driver-install
+container-image-csi-driver-install
 
 # To show the detected configuration
-warm-metal-container-image-csi-driver-install --print-detected-instead
+container-image-csi-driver-install --print-detected-instead
 
 # To change the default namespace that the driver to be installed in
-warm-metal-container-image-csi-driver-install --namespace=foo
+container-image-csi-driver-install --namespace=foo
 
 # To set a Secret as the imagepullsecret
-warm-metal-container-image-csi-driver-install --pull-image-secret-for-daemonset=foo
+container-image-csi-driver-install --pull-image-secret-for-daemonset=foo
 
 # To disable the memroy cache for imagepullsecrets if Secrets are short-lived.
-warm-metal-container-image-csi-driver-install --pull-image-secret-for-daemonset=foo --enable-daemon-image-credential-cache=false
+container-image-csi-driver-install --pull-image-secret-for-daemonset=foo --enable-daemon-image-credential-cache=false
 ```
 
 You can found some installation manifests as samples in [examples](https://github.com/warm-metal/container-image-csi-driver/tree/master/sample).
@@ -126,7 +126,7 @@ spec:
       volumes:
         - name: target
           csi:
-            driver: container-image.warm-metal.tech
+            driver: container-image.csi.tech
             # nodePublishSecretRef:
             #  name: "ImagePullSecret name in the same namespace"
             volumeAttributes:
@@ -145,14 +145,14 @@ kind: PersistentVolume
 metadata:
   name: pv-test-container-image-csi-driver-test-simple-fs
 spec:
-  storageClassName: container-image.warm-metal.tech
+  storageClassName: container-image.csi.tech
   capacity:
     storage: 5Gi
   accessModes:
     - ReadOnlyMany
   persistentVolumeReclaimPolicy: Retain
   csi:
-    driver: container-image.warm-metal.tech
+    driver: container-image.csi.tech
     volumeHandle: "docker.io/warmmetal/container-image-csi-driver-test:simple-fs"
     # nodePublishSecretRef:
     #  name: "name of the ImagePullSecret"
@@ -178,12 +178,12 @@ Otherwise, you need ImagePullSecrets to store your credential. The following lin
 - [https://kubernetes.io/docs/tasks/configure-pod-container/configure-service-account/#add-imagepullsecrets-to-a-service-account](https://kubernetes.io/docs/tasks/configure-pod-container/configure-service-account/#add-imagepullsecrets-to-a-service-account)
 
 If the secret is desired to be shared by all volumes, you can add it to the ServiceAccount of the driver,
-`container-image-warm-metal` by default, and update the Role `container-image-warm-metal` to make sure the daemon has permissions to fetch the secret,
-then restart the driver daemon pod. Users can run `warm-metal-container-image-csi-driver-install` to generate new manifests and apply them to update.
+`container-image-csi-driver` by default, and update the Role `container-image-csi-driver` to make sure the daemon has permissions to fetch the secret,
+then restart the driver daemon pod. Users can run `container-image-csi-driver-install` to generate new manifests and apply them to update.
 
 ```shell script
 # use secrets foo and bar
-warm-metal-container-image-csi-driver-install --pull-image-secret-for-daemonset=foo --pull-image-secret-for-daemonset=bar
+container-image-csi-driver-install --pull-image-secret-for-daemonset=foo --pull-image-secret-for-daemonset=bar
 ```
 
 If the secret works only for particular workloads, you can  set via the `nodePublishSecretRef` attribute of ephemeral volumes.

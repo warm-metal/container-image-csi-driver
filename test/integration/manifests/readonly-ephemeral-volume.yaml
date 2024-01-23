@@ -22,7 +22,7 @@ spec:
       volumes:
         - name: target
           csi:
-            driver: container-image.warm-metal.tech
+            driver: container-image.csi.tech
             readOnly: true
             volumeAttributes:
               image: "docker.io/warmmetal/container-image-csi-driver-test:simple-fs"

@@ -62,4 +62,4 @@ test-deps:
 install-util:
 	GOOS=linux CGO_ENABLED="0" go build \
 	  -ldflags "-X main.Version=$(VERSION) -X main.Registry=$(REGISTRY)" \
-	  -o _output/warm-metal-container-image-csi-driver-install ./cmd/install
+	  -o _output/container-image-csi-driver-install ./cmd/install

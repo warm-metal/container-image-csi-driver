@@ -21,7 +21,7 @@ import (
 )
 
 const (
-	driverName    = "container-image.warm-metal.tech"
+	driverName    = "container-image.csi.tech"
 	driverVersion = "v1.0.0"
 
 	containerdScheme = "containerd"
@@ -55,7 +55,7 @@ var (
 		"If positive, specifies duration allotted for async image pulls as measured from pull start time. If zero, negative, less than 30s, or omitted, the caller's timeout (usually kubelet: 2m) is used instead of this value. (additional time helps prevent timeout for larger images or slower image pull conditions)")
 	watcherResyncPeriod = flag.Duration("watcher-resync-period", 30*time.Minute, "The resync period of the pvc watcher.")
 	mode                = flag.String("mode", "", "The mode of the driver. Valid values are: node, controller")
-	nodePluginSA        = flag.String("node-plugin-sa", "container-image-warm-metal", "The name of the ServiceAccount used by the node plugin.")
+	nodePluginSA        = flag.String("node-plugin-sa", "container-image-csi-driver", "The name of the ServiceAccount used by the node plugin.")
 )
 
 func main() {

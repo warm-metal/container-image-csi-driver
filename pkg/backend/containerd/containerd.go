@@ -248,7 +248,7 @@ func (s snapshotMounter) ListSnapshots(ctx context.Context) (ss []backend.Snapsh
 }
 
 const (
-	labelPrefix         = "container-image.warm-metal.tech"
+	labelPrefix         = "container-image.csi.tech"
 	targetLabelPrefix   = labelPrefix + "/target"
 	volumeIdLabelPrefix = labelPrefix + "/id"
 	gcLabel             = "containerd.io/gc.root"
