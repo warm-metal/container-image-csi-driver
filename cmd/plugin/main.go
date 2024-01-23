@@ -21,7 +21,7 @@ import (
 )
 
 const (
-	driverName    = "container-image.csi.tech"
+	driverName    = "container-image.csi.k8s.io"
 	driverVersion = "v1.0.0"
 
 	containerdScheme = "containerd"

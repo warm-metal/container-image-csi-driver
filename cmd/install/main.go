@@ -209,7 +209,7 @@ const staticManifests = `---
 apiVersion: storage.k8s.io/v1
 kind: CSIDriver
 metadata:
-  name: container-image.csi.tech
+  name: container-image.csi.k8s.io
 spec:
   attachRequired: false
   podInfoOnMount: true
@@ -287,10 +287,10 @@ spec:
           lifecycle:
             preStop:
               exec:
-                command: ["/bin/sh", "-c", "rm -rf /registration/container-image.csi.tech /registration/container-image.csi.tech-reg.sock"]
+                command: ["/bin/sh", "-c", "rm -rf /registration/container-image.csi.k8s.io /registration/container-image.csi.k8s.io-reg.sock"]
           args:
             - --csi-address=/csi/csi.sock
-            - --kubelet-registration-path={{.KubeletRoot}}/plugins/container-image.csi.tech/csi.sock
+            - --kubelet-registration-path={{.KubeletRoot}}/plugins/container-image.csi.k8s.io/csi.sock
           env:
             - name: KUBE_NODE_NAME
               valueFrom:
@@ -332,7 +332,7 @@ spec:
               name: runtime-socket
       volumes:
         - hostPath:
-            path: {{.KubeletRoot}}/plugins/container-image.csi.tech
+            path: {{.KubeletRoot}}/plugins/container-image.csi.k8s.io
             type: DirectoryOrCreate
           name: socket-dir
         - hostPath:
