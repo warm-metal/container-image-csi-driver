@@ -12,6 +12,9 @@ kubectlwait default compatible-ephemeral-volume
 kubectl apply -f "${TestBase}/compatible-manifests/pre-provisioned-pv.yaml"
 kubectlwait default compatible-pre-provisioned-pv
 
+kubectl delete -f "${TestBase}/compatible-manifests/ephemeral-volume.yaml"
+kubectl delete --ignore-not-found -f "${TestBase}/compatible-manifests/pre-provisioned-pv.yaml"
+
 #Ignore deletion of older CSI driver for now to test if dual installation of the driver works.
 
 export VALUE_FILE=$(dirname "${BASH_SOURCE[0]}")/../../charts/warm-metal-csi-driver/values.yaml
@@ -34,6 +37,13 @@ helm install ${HELM_NAME} charts/warm-metal-csi-driver -n "${NAMESPACE}" \
 lib::run_test_job "${TestBase}/manifests/ephemeral-volume.yaml"
 lib::run_test_job "${TestBase}/manifests/readonly-ephemeral-volume.yaml"
 lib::run_test_job "${TestBase}/manifests/pre-provisioned-pv.yaml"
+
+#Reapply compatible-manifests which uses older CSI driver
+kubectl apply -f "${TestBase}/compatible-manifests/ephemeral-volume.yaml"
+kubectlwait default compatible-ephemeral-volume
+
+kubectl apply -f "${TestBase}/compatible-manifests/pre-provisioned-pv.yaml"
+kubectlwait default compatible-pre-provisioned-pv
 
 kubectl delete -f "${TestBase}/compatible-manifests/ephemeral-volume.yaml"
 kubectl delete --ignore-not-found -f "${TestBase}/compatible-manifests/pre-provisioned-pv.yaml"
