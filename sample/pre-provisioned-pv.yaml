@@ -1,22 +1,22 @@
 kind: StorageClass
 apiVersion: storage.k8s.io/v1
 metadata:
-  name: container-image.warm-metal.tech
-provisioner: container-image.warm-metal.tech
+  name: container-image.csi.tech
+provisioner: container-image.csi.tech
 ---
 apiVersion: v1
 kind: PersistentVolume
 metadata:
   name: pv-test-container-image-csi-driver-test-simple-fs
 spec:
-  storageClassName: container-image.warm-metal.tech
+  storageClassName: container-image.csi.tech
   capacity:
     storage: 5Gi
   accessModes:
     - ReadOnlyMany
   persistentVolumeReclaimPolicy: Retain
   csi:
-    driver: container-image.warm-metal.tech
+    driver: container-image.csi.tech
     volumeHandle: "docker.io/warmmetal/container-image-csi-driver-test:simple-fs"
     # volumeAttributes:
       # # set pullAlways if you want to ignore local images
@@ -30,7 +30,7 @@ kind: PersistentVolumeClaim
 metadata:
   name: pvc-test-container-image-csi-driver-test-simple-fs
 spec:
-  storageClassName: container-image.warm-metal.tech
+  storageClassName: container-image.csi.tech
   accessModes:
     - ReadOnlyMany
   resources:

@@ -230,5 +230,5 @@ func (s *SnapshotMounter) ImageExists(ctx context.Context, image docker.Named) b
 }
 
 func genSnapshotKey(parent string) SnapshotKey {
-	return SnapshotKey(fmt.Sprintf("container-image.warm-metal.tech-%s", parent))
+	return SnapshotKey(fmt.Sprintf("container-image.csi.tech-%s", parent))
 }

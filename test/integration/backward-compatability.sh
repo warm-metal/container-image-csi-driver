@@ -3,6 +3,7 @@
 set -e
 source $(dirname "${BASH_SOURCE[0]}")/../../hack/lib/cluster.sh
 lib::install_driver_from_manifest_file 'https://raw.githubusercontent.com/warm-metal/container-image-csi-driver/v0.4.2/install/cri-containerd.yaml'
+kubectlwait kube-system -l=app=csi-image-warm-metal
 
 TestBase=$(dirname "${BASH_SOURCE[0]}")
 kubectl apply -f "${TestBase}/compatible-manifests/ephemeral-volume.yaml"
