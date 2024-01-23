@@ -4,6 +4,8 @@ source $(dirname "${BASH_SOURCE[0]}")/../../hack/lib/utils.sh
 
 set -e
 
+TestBase=$(dirname "${BASH_SOURCE[0]}")
+
 lib::run_test_job "${TestBase}/manifests/ephemeral-volume.yaml"
 lib::run_test_job "${TestBase}/manifests/readonly-ephemeral-volume.yaml"
 lib::run_test_job "${TestBase}/manifests/pre-provisioned-pv.yaml"
