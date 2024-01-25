@@ -11,14 +11,30 @@ type Status int
 // https://stackoverflow.com/questions/14426366/what-is-an-idiomatic-way-of-representing-enums-in-go
 const (
 	// Errored means there was an error during processing
-	Errored Status = -1
+	Errored Status = iota - 1
 	// StatusNotFound means there has been no attempt to process
-	StatusNotFound Status = iota
+	StatusNotFound
 	// StillProcessing means the processing is happening
 	StillProcessing
 	// Processed means the operation has been fulfilled
 	Processed
 )
+
+func (s Status) String() string {
+	switch int(s) {
+	case -1:
+		return "Errored"
+	case 0:
+		return "StatusNotFound"
+	case 1:
+		return "StillProcessing"
+	case 2:
+		return "Processed"
+	default:
+		panic(fmt.Sprintf("unidentified status: %v", int(s)))
+	}
+
+}
 
 // StatusRecorder records the status
 type StatusRecorder struct {

@@ -3,13 +3,20 @@ package utils
 import (
 	"context"
 	"fmt"
+	"os"
+	"strings"
 	"time"
 
+	"github.com/container-storage-interface/spec/lib/go/csi"
 	"github.com/containerd/containerd/reference/docker"
+	"github.com/google/uuid"
 	"github.com/warm-metal/csi-driver-image/pkg/backend"
+	csicommon "github.com/warm-metal/csi-drivers/pkg/csi-common"
 	"google.golang.org/grpc"
 	criapi "k8s.io/cri-api/pkg/apis/runtime/v1"
 )
+
+const hundredMiB = 104857600
 
 type MockImageServiceClient struct {
 	PulledImages  map[string]bool
@@ -21,7 +28,51 @@ type MockMounter struct {
 	Mounted        map[string]bool
 }
 
-const hundredMB = 104857600
+type TestNonBlockingGRPCServer struct {
+	csicommon.NonBlockingGRPCServer
+	sockPath string
+}
+
+func BuildTestNonblockingGRPCServer() *TestNonBlockingGRPCServer {
+	u, err := uuid.NewUUID()
+	if err != nil {
+		panic(err)
+	}
+
+	sockPath := fmt.Sprintf("/tmp/%s-csi.sock", u.String())
+
+	// automatically deleted when the server is stopped
+	if _, err := os.Create(sockPath); err != nil {
+		panic(err)
+	}
+
+	return &TestNonBlockingGRPCServer{
+		NonBlockingGRPCServer: csicommon.NewNonBlockingGRPCServer(),
+		sockPath:              sockPath,
+	}
+}
+
+func (t *TestNonBlockingGRPCServer) Start(ids csi.IdentityServer, cs csi.ControllerServer, ns csi.NodeServer) {
+	t.NonBlockingGRPCServer.Start(fmt.Sprintf("unix://%s", t.sockPath), ids, cs, ns)
+}
+
+func (t *TestNonBlockingGRPCServer) SockPath() string {
+	return t.sockPath
+}
+
+func (t *TestNonBlockingGRPCServer) Wait() {
+	t.NonBlockingGRPCServer.Wait()
+}
+
+func (t *TestNonBlockingGRPCServer) Stop() {
+	defer os.Remove(t.sockPath)
+	t.NonBlockingGRPCServer.Stop()
+}
+
+func (t *TestNonBlockingGRPCServer) ForceStop() {
+	defer os.Remove(t.sockPath)
+	t.NonBlockingGRPCServer.ForceStop()
+}
 
 func (m *MockMounter) Mount(
 	ctx context.Context, volumeId string, target backend.MountTarget, image docker.Named, ro bool) (err error) {
@@ -51,7 +102,7 @@ func (c *MockImageServiceClient) ListImages(ctx context.Context, in *criapi.List
 		resp.Images = append(resp.Images, &criapi.Image{
 			Id: k,
 			// 100MB
-			Size_: hundredMB,
+			Size_: hundredMiB,
 			Spec: &criapi.ImageSpec{
 				Image: k,
 			},
@@ -65,7 +116,7 @@ func (c *MockImageServiceClient) ImageStatus(ctx context.Context, in *criapi.Ima
 	resp := new(criapi.ImageStatusResponse)
 	resp.Image = &criapi.Image{
 		Id:    in.Image.Image,
-		Size_: hundredMB,
+		Size_: hundredMiB,
 		Spec: &criapi.ImageSpec{
 			Image: in.Image.Image,
 		},
@@ -74,11 +125,20 @@ func (c *MockImageServiceClient) ImageStatus(ctx context.Context, in *criapi.Ima
 }
 
 func (c *MockImageServiceClient) PullImage(ctx context.Context, in *criapi.PullImageRequest, opts ...grpc.CallOption) (*criapi.PullImageResponse, error) {
+
 	resp := new(criapi.PullImageResponse)
 	resp.ImageRef = in.Image.Image
+
+	var err error = nil
+
+	if strings.HasSuffix(in.Image.Image, "INVALIDIMAGE") {
+		resp = nil
+		err = fmt.Errorf("mock puller: invalid image: %s", in.Image.Image)
+	}
+
 	time.Sleep(c.ImagePullTime)
 
-	return resp, nil
+	return resp, err
 }
 
 func (c *MockImageServiceClient) RemoveImage(ctx context.Context, in *criapi.RemoveImageRequest, opts ...grpc.CallOption) (*criapi.RemoveImageResponse, error) {
@@ -98,7 +158,7 @@ func (c *MockImageServiceClient) ImageFsInfo(ctx context.Context, in *criapi.Ima
 				Mountpoint: "target",
 			},
 			UsedBytes: &criapi.UInt64Value{
-				Value: hundredMB,
+				Value: hundredMiB,
 			},
 			InodesUsed: &criapi.UInt64Value{
 				// random value

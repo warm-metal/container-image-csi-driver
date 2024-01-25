@@ -8,23 +8,16 @@ import (
 	"github.com/container-storage-interface/spec/lib/go/csi"
 	"github.com/containerd/containerd/reference/docker"
 	"github.com/warm-metal/csi-driver-image/pkg/backend"
-	"github.com/warm-metal/csi-driver-image/pkg/constants"
 	"github.com/warm-metal/csi-driver-image/pkg/errorstore"
 	"github.com/warm-metal/csi-driver-image/pkg/metrics"
 	s "github.com/warm-metal/csi-driver-image/pkg/status"
 	"k8s.io/klog/v2"
 )
 
-const (
-	mountPollTimeInterval = 100 * time.Millisecond
-	mountPollTimeout      = 2 * time.Minute
-	mountCtxTimeout       = 10 * time.Minute
-)
-
 // MountExecutorOptions are options passed to mount executor
 type MountExecutorOptions struct {
-	AsyncMount bool
-	Mounter    backend.Mounter
+	Mounter         backend.Mounter
+	OverrideTimeout *time.Duration
 }
 
 // MountOptions are options for a single mount request
@@ -41,19 +34,19 @@ type MountOptions struct {
 
 // MountExecutor executes mount
 type MountExecutor struct {
-	asyncMount bool
 	mutexes    map[string]*sync.Mutex
 	mounter    backend.Mounter
 	errorStore *errorstore.ErrorStore
+	timeout    *time.Duration
 }
 
 // NewMountExecutor initializes a new mount executor
 func NewMountExecutor(o *MountExecutorOptions) *MountExecutor {
 	return &MountExecutor{
-		asyncMount: o.AsyncMount,
 		mutexes:    make(map[string]*sync.Mutex),
 		mounter:    o.Mounter,
 		errorStore: errorstore.New(),
+		timeout:    o.OverrideTimeout,
 	}
 }
 
@@ -67,9 +60,9 @@ func (m *MountExecutor) StartMounting(o *MountOptions) error {
 	if s.PullStatus.Get(pullStatusKey) != s.Processed ||
 		s.MountStatus.Get(o.TargetPath) == s.StillProcessing ||
 		s.MountStatus.Get(o.TargetPath) == s.Processed {
-		klog.Infof("can't mount the image '%s' (image pull status: %q; volume mount status: %q)",
+		klog.Infof("can't mount the image '%s' (image pull status: '%v'; volume mount status: '%v')",
 			o.NamedRef.Name(),
-			s.PullStatus.Get(pullStatusKey), s.MountStatus.Get(o.TargetPath))
+			s.PullStatus.Get(pullStatusKey).String(), s.MountStatus.Get(o.TargetPath).String())
 		return nil
 	}
 
@@ -77,18 +70,18 @@ func (m *MountExecutor) StartMounting(o *MountOptions) error {
 		o.VolumeCapability.AccessMode.Mode == csi.VolumeCapability_AccessMode_SINGLE_NODE_READER_ONLY ||
 		o.VolumeCapability.AccessMode.Mode == csi.VolumeCapability_AccessMode_MULTI_NODE_READER_ONLY
 
-	return m.mount(o, constants.Sync, ro)
+	return m.mount(o, ro)
 }
 
-func (m *MountExecutor) mount(o *MountOptions, mountType string, ro bool) error {
+func (m *MountExecutor) mount(o *MountOptions, ro bool) error {
 	m.mutexes[o.TargetPath].Lock()
 	defer m.mutexes[o.TargetPath].Unlock()
 
 	ctx := o.Context
 	var cancel context.CancelFunc
 
-	if mountType == constants.Async {
-		ctx, cancel = context.WithTimeout(context.Background(), mountCtxTimeout)
+	if m.timeout != nil {
+		ctx, cancel = context.WithTimeout(context.Background(), *m.timeout)
 		defer cancel()
 	}
 
@@ -101,7 +94,7 @@ func (m *MountExecutor) mount(o *MountOptions, mountType string, ro bool) error 
 		s.MountStatus.Update(o.TargetPath, s.Errored)
 		return m.errorStore.Put(o.TargetPath, err)
 	}
-	metrics.ImageMountTime.WithLabelValues(mountType).Observe(time.Since(startTime).Seconds())
+	metrics.ImageMountTime.Observe(time.Since(startTime).Seconds())
 	s.MountStatus.Update(o.TargetPath, s.Processed)
 	m.errorStore.Remove(o.TargetPath)
 	return nil

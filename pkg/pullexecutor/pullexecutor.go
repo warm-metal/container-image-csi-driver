@@ -9,7 +9,6 @@ import (
 	"github.com/containerd/containerd/reference/docker"
 	"github.com/pkg/errors"
 	"github.com/warm-metal/csi-driver-image/pkg/backend"
-	"github.com/warm-metal/csi-driver-image/pkg/constants"
 	"github.com/warm-metal/csi-driver-image/pkg/errorstore"
 	"github.com/warm-metal/csi-driver-image/pkg/metrics"
 	"github.com/warm-metal/csi-driver-image/pkg/remoteimage"
@@ -20,18 +19,13 @@ import (
 	"k8s.io/kubernetes/pkg/credentialprovider"
 )
 
-const (
-	pullPollTimeInterval = 100 * time.Millisecond
-	pullPollTimeout      = 2 * time.Minute
-	pullCtxTimeout       = 10 * time.Minute
-)
-
 // PullExecutorOptions are the options passed to the pull executor
 type PullExecutorOptions struct {
 	AsyncPull          bool
 	ImageServiceClient cri.ImageServiceClient
 	SecretStore        secret.Store
 	Mounter            backend.Mounter
+	OverrideTimeout    *time.Duration
 }
 
 // PullOptions are the options for a single pull request
@@ -53,6 +47,7 @@ type PullExecutor struct {
 	errorStore     *errorstore.ErrorStore
 	secretStore    secret.Store
 	mounter        backend.Mounter
+	timeout        *time.Duration
 }
 
 // NewPullExecutor initializes a new pull executor object
@@ -64,6 +59,7 @@ func NewPullExecutor(o *PullExecutorOptions) *PullExecutor {
 		secretStore:    o.SecretStore,
 		mounter:        o.Mounter,
 		errorStore:     errorstore.New(),
+		timeout:        o.OverrideTimeout,
 	}
 }
 
@@ -80,51 +76,50 @@ func (m *PullExecutor) StartPulling(o *PullOptions) error {
 		return errors.Errorf("unable to fetch keyring: %s", err)
 	}
 
-	if s.PullStatus.Get(pullStatusKey) == s.Processed ||
-		s.PullStatus.Get(pullStatusKey) == s.StillProcessing {
-		return nil
-	}
+	defer delete(m.mutexes, pullStatusKey)
+	fmt.Println("o, keyring, nref, pullStatusKey", o, keyring, nref, pullStatusKey)
+	e := m.pullImage(o, keyring, nref, pullStatusKey)
 
-	return m.pullImage(o, keyring, constants.Sync, nref, pullStatusKey)
+	return e
 }
 
 func (m *PullExecutor) pullImage(o *PullOptions,
-	keyring credentialprovider.DockerKeyring,
-	pullType, namedRef, pullStatusKey string) error {
+	keyring credentialprovider.DockerKeyring, namedRef, pullStatusKey string) error {
 
 	m.mutexes[pullStatusKey].Lock()
 	defer m.mutexes[pullStatusKey].Unlock()
 
+	if s.PullStatus.Get(pullStatusKey) == s.Processed ||
+		s.PullStatus.Get(pullStatusKey) == s.StillProcessing {
+
+		fmt.Println("o.PodUid", o.PodUid, namedRef)
+		e := errors.Errorf("image '%v' for pod uid '%v' is being pulled or already pulled", namedRef, o.PodUid)
+		fmt.Println("ERROR", e)
+		// klog.Infof("image %q for pod uid %q is being pulled or already pulled", namedRef, o.PodUid)
+		return e
+	}
+
 	c := o.Context
 	var cancel context.CancelFunc
-	if s.PullStatus.Get(pullStatusKey) == s.StatusNotFound {
-		if pullType == constants.Async {
-			c, cancel = context.WithTimeout(context.Background(), pullCtxTimeout)
-			defer cancel()
-		}
-
-		if s.PullStatus.Get(pullStatusKey) == s.StillProcessing {
-			klog.Infof("image %q for pod uid %q is already being pulled", namedRef, o.PodUid)
-			return nil
-		}
-
-		puller := remoteimage.NewPuller(m.imageSvcClient, o.NamedRef, keyring)
-		shouldPull := o.PullAlways || !m.mounter.ImageExists(o.Context, o.NamedRef)
-		if shouldPull {
-			klog.Infof("pull image %q ", o.Image)
-			s.PullStatus.Update(pullStatusKey, s.StillProcessing)
-			startTime := time.Now()
-			if err := puller.Pull(c); err != nil {
-				s.PullStatus.Update(pullStatusKey, s.Errored)
-				metrics.OperationErrorsCount.WithLabelValues("StartPulling").Inc()
-				return m.errorStore.Put(pullStatusKey, fmt.Errorf("unable to pull image %q: %s", o.NamedRef, err))
-			}
-			metrics.ImagePullTime.WithLabelValues(pullType).Observe(time.Since(startTime).Seconds())
-		}
-		klog.Infof("image is ready for use: %q ", o.NamedRef)
-		s.PullStatus.Update(pullStatusKey, s.Processed)
-		m.errorStore.Remove(pullStatusKey)
-		return nil
+	if m.timeout != nil {
+		c, cancel = context.WithTimeout(context.Background(), *m.timeout)
+		defer cancel()
 	}
+
+	puller := remoteimage.NewPuller(m.imageSvcClient, o.NamedRef, keyring)
+	shouldPull := o.PullAlways || !m.mounter.ImageExists(o.Context, o.NamedRef)
+	if shouldPull {
+		klog.Infof("pull image %q ", o.Image)
+		s.PullStatus.Update(pullStatusKey, s.StillProcessing)
+		startTime := time.Now()
+		if err := puller.Pull(c); err != nil {
+			s.PullStatus.Update(pullStatusKey, s.Errored)
+			metrics.OperationErrorsCount.WithLabelValues("StartPulling").Inc()
+			return fmt.Errorf("unable to pull image %q: %s", o.NamedRef, err)
+		}
+		metrics.ImagePullTime.Observe(time.Since(startTime).Seconds())
+	}
+	klog.Infof("image is ready for use: %q ", o.NamedRef)
+	s.PullStatus.Update(pullStatusKey, s.Processed)
 	return nil
 }

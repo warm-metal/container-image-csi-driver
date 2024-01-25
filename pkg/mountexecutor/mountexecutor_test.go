@@ -1,7 +1,7 @@
 package mountexecutor
 
-import "testing"
+// func TestStartMounting(t *testing.T) {
+// 	mo := &MountExecutorOptions{
 
-func TestStartMounting(t *testing.T) {
-
-}
+// 	}
+// }

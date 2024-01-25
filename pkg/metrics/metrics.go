@@ -14,24 +14,22 @@ const ImagePullTimeKey = "pull_duration_seconds"
 const ImageMountTimeKey = "mount_duration_seconds"
 const OperationErrorsCountKey = "operation_errors_total"
 
-var ImagePullTime = prometheus.NewHistogramVec(
+var ImagePullTime = prometheus.NewHistogram(
 	prometheus.HistogramOpts{
 		Subsystem: "warm_metal",
 		Name:      ImagePullTimeKey,
 		Help:      "The time it took to pull an image",
 		Buckets:   []float64{0, 1, 5, 10, 15, 30, 60, 120, 180},
 	},
-	[]string{"operation_type"},
 )
 
-var ImageMountTime = prometheus.NewHistogramVec(
+var ImageMountTime = prometheus.NewHistogram(
 	prometheus.HistogramOpts{
 		Subsystem: "warm_metal",
 		Name:      ImageMountTimeKey,
 		Help:      "The time it took to mount an image",
 		Buckets:   []float64{0, 1, 5, 10, 15, 30, 60, 120, 180},
 	},
-	[]string{"operation_type"},
 )
 
 var OperationErrorsCount = prometheus.NewCounterVec(

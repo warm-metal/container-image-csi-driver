@@ -4,6 +4,7 @@ import (
 	"context"
 	"os"
 	"strings"
+	"time"
 
 	"github.com/container-storage-interface/spec/lib/go/csi"
 	"github.com/containerd/containerd/reference/docker"
@@ -31,29 +32,31 @@ const (
 
 type ImagePullStatus int
 
-func NewNodeServer(driver *csicommon.CSIDriver, mounter backend.Mounter, imageSvc cri.ImageServiceClient, secretStore secret.Store) *NodeServer {
+func NewNodeServer(driver *csicommon.CSIDriver, mounter backend.Mounter,
+	imageSvc cri.ImageServiceClient, secretStore secret.Store, overrideTimeout *time.Duration) *NodeServer {
 	return &NodeServer{
 		DefaultNodeServer: csicommon.NewDefaultNodeServer(driver),
 		mounter:           mounter,
 		secretStore:       secretStore,
 		mountExecutor: mountexecutor.NewMountExecutor(&mountexecutor.MountExecutorOptions{
-			Mounter: mounter,
+			Mounter:         mounter,
+			OverrideTimeout: overrideTimeoutSeconds,
 		}),
 		pullExecutor: pullexecutor.NewPullExecutor(&pullexecutor.PullExecutorOptions{
 			ImageServiceClient: imageSvc,
 			SecretStore:        secretStore,
 			Mounter:            mounter,
+			OverrideTimeout:    overrideTimeoutSeconds,
 		}),
 	}
 }
 
 type NodeServer struct {
 	*csicommon.DefaultNodeServer
-	mounter             backend.Mounter
-	secretStore         secret.Store
-	asyncImagePullMount bool
-	mountExecutor       *mountexecutor.MountExecutor
-	pullExecutor        *pullexecutor.PullExecutor
+	mounter       backend.Mounter
+	secretStore   secret.Store
+	mountExecutor *mountexecutor.MountExecutor
+	pullExecutor  *pullexecutor.PullExecutor
 }
 
 func (n NodeServer) NodePublishVolume(ctx context.Context, req *csi.NodePublishVolumeRequest) (resp *csi.NodePublishVolumeResponse, err error) {
@@ -141,7 +144,7 @@ func (n NodeServer) NodePublishVolume(ctx context.Context, req *csi.NodePublishV
 	}
 
 	if e := n.pullExecutor.StartPulling(po); e != nil {
-		err = status.Errorf(codes.Internal, "unable to pull image %q: %s", image, e)
+		err = status.Errorf(codes.Internal, "unable to pull image %q: %v", image, e)
 		return
 	}
 

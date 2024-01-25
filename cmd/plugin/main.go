@@ -52,8 +52,8 @@ var (
 	enableCache = flag.Bool("enable-daemon-image-credential-cache", true,
 		"Whether to save contents of imagepullsecrets of the daemon ServiceAccount in memory. "+
 			"If set to false, secrets will be fetched from the API server on every image pull.")
-	asyncImagePullMountTimeout = flag.String("pull-mount-timeout-seconds", "inherit",
-		"timeout for pulling and mounting an image (default: inherit from kubelet request)")
+	overrideTimeoutSeconds = flag.Duration("override-timeout-seconds", -1,
+		"override kubelet timeout (don't specify this flag if you want to use kubelet timeout)")
 	watcherResyncPeriod = flag.Duration("watcher-resync-period", 30*time.Minute, "The resync period of the pvc watcher.")
 	mode                = flag.String("mode", "", "The mode of the driver. Valid values are: node, controller")
 	nodePluginSA        = flag.String("node-plugin-sa", "csi-image-warm-metal", "The name of the ServiceAccount used by the node plugin.")
@@ -79,6 +79,10 @@ func main() {
 
 	if len(*mode) == 0 {
 		klog.Fatalf("The mode of the driver is required.")
+	}
+
+	if !flag.Lookup("override-timeout-seconds").Changed {
+		overrideTimeoutSeconds = nil
 	}
 
 	server := csicommon.NewNonBlockingGRPCServer()
@@ -130,7 +134,7 @@ func main() {
 		server.Start(*endpoint,
 			NewIdentityServer(driverVersion),
 			nil,
-			NewNodeServer(driver, mounter, criClient, secretStore))
+			NewNodeServer(driver, mounter, criClient, secretStore, overrideTimeoutSeconds))
 	case controllerMode:
 		watcher, err := watcher.New(context.Background(), *watcherResyncPeriod)
 		if err != nil {
