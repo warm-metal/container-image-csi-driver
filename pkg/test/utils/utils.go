@@ -6,7 +6,7 @@ import (
 	"time"
 
 	"github.com/containerd/containerd/reference/docker"
-	"github.com/warm-metal/csi-driver-image/pkg/backend"
+	"github.com/warm-metal/container-image-csi-driver/pkg/backend"
 	"google.golang.org/grpc"
 	criapi "k8s.io/cri-api/pkg/apis/runtime/v1"
 )
