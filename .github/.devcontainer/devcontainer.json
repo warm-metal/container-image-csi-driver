@@ -1,0 +1,40 @@
+// For format details, see https://containers.dev
+{
+	"name": "csi-driver-image dev container",
+	"image": "mcr.microsoft.com/devcontainers/base:ubuntu",
+
+	"otherPortsAttributes": {
+		"onAutoForward": "silent"
+	},
+
+	"features": {
+		"ghcr.io/devcontainers/features/go:1": {
+			"version": "1.19"
+		},
+		"ghcr.io/devcontainers/features/kubectl-helm-minikube:1": {
+			"version": "latest",
+			"helm": "latest",
+			"minikube": "none"
+		},
+		"ghcr.io/devcontainers/features/docker-in-docker:2": {
+			"dockerDashComposeVersion": "v2"
+		},
+		"ghcr.io/devcontainers-contrib/features/kind:1": {}
+	},
+
+	"customizations": {
+		"vscode": {
+			"settings": {
+				"terminal.integrated.defaultProfile.linux": "zsh",
+				"terminal.integrated.profiles.linux": {
+				  "zsh": {
+					"path": "zsh"
+				  }
+				}
+			},
+			"extensions": [
+				"golang.go"
+			]
+		}
+	}
+}

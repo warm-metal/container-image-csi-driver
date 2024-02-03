@@ -7,16 +7,17 @@ import (
 
 	"github.com/container-storage-interface/spec/lib/go/csi"
 	"github.com/containerd/containerd/reference/docker"
-	"github.com/warm-metal/csi-driver-image/pkg/backend"
-	"github.com/warm-metal/csi-driver-image/pkg/metrics"
-	"github.com/warm-metal/csi-driver-image/pkg/mountexecutor"
-	"github.com/warm-metal/csi-driver-image/pkg/mountstatus"
-	"github.com/warm-metal/csi-driver-image/pkg/pullexecutor"
-	"github.com/warm-metal/csi-driver-image/pkg/secret"
+	"github.com/google/uuid"
+	"github.com/warm-metal/container-image-csi-driver/pkg/backend"
+	"github.com/warm-metal/container-image-csi-driver/pkg/metrics"
+	"github.com/warm-metal/container-image-csi-driver/pkg/mountexecutor"
+	"github.com/warm-metal/container-image-csi-driver/pkg/mountstatus"
+	"github.com/warm-metal/container-image-csi-driver/pkg/pullexecutor"
+	"github.com/warm-metal/container-image-csi-driver/pkg/secret"
 	csicommon "github.com/warm-metal/csi-drivers/pkg/csi-common"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
-	cri "k8s.io/cri-api/pkg/apis/runtime/v1alpha2"
+	cri "k8s.io/cri-api/pkg/apis/runtime/v1"
 	"k8s.io/klog/v2"
 	k8smount "k8s.io/mount-utils"
 )
@@ -59,7 +60,8 @@ type NodeServer struct {
 }
 
 func (n NodeServer) NodePublishVolume(ctx context.Context, req *csi.NodePublishVolumeRequest) (resp *csi.NodePublishVolumeResponse, err error) {
-	klog.Infof("mount request: %s", req.String())
+	valuesLogger := klog.LoggerWithValues(klog.NewKlogr(), "pod-name", req.VolumeContext["pod-name"], "namespace", req.VolumeContext["namespace"], "uid", req.VolumeContext["uid"], "request-id", uuid.NewString())
+	valuesLogger.Info("Incoming NodePublishVolume request", "request string", req.String())
 	if len(req.VolumeId) == 0 {
 		err = status.Error(codes.InvalidArgument, "VolumeId is missing")
 		return
@@ -99,7 +101,7 @@ func (n NodeServer) NodePublishVolume(ctx context.Context, req *csi.NodePublishV
 			return
 		}
 
-		if err = os.MkdirAll(req.TargetPath, 0755); err != nil {
+		if err = os.MkdirAll(req.TargetPath, 0o755); err != nil {
 			err = status.Error(codes.Internal, err.Error())
 			return
 		}
@@ -134,6 +136,7 @@ func (n NodeServer) NodePublishVolume(ctx context.Context, req *csi.NodePublishV
 		PullAlways:  pullAlways,
 		Image:       image,
 		PullSecrets: req.Secrets,
+		Logger:      valuesLogger,
 	}
 
 	if e := n.pullExecutor.StartPulling(po); e != nil {
@@ -157,6 +160,7 @@ func (n NodeServer) NodePublishVolume(ctx context.Context, req *csi.NodePublishV
 		TargetPath:       req.TargetPath,
 		VolumeCapability: req.VolumeCapability,
 		ReadOnly:         req.Readonly,
+		Logger:           valuesLogger,
 	}
 
 	if e := n.mountExecutor.StartMounting(o); e != nil {

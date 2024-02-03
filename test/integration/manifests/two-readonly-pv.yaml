@@ -7,7 +7,7 @@ provisioner: csi-image.warm-metal.tech
 apiVersion: v1
 kind: PersistentVolume
 metadata:
-  name: pv-test-csi-image-test-simple-fs-1
+  name: pv-test-container-image-csi-driver-test-simple-fs-1
 spec:
   storageClassName: csi-image.warm-metal.tech
   capacity:
@@ -17,14 +17,14 @@ spec:
   persistentVolumeReclaimPolicy: Retain
   csi:
     driver: csi-image.warm-metal.tech
-    volumeHandle: "docker.io/warmmetal/csi-image-test:simple-fs"
+    volumeHandle: "docker.io/warmmetal/container-image-csi-driver-test:simple-fs"
     volumeAttributes:
       pullAlways: "true"
 ---
 apiVersion: v1
 kind: PersistentVolumeClaim
 metadata:
-  name: pvc-test-csi-image-test-simple-fs-1
+  name: pvc-test-container-image-csi-driver-test-simple-fs-1
 spec:
   storageClassName: csi-image.warm-metal.tech
   accessModes:
@@ -32,12 +32,12 @@ spec:
   resources:
     requests:
       storage: 5Gi
-  volumeName: pv-test-csi-image-test-simple-fs-1
+  volumeName: pv-test-container-image-csi-driver-test-simple-fs-1
 ---
 # apiVersion: v1
 # kind: PersistentVolume
 # metadata:
-#   name: pv-test-csi-image-test-simple-fs-2
+#   name: pv-test-container-image-csi-driver-test-simple-fs-2
 # spec:
 #   storageClassName: csi-image.warm-metal.tech
 #   capacity:
@@ -47,14 +47,14 @@ spec:
 #   persistentVolumeReclaimPolicy: Retain
 #   csi:
 #     driver: csi-image.warm-metal.tech
-#     volumeHandle: "docker.io/warmmetal/csi-image-test:simple-fs"
+#     volumeHandle: "docker.io/warmmetal/container-image-csi-driver-test:simple-fs"
 #     volumeAttributes:
 #       pullAlways: "true"
 ---
 # apiVersion: v1
 # kind: PersistentVolumeClaim
 # metadata:
-#   name: pvc-test-csi-image-test-simple-fs-2
+#   name: pvc-test-container-image-csi-driver-test-simple-fs-2
 # spec:
 #   storageClassName: csi-image.warm-metal.tech
 #   accessModes:
@@ -62,7 +62,7 @@ spec:
 #   resources:
 #     requests:
 #       storage: 5Gi
-#   volumeName: pv-test-csi-image-test-simple-fs-2
+#   volumeName: pv-test-container-image-csi-driver-test-simple-fs-2
 ---
 apiVersion: batch/v1
 kind: Job
@@ -75,7 +75,7 @@ spec:
     spec:
       containers:
         - name: two-ro-pre-provisioned-pv
-          image: docker.io/warmmetal/csi-image-test:check-fs
+          image: docker.io/warmmetal/container-image-csi-driver-test:check-fs
           env:
             - name: TARGET
               value: /target1
@@ -94,8 +94,8 @@ spec:
       volumes:
         - name: target1
           persistentVolumeClaim:
-            claimName: pvc-test-csi-image-test-simple-fs-1
+            claimName: pvc-test-container-image-csi-driver-test-simple-fs-1
         # - name: target2
         #   persistentVolumeClaim:
-        #     claimName: pvc-test-csi-image-test-simple-fs-2
+        #     claimName: pvc-test-container-image-csi-driver-test-simple-fs-2
   backoffLimit: 0

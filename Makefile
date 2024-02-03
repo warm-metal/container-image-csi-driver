@@ -1,8 +1,9 @@
-VERSION ?= v0.9.0
+VERSION ?= v1.1.0
 
 IMAGE_BUILDER ?= docker
 IMAGE_BUILD_CMD ?= buildx
 REGISTRY ?= docker.io/warmmetal
+PLATFORM ?= linux/amd64
 
 export IMG = $(REGISTRY)/csi-image:$(VERSION)
 
@@ -16,10 +17,10 @@ build:
 
 .PHONY: sanity
 sanity:
-	$(IMAGE_BUILDER) $(IMAGE_BUILD_CMD) build -t local.test/csi-driver-image-test:sanity test/sanity
+	$(IMAGE_BUILDER) $(IMAGE_BUILD_CMD) build -t local.test/container-image-csi-driver-test:sanity test/sanity
 	kubectl delete --ignore-not-found -f test/sanity/manifest.yaml
 	kubectl apply --wait -f test/sanity/manifest.yaml
-	kubectl -n cliapp-system wait --for=condition=complete job/csi-driver-image-sanity-test
+	kubectl -n cliapp-system wait --for=condition=complete job/container-image-csi-driver-sanity-test
 
 .PHONY: e2e
 e2e:
@@ -35,17 +36,18 @@ integration:
 
 .PHONY: image
 image:
-	$(IMAGE_BUILDER) $(IMAGE_BUILD_CMD) build -t $(REGISTRY)/csi-image:$(VERSION) --push .
+	$(IMAGE_BUILDER) $(IMAGE_BUILD_CMD) build --platform=$(PLATFORM) -t $(REGISTRY)/csi-image:$(VERSION) --push .
 
 .PHONY: local
 local:
-	$(IMAGE_BUILDER) $(IMAGE_BUILD_CMD) build -t $(REGISTRY)/csi-image:$(VERSION) --load .
+	$(IMAGE_BUILDER) $(IMAGE_BUILD_CMD) build --platform=$(PLATFORM) -t $(REGISTRY)/csi-image:$(VERSION) --load .
 
 .PHONY: test-deps
 test-deps:
-	$(IMAGE_BUILDER) $(IMAGE_BUILD_CMD) build --push -t $(REGISTRY)/csi-image-test:stat-fs -f csi-image-test:stat-fs.dockerfile hack/integration-test-image
-	$(IMAGE_BUILDER) $(IMAGE_BUILD_CMD) build --push -t $(REGISTRY)/csi-image-test:check-fs -f csi-image-test:check-fs.dockerfile hack/integration-test-image
-	$(IMAGE_BUILDER) $(IMAGE_BUILD_CMD) build --push -t $(REGISTRY)/csi-image-test:write-check -f csi-image-test:write-check.dockerfile hack/integration-test-image
+	$(IMAGE_BUILDER) $(IMAGE_BUILD_CMD) build --platform=$(PLATFORM) --push -t $(REGISTRY)/container-image-csi-driver-test:simple-fs -f hack/integration-test-image/container-image-csi-driver-test:simple-fs.dockerfile hack/integration-test-image
+	$(IMAGE_BUILDER) $(IMAGE_BUILD_CMD) build --platform=$(PLATFORM) --push -t $(REGISTRY)/container-image-csi-driver-test:stat-fs -f hack/integration-test-image/container-image-csi-driver-test:stat-fs.dockerfile hack/integration-test-image
+	$(IMAGE_BUILDER) $(IMAGE_BUILD_CMD) build --platform=$(PLATFORM) --push -t $(REGISTRY)/container-image-csi-driver-test:check-fs -f hack/integration-test-image/container-image-csi-driver-test:check-fs.dockerfile hack/integration-test-image
+	$(IMAGE_BUILDER) $(IMAGE_BUILD_CMD) build --platform=$(PLATFORM) --push -t $(REGISTRY)/container-image-csi-driver-test:write-check -f hack/integration-test-image/container-image-csi-driver-test:write-check.dockerfile hack/integration-test-image
 
 .PHONY: install-util
 install-util:

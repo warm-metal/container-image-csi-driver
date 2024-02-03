@@ -14,12 +14,11 @@ import (
 	"time"
 
 	"github.com/container-storage-interface/spec/lib/go/csi"
-	csipbv1 "github.com/container-storage-interface/spec/lib/go/csi"
 	"github.com/stretchr/testify/assert"
-	"github.com/warm-metal/csi-driver-image/pkg/backend"
-	"github.com/warm-metal/csi-driver-image/pkg/backend/containerd"
-	"github.com/warm-metal/csi-driver-image/pkg/cri"
-	"github.com/warm-metal/csi-driver-image/pkg/metrics"
+	"github.com/warm-metal/container-image-csi-driver/pkg/backend"
+	"github.com/warm-metal/container-image-csi-driver/pkg/backend/containerd"
+	"github.com/warm-metal/container-image-csi-driver/pkg/cri"
+	"github.com/warm-metal/container-image-csi-driver/pkg/metrics"
 	csicommon "github.com/warm-metal/csi-drivers/pkg/csi-common"
 	"google.golang.org/grpc"
 	"k8s.io/apimachinery/pkg/util/wait"
@@ -58,6 +57,10 @@ func TestNodePublishVolumeAsync(t *testing.T) {
 		VolumeContext: map[string]string{
 			// so that the test would always attempt to pull an image
 			ctxKeyPullAlways: "true",
+			// to see improved logs
+			"pod-name":  "test-pod",
+			"namespace": "test-namespace",
+			"uid":       "test-uid",
 		},
 		VolumeCapability: &csi.VolumeCapability{
 			AccessMode: &csi.VolumeCapability_AccessMode{
@@ -81,7 +84,6 @@ func TestNodePublishVolumeAsync(t *testing.T) {
 	var wg sync.WaitGroup
 	wg.Add(1)
 	go func() {
-
 		server.Start(*endpoint,
 			nil,
 			nil,
@@ -116,7 +118,7 @@ func TestNodePublishVolumeAsync(t *testing.T) {
 	assert.NoError(t, err)
 	assert.NotNil(t, conn)
 
-	nodeClient := csipbv1.NewNodeClient(conn)
+	nodeClient := csi.NewNodeClient(conn)
 	assert.NotNil(t, nodeClient)
 
 	condFn := func() (done bool, err error) {
@@ -181,6 +183,10 @@ func TestNodePublishVolumeSync(t *testing.T) {
 		VolumeContext: map[string]string{
 			// so that the test would always attempt to pull an image
 			ctxKeyPullAlways: "true",
+			// to see improved logs
+			"pod-name":  "test-pod",
+			"namespace": "test-namespace",
+			"uid":       "test-uid",
 		},
 		VolumeCapability: &csi.VolumeCapability{
 			AccessMode: &csi.VolumeCapability_AccessMode{
@@ -204,7 +210,6 @@ func TestNodePublishVolumeSync(t *testing.T) {
 	var wg sync.WaitGroup
 	wg.Add(1)
 	go func() {
-
 		server.Start(*endpoint,
 			nil,
 			nil,
@@ -239,7 +244,7 @@ func TestNodePublishVolumeSync(t *testing.T) {
 	assert.NoError(t, err)
 	assert.NotNil(t, conn)
 
-	nodeClient := csipbv1.NewNodeClient(conn)
+	nodeClient := csi.NewNodeClient(conn)
 	assert.NotNil(t, nodeClient)
 
 	condFn := func() (done bool, err error) {
@@ -350,7 +355,7 @@ func TestMetrics(t *testing.T) {
 	assert.NoError(t, err)
 	assert.NotNil(t, conn)
 
-	nodeClient := csipbv1.NewNodeClient(conn)
+	nodeClient := csi.NewNodeClient(conn)
 	assert.NotNil(t, nodeClient)
 
 	ctx, cancel := context.WithTimeout(context.Background(), 3*timeout)
@@ -364,6 +369,10 @@ func TestMetrics(t *testing.T) {
 		VolumeContext: map[string]string{
 			// so that the test would always attempt to pull an image
 			ctxKeyPullAlways: "true",
+			// to see improved logs
+			"pod-name":  "test-pod",
+			"namespace": "test-namespace",
+			"uid":       "test-uid",
 		},
 		VolumeCapability: &csi.VolumeCapability{
 			AccessMode: &csi.VolumeCapability_AccessMode{
@@ -384,6 +393,10 @@ func TestMetrics(t *testing.T) {
 		VolumeContext: map[string]string{
 			// so that the test would always attempt to pull an image
 			ctxKeyPullAlways: "true",
+			// to see improved logs
+			"pod-name":  "test-pod",
+			"namespace": "test-namespace",
+			"uid":       "test-uid",
 		},
 		VolumeCapability: &csi.VolumeCapability{
 			AccessMode: &csi.VolumeCapability_AccessMode{
@@ -435,8 +448,7 @@ func TestMetrics(t *testing.T) {
 	assert.NoError(t, err)
 }
 
-type testSecretStore struct {
-}
+type testSecretStore struct{}
 
 func (t *testSecretStore) GetDockerKeyring(ctx context.Context, secrets map[string]string) (credentialprovider.DockerKeyring, error) {
 	return credentialprovider.UnionDockerKeyring{credentialprovider.NewDockerKeyring()}, nil

@@ -13,7 +13,7 @@ import (
 	"github.com/containerd/containerd/reference/docker"
 	"github.com/containerd/containerd/snapshots"
 	"github.com/opencontainers/image-spec/identity"
-	"github.com/warm-metal/csi-driver-image/pkg/backend"
+	"github.com/warm-metal/container-image-csi-driver/pkg/backend"
 	"k8s.io/klog/v2"
 )
 

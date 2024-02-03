@@ -8,13 +8,13 @@ import (
 
 	"github.com/containerd/containerd/reference/docker"
 	"github.com/pkg/errors"
-	"github.com/warm-metal/csi-driver-image/pkg/backend"
-	"github.com/warm-metal/csi-driver-image/pkg/metrics"
-	"github.com/warm-metal/csi-driver-image/pkg/pullstatus"
-	"github.com/warm-metal/csi-driver-image/pkg/remoteimage"
-	"github.com/warm-metal/csi-driver-image/pkg/secret"
+	"github.com/warm-metal/container-image-csi-driver/pkg/backend"
+	"github.com/warm-metal/container-image-csi-driver/pkg/metrics"
+	"github.com/warm-metal/container-image-csi-driver/pkg/pullstatus"
+	"github.com/warm-metal/container-image-csi-driver/pkg/remoteimage"
+	"github.com/warm-metal/container-image-csi-driver/pkg/secret"
 	"k8s.io/apimachinery/pkg/util/wait"
-	cri "k8s.io/cri-api/pkg/apis/runtime/v1alpha2"
+	cri "k8s.io/cri-api/pkg/apis/runtime/v1"
 	"k8s.io/klog/v2"
 )
 
@@ -40,6 +40,7 @@ type PullOptions struct {
 	PullAlways  bool
 	PullSecrets map[string]string
 	Image       string
+	Logger      klog.Logger
 }
 
 // PullExecutor executes the pulls
@@ -66,7 +67,6 @@ func NewPullExecutor(o *PullExecutorOptions) *PullExecutor {
 
 // StartPulling starts pulling the image
 func (m *PullExecutor) StartPulling(o *PullOptions) error {
-
 	keyring, err := m.secretStore.GetDockerKeyring(o.Context, o.PullSecrets)
 	if err != nil {
 		return errors.Errorf("unable to fetch keyring: %s", err)
@@ -76,15 +76,19 @@ func (m *PullExecutor) StartPulling(o *PullOptions) error {
 		puller := remoteimage.NewPuller(m.imageSvcClient, o.NamedRef, keyring)
 		shouldPull := o.PullAlways || !m.mounter.ImageExists(o.Context, o.NamedRef)
 		if shouldPull {
-			klog.Infof("pull image %q ", o.Image)
+			o.Logger.Info("Pulling image", "image", o.Image)
 			pullstatus.Update(o.NamedRef, pullstatus.StillPulling)
 			startTime := time.Now()
 			if err = puller.Pull(o.Context); err != nil {
 				pullstatus.Update(o.NamedRef, pullstatus.Errored)
 				metrics.OperationErrorsCount.WithLabelValues("StartPulling").Inc()
+				o.Logger.Error(err, "Unable to pull image", "image", o.NamedRef)
 				return errors.Errorf("unable to pull image %q: %s", o.NamedRef, err)
 			}
-			metrics.ImagePullTime.WithLabelValues(metrics.Sync).Observe(time.Since(startTime).Seconds())
+			elapsed := time.Since(startTime)
+			metrics.ImagePullTime.WithLabelValues(metrics.Sync).Observe(elapsed.Seconds())
+			size := puller.ImageSize(o.Context)
+			o.Logger.Info("Finished pulling image", "image", o.Image, "pull-duration", elapsed, "image-size", fmt.Sprintf("%.2f MiB", float64(size)/(1024.0*1024.0)))
 		}
 		pullstatus.Update(o.NamedRef, pullstatus.Pulled)
 		return nil
@@ -102,24 +106,30 @@ func (m *PullExecutor) StartPulling(o *PullOptions) error {
 			c, cancel := context.WithTimeout(context.Background(), pullCtxTimeout)
 			defer cancel()
 
-			if pullstatus.Get(o.NamedRef) == pullstatus.StillPulling {
+			if pullstatus.Get(o.NamedRef) == pullstatus.StillPulling ||
+				pullstatus.Get(o.NamedRef) == pullstatus.Pulled {
 				return
 			}
 
 			puller := remoteimage.NewPuller(m.imageSvcClient, o.NamedRef, keyring)
 			shouldPull := o.PullAlways || !m.mounter.ImageExists(o.Context, o.NamedRef)
 			if shouldPull {
-				klog.Infof("pull image %q ", o.Image)
+				o.Logger.Info("Pulling image asynchronously", "image", o.Image)
 				pullstatus.Update(o.NamedRef, pullstatus.StillPulling)
 				startTime := time.Now()
 
 				if err = puller.Pull(c); err != nil {
 					pullstatus.Update(o.NamedRef, pullstatus.Errored)
 					metrics.OperationErrorsCount.WithLabelValues("StartPulling").Inc()
+					o.Logger.Error(err, "Unable to pull image", "image", o.Image)
 					m.asyncErrs[o.NamedRef] = fmt.Errorf("unable to pull image %q: %s", o.Image, err)
 					return
 				}
-				metrics.ImagePullTime.WithLabelValues(metrics.Async).Observe(time.Since(startTime).Seconds())
+				elapsed := time.Since(startTime)
+				metrics.ImagePullTime.WithLabelValues(metrics.Async).Observe(elapsed.Seconds())
+				size := puller.ImageSize(o.Context)
+				o.Logger.Info("Finished pulling image", "image", o.Image, "pull-duration", elapsed, "image-size", fmt.Sprintf("%.2f MiB", float64(size)/(1024.0*1024.0)))
+
 			}
 			pullstatus.Update(o.NamedRef, pullstatus.Pulled)
 		}

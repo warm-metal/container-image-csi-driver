@@ -278,7 +278,7 @@ spec:
       labels:
         app: csi-image-warm-metal
     spec:
-      hostNetwork: true
+      hostNetwork: false
       serviceAccountName: csi-image-warm-metal
       containers:
         - name: node-driver-registrar

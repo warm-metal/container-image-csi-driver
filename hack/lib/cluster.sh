@@ -4,7 +4,7 @@ source $(dirname "${BASH_SOURCE[0]}")/utils.sh
 
 function lib::start_cluster_containerd() {
   local version=${1:-stable}
-  minikube start -p csi-image-test \
+  minikube start -p container-image-csi-driver-test \
     --kubernetes-version=${version} \
     --container-runtime=containerd \
     --insecure-registry=localhost:31000
@@ -12,7 +12,7 @@ function lib::start_cluster_containerd() {
 
 function lib::start_cluster_crio() {
   local version=${1:-stable}
-  minikube start -p csi-image-test \
+  minikube start -p container-image-csi-driver-test \
     --kubernetes-version=${version} \
     --container-runtime=cri-o \
     --insecure-registry=localhost:31000
@@ -20,7 +20,7 @@ function lib::start_cluster_crio() {
 
 function lib::start_cluster_docker() {
   local version=${1:-stable}
-  minikube start -p csi-image-test \
+  minikube start -p container-image-csi-driver-test \
     --kubernetes-version=${version} \
     --container-runtime=docker \
     --insecure-registry=localhost:31000
@@ -101,7 +101,7 @@ function lib::install_private_registry() {
   if [ "$(docker inspect -f='{{json .NetworkSettings.Networks.kind}}' 'private-registry')" = 'null' ]; then
     docker network connect "kind" "private-registry"
   fi
-  
+
   cat <<EOF | kubectl apply -f -
 apiVersion: v1
 kind: ConfigMap
