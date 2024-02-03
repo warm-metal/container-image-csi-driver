@@ -31,13 +31,6 @@ spec:
                   fieldPath: spec.nodeName
           image: "{{ .Values.csiNodeDriverRegistrar.image.repository }}:{{ .Values.csiNodeDriverRegistrar.image.tag }}"
           imagePullPolicy: {{ .Values.csiNodeDriverRegistrar.image.pullPolicy }}
-          lifecycle:
-            preStop:
-              exec:
-                command:
-                  - /bin/sh
-                  - -c
-                  - rm -rf /registration/csi-image.warm-metal.tech /registration/csi-image.warm-metal.tech-reg.sock
           {{- with .Values.csiNodeDriverRegistrar.resources }}
           resources:
           {{- toYaml . | nindent 12 }}
