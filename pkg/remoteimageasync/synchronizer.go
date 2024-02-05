@@ -61,7 +61,7 @@ func (s synchronizer) StartPull(image string, puller remoteimage.Puller, asyncPu
 			err:        nil,
 		}
 		select {
-		case s.sessions <- ses: // start session, check for deadlock
+		case s.sessions <- ses: // start session, check for deadlock... possibility of panic but only during app shutdown where Puller has already ceased to operate
 			fmt.Printf("start pull: new session created for %s with timeout %v\n", ses.image, ses.timeout)
 		default: // catch deadlock or throttling (they will look the same)
 			ses.err = fmt.Errorf("start pull: cannot pull %s at this time, throttling or deadlock condition exists, retry if throttling", ses.image)
@@ -96,9 +96,11 @@ func (s synchronizer) RunCompletionsChecker() {
 	go func() {
 		shutdown := func() {
 			s.mutex.Lock()
-			for image := range s.sessionMap {
-				delete(s.sessionMap, image) // no-op if already deleted due to race
+			for image := range s.sessionMap { // purge open sessions, continuation no longer allowed
+				delete(s.sessionMap, image) // no-op if already deleted
 			}
+			close(s.sessions) // the writer is supposed to close channels
+			// no need to process any future completed events
 			s.mutex.Unlock()
 		}
 		defer shutdown()
@@ -106,15 +108,13 @@ func (s synchronizer) RunCompletionsChecker() {
 		for {
 			select {
 			case <-s.ctx.Done(): // shut down loop
-				close(s.sessions) // the writer is supposed to close channels
-				// no need to process any future completed events, will panic if we close session channel again anyway
 				return // deferred shutdown will do the work
 			case image, ok := <-s.completedEvents: // remove session (no longer active)
 				if ok {
 					s.mutex.Lock()
-					delete(s.sessionMap, image) // no-op if already deleted due to race
+					delete(s.sessionMap, image) // no-op if already deleted
 					s.mutex.Unlock()
-				} else {
+				} else { // channel closed, no further sessions can be created
 					return // deferred shutdown will do the work
 				}
 			}
