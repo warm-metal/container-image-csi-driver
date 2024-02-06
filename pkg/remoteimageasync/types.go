@@ -8,6 +8,8 @@ import (
 	"github.com/warm-metal/container-image-csi-driver/pkg/remoteimage"
 )
 
+const prefix = "remoteimageasync"
+
 type PullSession struct {
 	image      string
 	puller     remoteimage.Puller

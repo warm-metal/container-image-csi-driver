@@ -4,6 +4,8 @@ import (
 	"context"
 	"fmt"
 	"time"
+
+	"k8s.io/klog/v2"
 )
 
 func RunPullerLoop(
@@ -22,8 +24,8 @@ func RunPullerLoop(
 					return
 				}
 				go func() {
-					fmt.Printf("puller: asked to pull image %s with timeout %v\n",
-						ses.image, ses.timeout)
+					klog.V(2).Infof("%s.RunPullerLoop(): asked to pull image %s with timeout %v\n",
+						prefix, ses.image, ses.timeout)
 					ctxCombined, cancelDontCare := context.WithTimeout(ctx, ses.timeout) // combine timeout and shut down signal into one
 					defer cancelDontCare()                                               // IF we exit, this no longer matters. calling to satisfy linter.
 					//NOTE: the logic for "mustPull" is not needed so long as we are not throttling.
@@ -31,7 +33,7 @@ func RunPullerLoop(
 					// mustPull := !cri.hasImage(ses.image)
 					pullStart := time.Now()
 					// if mustPull {
-					// 	fmt.Printf("puller: image not found, pulling %s\n", ses.image)
+					// 	klog.V(2).Infof("%s.RunPullerLoop(): image not found, pulling %s\n", prefix, ses.image)
 					// 	cri.pullImage(ses.image, ctx2)
 					// }
 					pullErr := ses.puller.Pull(ctxCombined) //NOTE: relying existing tests or history to veirfy behavior, asyncPull just wraps it
@@ -40,21 +42,21 @@ func RunPullerLoop(
 					case <-ctx.Done(): // shutting down
 						ses.isComplete = false
 						ses.isTimedOut = false
-						ses.err = fmt.Errorf("puller: shutting down")
-						fmt.Println(ses.err.Error())
+						ses.err = fmt.Errorf("%s.RunPullerLoop(): shutting down", prefix)
+						klog.V(2).Infof(ses.err.Error())
 					case <-ctxCombined.Done():
 						ses.isComplete = false
 						ses.isTimedOut = true
-						ses.err = fmt.Errorf("puller: async pull exceeded timeout of %v for image %s", ses.timeout, ses.image)
-						fmt.Println(ses.err.Error())
+						ses.err = fmt.Errorf("%s.RunPullerLoop(): async pull exceeded timeout of %v for image %s", prefix, ses.timeout, ses.image)
+						klog.V(2).Infof(ses.err.Error())
 					default:
 						ses.isComplete = true
 						ses.isTimedOut = false
 						ses.err = pullErr
 						// if mustPull {
-						fmt.Printf("puller: pull completed in %v for image %s\n", time.Since(pullStart), ses.image)
+						klog.V(2).Infof("%s.RunPullerLoop(): pull completed in %v for image %s\n", prefix, time.Since(pullStart), ses.image)
 						// } else {
-						// 	fmt.Printf("puller: image already present for %s\n", ses.image)
+						// 	klog.V(2).Infof("%s.RunPullerLoop(): image already present for %s\n", prefix, ses.image)
 						// }
 					}
 					close(ses.done) // signal done

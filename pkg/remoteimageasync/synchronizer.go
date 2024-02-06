@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/warm-metal/container-image-csi-driver/pkg/remoteimage"
+	"k8s.io/klog/v2"
 )
 
 // sessionChanDepth : 100 - must give lots of buffer to ensure no deadlock or dropped requests
@@ -31,10 +32,10 @@ func getSynchronizer(
 	completedChan chan string,
 ) synchronizer {
 	if cap(sessionChan) < 50 {
-		panic("session channel must have capacity to buffer events, minimum of 50 is required")
+		klog.Fatalf("%s.getSynchronizer(): session channel must have capacity to buffer events, minimum of 50 is required", prefix)
 	}
 	if cap(completedChan) < 5 {
-		panic("completion channel must have capacity to buffer events, minimum of 5 is required")
+		klog.Fatalf("%s.getSynchronizer(): completion channel must have capacity to buffer events, minimum of 5 is required", prefix)
 	}
 	return synchronizer{
 		sessionMap:      make(map[string]PullSession),
@@ -46,7 +47,7 @@ func getSynchronizer(
 }
 
 func (s synchronizer) StartPull(image string, puller remoteimage.Puller, asyncPullTimeout time.Duration) (PullSession, error) {
-	fmt.Printf("start pull: asked to pull image %s\n", image)
+	klog.V(2).Infof("%s.StartPull(): start pull: asked to pull image %s", prefix, image)
 	s.mutex.Lock() // lock mutex
 	defer s.mutex.Unlock()
 	ses, ok := s.sessionMap[image] // try get session
@@ -62,39 +63,46 @@ func (s synchronizer) StartPull(image string, puller remoteimage.Puller, asyncPu
 		}
 		select {
 		case s.sessions <- ses: // start session, check for deadlock... possibility of panic but only during app shutdown where Puller has already ceased to operate
-			fmt.Printf("start pull: new session created for %s with timeout %v\n", ses.image, ses.timeout)
+			klog.V(2).Infof("%s.StartPull(): new session created for %s with timeout %v", prefix, ses.image, ses.timeout)
 		default: // catch deadlock or throttling (they will look the same)
-			ses.err = fmt.Errorf("start pull: cannot pull %s at this time, throttling or deadlock condition exists, retry if throttling", ses.image)
+			ses.err = fmt.Errorf("%s.StartPull(): cannot pull %s at this time, throttling or deadlock condition exists, retry if throttling", prefix, ses.image)
+			klog.V(2).Info(ses.err.Error())
 			ses.done <- true
 			return ses, ses.err
 		}
 		s.sessionMap[image] = ses // add session to map
 	} else {
-		fmt.Printf("start pull: found open session for %s\n", ses.image)
+		klog.V(2).Infof("%s.StartPull(): found open session for %s", prefix, ses.image)
 	}
 	// return session and unlock
 	return ses, nil
 }
 
 func (s synchronizer) WaitForPull(session PullSession, callerTimeout context.Context) error {
-	fmt.Printf("wait for pull: starting to wait for image %s\n", session.image)
-	defer fmt.Printf("wait for pull: exiting wait for image %s\n", session.image)
+	klog.V(2).Infof("%s.WaitForPull(): starting to wait for image %s", prefix, session.image)
+	defer klog.V(2).Infof("%s.WaitForPull(): exiting wait for image %s", prefix, session.image)
 	select {
 	case <-session.done: // success or error (including session timeout)
-		fmt.Printf("wait for pull: pull completed for %s, isError: %t\n",
-			session.image, session.err != nil)
+		klog.V(2).Infof("%s.WaitForPull(): pull completed for %s, isError: %t, error: %v",
+			prefix, session.image, session.err != nil, session.err)
 		return session.err
 	case <-callerTimeout.Done():
-		return fmt.Errorf("wait for pull: this wait for image %s has timed out due to caller context cancellation, pull likely continues in the background",
-			session.image)
+		err := fmt.Errorf("%s.WaitForPull(): this wait for image %s has timed out due to caller context cancellation, pull likely continues in the background",
+			prefix, session.image)
+		klog.V(2).Info(err.Error())
+		return err
 	case <-s.ctx.Done(): //TODO: might wait for puller to do this instead
-		return fmt.Errorf("wait for pull: synchronizer is shutting down") // must return error since not success
+		err := fmt.Errorf("%s.WaitForPull(): synchronizer is shutting down", prefix) // must return error since not success
+		klog.V(2).Infof(err.Error())
+		return err
 	}
 }
 
 func (s synchronizer) RunCompletionsChecker() {
 	go func() {
+		klog.V(2).Infof("%s.RunCompletionsChecker(): starting", prefix)
 		shutdown := func() {
+			klog.V(2).Infof("%s.RunCompletionsChecker(): shutting down", prefix)
 			s.mutex.Lock()
 			for image := range s.sessionMap { // purge open sessions, continuation no longer allowed
 				delete(s.sessionMap, image) // no-op if already deleted
