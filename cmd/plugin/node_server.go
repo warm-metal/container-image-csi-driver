@@ -56,9 +56,8 @@ type NodeServer struct {
 }
 
 func (n NodeServer) NodePublishVolume(ctx context.Context, req *csi.NodePublishVolumeRequest) (resp *csi.NodePublishVolumeResponse, err error) {
-	// valuesLogger := klog.LoggerWithValues(klog.NewKlogr(), "pod-name", req.VolumeContext["pod-name"], "namespace", req.VolumeContext["namespace"], "uid", req.VolumeContext["uid"], "request-id", uuid.NewString())
-	// valuesLogger.Info("Incoming NodePublishVolume request", "request string", req.String())
-	klog.Infof("mount request: %s", req.String()) //TODO: review the commented logging above
+	valuesLogger := klog.LoggerWithValues(klog.NewKlogr(), "pod-name", req.VolumeContext["pod-name"], "namespace", req.VolumeContext["namespace"], "uid", req.VolumeContext["uid"])
+	valuesLogger.Info("Incoming NodePublishVolume request", "request string", req.String())
 	if len(req.VolumeId) == 0 {
 		err = status.Error(codes.InvalidArgument, "VolumeId is missing")
 		return
