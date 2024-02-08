@@ -1,4 +1,4 @@
-👋 Welcome to your development environment for CSI Driver Image!
+👋 Welcome to your development environment for Container Image CSI Driver!
 
 This debian dev container image contains all tools needed for development.
 
