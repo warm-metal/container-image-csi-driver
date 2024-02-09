@@ -13,6 +13,7 @@ import (
 // sessionChanDepth : 100 - must give lots of buffer to ensure no deadlock or dropped requests
 // completedChanDepth : 20 - must give some buffer to ensure no deadlock
 func StartAsyncPuller(ctx context.Context, sessionChanDepth, completedChanDepth int) AsyncPuller {
+	klog.Infof("%s.StartAsyncPuller(): starting async puller", prefix)
 	sessionChan := make(chan PullSession, sessionChanDepth)
 	completedChan := make(chan string, completedChanDepth)
 	async := getSynchronizer(
@@ -22,6 +23,7 @@ func StartAsyncPuller(ctx context.Context, sessionChanDepth, completedChanDepth 
 	)
 	async.RunCompletionsChecker()
 	RunPullerLoop(ctx, sessionChan, completedChan)
+	klog.Infof("%s.StartAsyncPuller(): async puller is operational", prefix)
 	return async
 }
 
