@@ -168,7 +168,7 @@ func TestNodePublishVolumeSync(t *testing.T) {
 	driver := csicommon.NewCSIDriver(driverName, driverVersion, "fake-node")
 	assert.NotNil(t, driver)
 
-	asyncImagePulls := 15 * time.Minute //TODO: determine intended value for this in the context of this test
+	asyncImagePulls := 0 * time.Minute //TODO: determine intended value for this in the context of this test
 	ns := NewNodeServer(driver, mounter, criClient, &testSecretStore{}, asyncImagePulls)
 
 	// based on kubelet's csi mounter plugin code
