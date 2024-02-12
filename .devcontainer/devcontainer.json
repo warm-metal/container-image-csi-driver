@@ -1,11 +1,11 @@
 // For format details, see https://containers.dev
 {
-	"name": "csi-driver-image dev container",
-	"image": "ghcr.io/warm-metal/csi-driver-image/devcontainer:latest",
+	"name": "container-image-csi-driver dev container",
+	"image": "ghcr.io/warm-metal/container-image-csi-driver/devcontainer:latest",
 
 	// Setup the go environment and mount into the dev container at the expected location
-	"workspaceFolder": "/go/src/github.com/warm-metal/csi-driver-image",
-	"workspaceMount": "source=${localWorkspaceFolder},target=/go/src/github.com/warm-metal/csi-driver-image,type=bind,consistency=cached",
+	"workspaceFolder": "/go/src/github.com/warm-metal/container-image-csi-driver",
+	"workspaceMount": "source=${localWorkspaceFolder},target=/go/src/github.com/warm-metal/container-image-csi-driver,type=bind,consistency=cached",
 
 	// Copy over welcome message
 	"postCreateCommand": "sudo cp .devcontainer/welcome.txt /usr/local/etc/vscode-dev-containers/first-run-notice.txt"
