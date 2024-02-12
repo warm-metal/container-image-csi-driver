@@ -7,6 +7,13 @@ make local-kind-flush
 make local-kind-load
 make local-kind-install
 sleep 1
+echo "recreating container image pod to ensure image is current"
+k patch ds -n kube-system container-image-csi-driver-warm-metal-csi-driver-nodeplugin --type=json --patch '[{"op":"add","path":"/spec/template/spec/containers/2/args/6","value":"--async-pull-timeout=10m"}]'
+k patch ds -n kube-system container-image-csi-driver-warm-metal-csi-driver-nodeplugin --type=json --patch '[{"op":"replace","path":"/spec/template/spec/containers/2/args/4","value":"--v=7"}]'
+PODNAME=$(k get po -n kube-system -l=component=nodeplugin --no-headers | cut -f 1 -d " ")
+k delete po -n kube-system ${PODNAME}
+sleep 3
+echo "tailing logs of plugin pod"
 PODNAME=$(k get po -n kube-system -l=component=nodeplugin --no-headers | cut -f 1 -d " ")
 CONTAINERLOG='/tmp/container-image-csi-plugin.log'
 echo "" > ${CONTAINERLOG}

@@ -57,7 +57,7 @@ local-kind-install:
 # removes all images which were directly pushed to kind registry
 .PHONY: local-kind-flush
 local-kind-flush:
-	docker exec -e CONTAINERD_NAMESPACE=k8s.io kind-control-plane bash -c "crictl images -o json | jq '.images[] | select(.repoTags == []) | .id' -r > '/tmp/TMPFILE';cat /tmp/TMPFILE | awk '{print \"crictl rmi \" \$$1}' | sh;systemctl restart containerd"
+	docker exec -e CONTAINERD_NAMESPACE=k8s.io kind-control-plane bash -c "crictl images -o json | jq '.images[] | select((.repoTags == []) or (.repoTags[] | contains(\"docker.io/warmmetal/container-image-csi-driver-test:simple-fs\"))) | .id' -r > '/tmp/TMPFILE';cat /tmp/TMPFILE | awk '{print \"crictl rmi \" \$$1}' | sh;systemctl restart containerd"
 
 .PHONY: test-deps
 test-deps:

@@ -169,6 +169,8 @@ func (n NodeServer) NodePublishVolume(ctx context.Context, req *csi.NodePublishV
 		return
 	}
 
+	valuesLogger.Info("Successfully completed NodePublishVolume request", "request string", req.String())
+
 	return &csi.NodePublishVolumeResponse{}, nil
 }
 
