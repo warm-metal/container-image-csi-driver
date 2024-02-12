@@ -1,9 +1,10 @@
-VERSION ?= v1.1.0
+VERSION ?= async-pull-jk
 
 IMAGE_BUILDER ?= docker
 IMAGE_BUILD_CMD ?= buildx
 REGISTRY ?= docker.io/warmmetal
 PLATFORM ?= linux/amd64
+KIND ?= kind
 
 export IMG = $(REGISTRY)/csi-image:$(VERSION)
 
@@ -36,11 +37,27 @@ integration:
 
 .PHONY: image
 image:
-	$(IMAGE_BUILDER) $(IMAGE_BUILD_CMD) build --platform=$(PLATFORM) -t $(REGISTRY)/csi-image:$(VERSION) --push .
+	$(IMAGE_BUILDER) $(IMAGE_BUILD_CMD) build --platform=$(PLATFORM) -t $(REGISTRY)/csi-image:$(VERSION) .
 
 .PHONY: local
 local:
 	$(IMAGE_BUILDER) $(IMAGE_BUILD_CMD) build --platform=$(PLATFORM) -t $(REGISTRY)/csi-image:$(VERSION) --load .
+
+# builds and loads csi-image into kind registry
+.PHONY: local-kind-load
+local-kind-load:
+	$(IMAGE_BUILDER) $(IMAGE_BUILD_CMD) build --platform=$(PLATFORM) -t $(REGISTRY)/csi-image:$(VERSION) .
+	kind load docker-image $(REGISTRY)/csi-image:$(VERSION) --name $(KIND)
+
+# installs/upgrades csi-driver into kind via helm
+.PHONY: local-kind-install
+local-kind-install:
+	helm upgrade --install container-image-csi-driver charts/warm-metal-csi-driver -n kube-system -f charts/warm-metal-csi-driver/values.yaml --set csiPlugin.image.tag=$(VERSION) --wait --debug
+
+# removes all images which were directly pushed to kind registry
+.PHONY: local-kind-flush
+local-kind-flush:
+	docker exec -e CONTAINERD_NAMESPACE=k8s.io kind-control-plane bash -c "crictl images -o json | jq '.images[] | select(.repoTags == []) | .id' -r > '/tmp/TMPFILE';cat /tmp/TMPFILE | awk '{print \"crictl rmi \" \$$1}' | sh;systemctl restart containerd"
 
 .PHONY: test-deps
 test-deps:
@@ -52,5 +69,11 @@ test-deps:
 .PHONY: install-util
 install-util:
 	GOOS=linux CGO_ENABLED="0" go build \
+	  -ldflags "-X main.Version=$(VERSION) -X main.Registry=$(REGISTRY)" \
+	  -o _output/warm-metal-csi-image-install ./cmd/install
+
+.PHONY: install-util-osx
+install-util-osx:
+	GOOS=darwin CGO_ENABLED="0" go build \
 	  -ldflags "-X main.Version=$(VERSION) -X main.Registry=$(REGISTRY)" \
 	  -o _output/warm-metal-csi-image-install ./cmd/install

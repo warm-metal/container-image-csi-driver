@@ -1,0 +1,159 @@
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: ephemeral-volume-1
+spec:
+  template:
+    metadata:
+      name: ephemeral-volume-1
+    spec:
+      containers:
+        - name: ephemeral-volume
+          image: docker.io/warmmetal/container-image-csi-driver-test:check-fs
+          env:
+            - name: TARGET
+              value: /target
+          volumeMounts:
+            - mountPath: /target
+              name: target
+      restartPolicy: Never
+      volumes:
+        - name: target
+          csi:
+            driver: csi-image.warm-metal.tech
+            volumeAttributes:
+              image: "docker.io/warmmetal/container-image-csi-driver-test:simple-fs"
+              # # set pullAlways if you want to ignore local images
+              pullAlways: "false"
+              # # set secret if the image is private
+              # secret: "name of the ImagePullSecret"
+              # secretNamespace: "namespace of the secret"
+  backoffLimit: 0
+---
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: ephemeral-volume-2
+spec:
+  template:
+    metadata:
+      name: ephemeral-volume-2
+    spec:
+      containers:
+        - name: ephemeral-volume
+          image: docker.io/warmmetal/container-image-csi-driver-test:check-fs
+          env:
+            - name: TARGET
+              value: /target
+          volumeMounts:
+            - mountPath: /target
+              name: target
+      restartPolicy: Never
+      volumes:
+        - name: target
+          csi:
+            driver: csi-image.warm-metal.tech
+            volumeAttributes:
+              image: "docker.io/warmmetal/container-image-csi-driver-test:simple-fs"
+              # # set pullAlways if you want to ignore local images
+              pullAlways: "false"
+              # # set secret if the image is private
+              # secret: "name of the ImagePullSecret"
+              # secretNamespace: "namespace of the secret"
+  backoffLimit: 0
+---
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: ephemeral-volume-3
+spec:
+  template:
+    metadata:
+      name: ephemeral-volume-3
+    spec:
+      containers:
+        - name: ephemeral-volume
+          image: docker.io/warmmetal/container-image-csi-driver-test:check-fs
+          env:
+            - name: TARGET
+              value: /target
+          volumeMounts:
+            - mountPath: /target
+              name: target
+      restartPolicy: Never
+      volumes:
+        - name: target
+          csi:
+            driver: csi-image.warm-metal.tech
+            volumeAttributes:
+              image: "docker.io/warmmetal/container-image-csi-driver-test:simple-fs"
+              # # set pullAlways if you want to ignore local images
+              pullAlways: "false"
+              # # set secret if the image is private
+              # secret: "name of the ImagePullSecret"
+              # secretNamespace: "namespace of the secret"
+  backoffLimit: 0
+---
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: ephemeral-volume-4
+spec:
+  template:
+    metadata:
+      name: ephemeral-volume-4
+    spec:
+      containers:
+        - name: ephemeral-volume
+          image: docker.io/warmmetal/container-image-csi-driver-test:check-fs
+          env:
+            - name: TARGET
+              value: /target
+          volumeMounts:
+            - mountPath: /target
+              name: target
+      restartPolicy: Never
+      volumes:
+        - name: target
+          csi:
+            driver: csi-image.warm-metal.tech
+            volumeAttributes:
+              image: "docker.io/warmmetal/container-image-csi-driver-test:simple-fs"
+              # # set pullAlways if you want to ignore local images
+              pullAlways: "false"
+              # # set secret if the image is private
+              # secret: "name of the ImagePullSecret"
+              # secretNamespace: "namespace of the secret"
+  backoffLimit: 0
+---
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: ephemeral-volume-5
+spec:
+  template:
+    metadata:
+      name: ephemeral-volume-5
+    spec:
+      containers:
+        - name: ephemeral-volume
+          image: docker.io/warmmetal/container-image-csi-driver-test:check-fs
+          env:
+            - name: TARGET
+              value: /target
+          volumeMounts:
+            - mountPath: /target
+              name: target
+      restartPolicy: Never
+      volumes:
+        - name: target
+          csi:
+            driver: csi-image.warm-metal.tech
+            volumeAttributes:
+              image: "docker.io/warmmetal/container-image-csi-driver-test:simple-fs"
+              # # set pullAlways if you want to ignore local images
+              pullAlways: "false"
+              # # set secret if the image is private
+              # secret: "name of the ImagePullSecret"
+              # secretNamespace: "namespace of the secret"
+  backoffLimit: 0
