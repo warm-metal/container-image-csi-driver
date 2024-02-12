@@ -34,6 +34,7 @@ func NewNodeServer(driver *csicommon.CSIDriver, mounter *backend.SnapshotMounter
 	ns := NodeServer{
 		DefaultNodeServer:     csicommon.NewDefaultNodeServer(driver),
 		mounter:               mounter,
+		imageSvc:              imageSvc,
 		secretStore:           secretStore,
 		asyncImagePullTimeout: asyncImagePullTimeout,
 		asyncImagePuller:      nil,
