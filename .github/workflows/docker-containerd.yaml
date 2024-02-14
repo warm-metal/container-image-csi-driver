@@ -5,7 +5,7 @@ jobs:
   integration:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@v4
       - uses: opsgang/ga-setup-minikube@v0.1.2
         with:
           minikube-version: '1.20.0'

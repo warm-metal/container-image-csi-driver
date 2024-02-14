@@ -5,19 +5,19 @@ import (
 	goflag "flag"
 	"fmt"
 	"net/url"
+	"time"
 
 	"github.com/container-storage-interface/spec/lib/go/csi"
 	flag "github.com/spf13/pflag"
-	"github.com/warm-metal/csi-driver-image/pkg/backend"
-	"github.com/warm-metal/csi-driver-image/pkg/backend/containerd"
-	"github.com/warm-metal/csi-driver-image/pkg/backend/crio"
-	"github.com/warm-metal/csi-driver-image/pkg/cri"
-	"github.com/warm-metal/csi-driver-image/pkg/secret"
-	"github.com/warm-metal/csi-driver-image/pkg/watcher"
+	"github.com/warm-metal/container-image-csi-driver/pkg/backend"
+	"github.com/warm-metal/container-image-csi-driver/pkg/backend/containerd"
+	"github.com/warm-metal/container-image-csi-driver/pkg/backend/crio"
+	"github.com/warm-metal/container-image-csi-driver/pkg/cri"
+	"github.com/warm-metal/container-image-csi-driver/pkg/metrics"
+	"github.com/warm-metal/container-image-csi-driver/pkg/secret"
+	"github.com/warm-metal/container-image-csi-driver/pkg/watcher"
 	csicommon "github.com/warm-metal/csi-drivers/pkg/csi-common"
 	"k8s.io/klog/v2"
-
-	"time"
 )
 
 const (
@@ -98,7 +98,7 @@ func main() {
 			*runtimeAddr = addr.String()
 		}
 
-		var mounter *backend.SnapshotMounter
+		var mounter backend.Mounter
 		if len(*runtimeAddr) > 0 {
 			addr, err := url.Parse(*runtimeAddr)
 			if err != nil {
@@ -145,5 +145,6 @@ func main() {
 		)
 	}
 
+	metrics.StartMetricsServer(metrics.RegisterMetrics())
 	server.Wait()
 }

@@ -13,7 +13,7 @@ import (
 	"github.com/containerd/containerd/reference/docker"
 	"github.com/containerd/containerd/snapshots"
 	"github.com/opencontainers/image-spec/identity"
-	"github.com/warm-metal/csi-driver-image/pkg/backend"
+	"github.com/warm-metal/container-image-csi-driver/pkg/backend"
 	"k8s.io/klog/v2"
 )
 
@@ -22,7 +22,7 @@ type snapshotMounter struct {
 	cli         *containerd.Client
 }
 
-func NewMounter(socketPath string) *backend.SnapshotMounter {
+func NewMounter(socketPath string) backend.Mounter {
 	c, err := containerd.New(socketPath, containerd.WithDefaultNamespace("k8s.io"))
 	if err != nil {
 		klog.Fatalf("containerd connection is broken because the mounted unix socket somehow dose not work,"+

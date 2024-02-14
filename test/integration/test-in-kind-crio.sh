@@ -4,7 +4,7 @@ set -e
 
 export IMAGE_TAG=v0.7.0
 export GITHUB_RUN_ID=1
-export NODE_IMAGE=docker.io/warmmetal/kindest-node-crio:v1.25.2-csi-driver-image
+export NODE_IMAGE=docker.io/warmmetal/kindest-node-crio:v1.25.2-container-image-csi-driver
 export VALUE_FILE=$(dirname "${BASH_SOURCE[0]}")/crio-helm-values.yaml
 
 HELM_NAME='wm-csi-integration-tests'
@@ -15,7 +15,7 @@ $(dirname "${BASH_SOURCE[0]}")/../../hack/helper/kind_bed.sh 'k8s'
 trap "docker rm -f kind-${GITHUB_RUN_ID}-control-plane" ERR EXIT INT TERM
 
 $(dirname "${BASH_SOURCE[0]}")/../../hack/ci/setup_private_registry.sh
-trap "docker rm -f private-registry; docker rmi localhost:5000/warmmetal/csi-image-test:simple-fs" ERR EXIT INT TERM
+trap "docker rm -f private-registry; docker rmi localhost:5000/warmmetal/container-image-csi-driver-test:simple-fs" ERR EXIT INT TERM
 
 helm install ${HELM_NAME} $(dirname "${BASH_SOURCE[0]}")/../../charts/warm-metal-csi-driver -n kube-system \
   -f ${VALUE_FILE} \

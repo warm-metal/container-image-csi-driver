@@ -31,13 +31,6 @@ spec:
                   fieldPath: spec.nodeName
           image: "{{ .Values.csiNodeDriverRegistrar.image.repository }}:{{ .Values.csiNodeDriverRegistrar.image.tag }}"
           imagePullPolicy: {{ .Values.csiNodeDriverRegistrar.image.pullPolicy }}
-          lifecycle:
-            preStop:
-              exec:
-                command:
-                  - /bin/sh
-                  - -c
-                  - rm -rf /registration/csi-image.warm-metal.tech /registration/csi-image.warm-metal.tech-reg.sock
           {{- with .Values.csiNodeDriverRegistrar.resources }}
           resources:
           {{- toYaml . | nindent 12 }}
@@ -70,6 +63,9 @@ spec:
             {{- if .Values.enableDaemonImageCredentialCache }}
             - --enable-daemon-image-credential-cache
             {{- end }}
+            {{- if .Values.enableAsyncPullMount }}
+            - --async-pull-mount=true
+            {{- end }}
             - "-v={{ .Values.logLevel }}"
             - "--mode=node"
           env:
@@ -91,6 +87,9 @@ spec:
           ports:
             - containerPort: 9809
               name: metrics
+              protocol: TCP
+            - containerPort: 8080
+              name: metrics2
               protocol: TCP
           livenessProbe:
             {{- toYaml .Values.csiPlugin.livenessProbe | nindent 12}}
@@ -116,7 +115,7 @@ spec:
             - mountPath: {{ .Values.crioMountProgram }}
               name: crio-mount-program
             {{- end }}
-      hostNetwork: true
+      hostNetwork: {{.Values.csiPlugin.hostNetwork}}
       serviceAccountName: {{ include "warm-metal-csi-driver.fullname" . }}-nodeplugin
       volumes:
         - hostPath:

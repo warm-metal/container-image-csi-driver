@@ -1,0 +1,65 @@
+name: Create and publish the container image
+
+on:
+  push:
+    branches:
+      - '*'
+    tags:
+      - 'v*'
+
+env:
+  BASE_REPOSITORY: warm-metal/container-image-csi-driver
+  BASE_DEFAULT_BRANCH: main
+  BASE_IMAGE_NAME: warmmetal/csi-image
+  FORK_IMAGE_NAME: ghcr.io/${{ github.repository }}
+
+permissions:
+  packages: write
+
+jobs:
+  build-and-push-image:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Login to Docker Hub
+        uses: docker/login-action@v3
+        if: github.repository == env.BASE_REPOSITORY
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+      - name: Log in to the GitHub Container registry
+        uses: docker/login-action@v3
+        if: github.repository != env.BASE_REPOSITORY
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Extract metadata (tags, labels) for Docker
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: |
+            name=${{ env.BASE_IMAGE_NAME }},enable=${{ github.repository == env.BASE_REPOSITORY }}
+            name=${{ env.FORK_IMAGE_NAME }},enable=${{ github.repository != env.BASE_REPOSITORY }}
+          tags: |
+            # set 'latest' tag for default branch
+            type=raw,value=latest,enable=${{ github.ref == format('refs/heads/{0}', env.BASE_DEFAULT_BRANCH) }}
+            # set image tag based on GitHub release tag
+            type=semver,pattern={{version}},prefix=v
+            # set the image tag based on the branch
+            # https://github.com/docker/metadata-action/issues/247#issuecomment-1511259674
+            type=ref,event=branch,enable=${{ github.ref_name != env.BASE_DEFAULT_BRANCH }}
+          flavor: |
+            latest=false
+
+      - name: Build and push Docker image
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}

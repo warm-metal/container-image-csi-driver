@@ -1,0 +1,7 @@
+👋 Welcome to your development environment for Container Image CSI Driver!
+
+This debian dev container image contains all tools needed for development.
+
+Get started right away! 🚀
+
+Check out the guide in docs/running-locally.md

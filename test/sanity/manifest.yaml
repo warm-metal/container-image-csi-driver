@@ -1,17 +1,17 @@
 apiVersion: batch/v1
 kind: Job
 metadata:
-  name: csi-driver-image-sanity-test
+  name: container-image-csi-driver-sanity-test
   namespace: cliapp-system
 spec:
   template:
     metadata:
-      name: csi-driver-image-sanity-test
+      name: container-image-csi-driver-sanity-test
     spec:
       serviceAccountName: csi-image-warm-metal
       containers:
-        - name: csi-driver-image-sanity-test
-          image: local.test/csi-driver-image-test:sanity
+        - name: container-image-csi-driver-sanity-test
+          image: local.test/container-image-csi-driver-test:sanity
           volumeMounts:
             - mountPath: /csi
               name: socket-dir

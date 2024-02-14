@@ -7,7 +7,7 @@ provisioner: csi-image.warm-metal.tech
 apiVersion: v1
 kind: PersistentVolume
 metadata:
-  name: compatible-pv-test-csi-image-test-simple-fs
+  name: compatible-pv-test-container-image-csi-driver-test-simple-fs
 spec:
   storageClassName: csi-image.warm-metal.tech
   capacity:
@@ -17,12 +17,12 @@ spec:
   persistentVolumeReclaimPolicy: Retain
   csi:
     driver: csi-image.warm-metal.tech
-    volumeHandle: "docker.io/warmmetal/csi-image-test:simple-fs"
+    volumeHandle: "docker.io/warmmetal/container-image-csi-driver-test:simple-fs"
 ---
 apiVersion: v1
 kind: PersistentVolumeClaim
 metadata:
-  name: compatible-pvc-test-csi-image-test-simple-fs
+  name: compatible-pvc-test-container-image-csi-driver-test-simple-fs
 spec:
   storageClassName: csi-image.warm-metal.tech
   accessModes:
@@ -30,7 +30,7 @@ spec:
   resources:
     requests:
       storage: 5Gi
-  volumeName: compatible-pv-test-csi-image-test-simple-fs
+  volumeName: compatible-pv-test-container-image-csi-driver-test-simple-fs
 ---
 apiVersion: v1
 kind: Pod
@@ -50,4 +50,4 @@ spec:
   volumes:
     - name: target
       persistentVolumeClaim:
-        claimName: compatible-pvc-test-csi-image-test-simple-fs
+        claimName: compatible-pvc-test-container-image-csi-driver-test-simple-fs

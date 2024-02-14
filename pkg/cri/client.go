@@ -5,7 +5,7 @@ import (
 	"time"
 
 	"google.golang.org/grpc"
-	cri "k8s.io/cri-api/pkg/apis/runtime/v1alpha2"
+	cri "k8s.io/cri-api/pkg/apis/runtime/v1"
 	"k8s.io/klog/v2"
 	"k8s.io/kubernetes/pkg/kubelet/util"
 )
