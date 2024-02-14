@@ -4,7 +4,7 @@ This directory contains two files:
 2. `Dockerfile.containerd`: used to run containerd
 
 ## Why?
-This is to run warm metal code in a container where containerd is running
+This is to run container-image-csi-driver code in a container where containerd is running
 
 ## How to use?
 Build the image
