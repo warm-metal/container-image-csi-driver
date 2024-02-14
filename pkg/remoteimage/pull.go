@@ -45,7 +45,7 @@ func (p puller) ImageSize(ctx context.Context) int {
 func (p puller) Pull(ctx context.Context) (err error) {
 	startTime := time.Now()
 	defer func() { // must capture final value of "err"
-		elapsed := time.Millisecond.Round(time.Since(startTime)).Seconds()
+		elapsed := time.Since(startTime).Seconds()
 		metrics.ImagePullTimeHist.WithLabelValues(metrics.BoolToString(err != nil)).Observe(elapsed)
 		metrics.ImagePullTime.WithLabelValues(p.image.String(), metrics.BoolToString(err != nil)).Set(elapsed)
 		if err != nil {
