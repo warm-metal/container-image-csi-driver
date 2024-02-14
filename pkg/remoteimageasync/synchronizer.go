@@ -14,7 +14,7 @@ import (
 // completedChanDepth : 20 - must give some buffer to ensure no deadlock
 func StartAsyncPuller(ctx context.Context, sessionChanDepth, completedChanDepth int) AsyncPuller {
 	klog.Infof("%s.StartAsyncPuller(): starting async puller", prefix)
-	sessionChan := make(chan PullSession, sessionChanDepth)
+	sessionChan := make(chan *PullSession, sessionChanDepth)
 	completedChan := make(chan string, completedChanDepth)
 	async := getSynchronizer(
 		ctx,
@@ -30,7 +30,7 @@ func StartAsyncPuller(ctx context.Context, sessionChanDepth, completedChanDepth 
 // channels are exposed for testing
 func getSynchronizer(
 	ctx context.Context,
-	sessionChan chan PullSession,
+	sessionChan chan *PullSession,
 	completedChan chan string,
 ) synchronizer {
 	if cap(sessionChan) < 50 {
@@ -40,7 +40,7 @@ func getSynchronizer(
 		klog.Fatalf("%s.getSynchronizer(): completion channel must have capacity to buffer events, minimum of 5 is required", prefix)
 	}
 	return synchronizer{
-		sessionMap:      make(map[string]PullSession),
+		sessionMap:      make(map[string]*PullSession),
 		mutex:           &sync.Mutex{},
 		sessions:        sessionChan,
 		completedEvents: completedChan,
@@ -48,13 +48,13 @@ func getSynchronizer(
 	}
 }
 
-func (s synchronizer) StartPull(image string, puller remoteimage.Puller, asyncPullTimeout time.Duration) (PullSession, error) {
+func (s synchronizer) StartPull(image string, puller remoteimage.Puller, asyncPullTimeout time.Duration) (*PullSession, error) {
 	klog.V(2).Infof("%s.StartPull(): start pull: asked to pull image %s", prefix, image)
 	s.mutex.Lock() // lock mutex
 	defer s.mutex.Unlock()
 	ses, ok := s.sessionMap[image] // try get session
 	if !ok {                       // if no session, create session
-		ses = PullSession{
+		ses = &PullSession{
 			image:      image,
 			puller:     puller,
 			timeout:    asyncPullTimeout,
@@ -66,13 +66,13 @@ func (s synchronizer) StartPull(image string, puller remoteimage.Puller, asyncPu
 		select {
 		case s.sessions <- ses: // start session, check for deadlock... possibility of panic but only during app shutdown where Puller has already ceased to operate
 			klog.V(2).Infof("%s.StartPull(): new session created for %s with timeout %v", prefix, ses.image, ses.timeout)
+			s.sessionMap[image] = ses // add session to map to allow continuation... only do this because was passed to puller via sessions channel
 		default: // catch deadlock or throttling (they will look the same)
 			ses.err = fmt.Errorf("%s.StartPull(): cannot pull %s at this time, throttling or deadlock condition exists, retry if throttling", prefix, ses.image)
 			klog.V(2).Info(ses.err.Error())
-			ses.done <- true
+			close(ses.done) // this can and must be closed here because it was never passed to the puller via sessions channel
 			return ses, ses.err
 		}
-		s.sessionMap[image] = ses // add session to map
 	} else {
 		klog.V(2).Infof("%s.StartPull(): found open session for %s", prefix, ses.image)
 	}
@@ -80,13 +80,12 @@ func (s synchronizer) StartPull(image string, puller remoteimage.Puller, asyncPu
 	return ses, nil
 }
 
-func (s synchronizer) WaitForPull(session PullSession, callerTimeout context.Context) error {
+func (s synchronizer) WaitForPull(session *PullSession, callerTimeout context.Context) error {
 	klog.V(2).Infof("%s.WaitForPull(): starting to wait for image %s", prefix, session.image)
 	defer klog.V(2).Infof("%s.WaitForPull(): exiting wait for image %s", prefix, session.image)
 	select {
 	case <-session.done: // success or error (including session timeout)
-		klog.V(2).Infof("%s.WaitForPull(): pull completed for %s, isError: %t, error: %v",
-			prefix, session.image, session.err != nil, session.err)
+		klog.V(2).Infof("%s.WaitForPull(): session completed with success or error for image %s, error=%v", prefix, session.image, session.err)
 		return session.err
 	case <-callerTimeout.Done():
 		err := fmt.Errorf("%s.WaitForPull(): this wait for image %s has timed out due to caller context cancellation, pull likely continues in the background",

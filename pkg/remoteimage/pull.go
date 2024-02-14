@@ -2,10 +2,13 @@ package remoteimage
 
 import (
 	"context"
+	"time"
 
 	"github.com/containerd/containerd/reference/docker"
+	"github.com/warm-metal/container-image-csi-driver/pkg/metrics"
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	cri "k8s.io/cri-api/pkg/apis/runtime/v1"
+	"k8s.io/klog/v2"
 	"k8s.io/kubernetes/pkg/credentialprovider"
 )
 
@@ -40,14 +43,25 @@ func (p puller) ImageSize(ctx context.Context) int {
 }
 
 func (p puller) Pull(ctx context.Context) (err error) {
+	startTime := time.Now()
+	defer func() { // must capture final value of "err"
+		elapsed := time.Millisecond.Round(time.Since(startTime)).Seconds()
+		metrics.ImagePullTimeHist.WithLabelValues(metrics.BoolToString(err != nil)).Observe(elapsed)
+		metrics.ImagePullTime.WithLabelValues(p.image.String(), metrics.BoolToString(err != nil)).Set(elapsed)
+		if err != nil {
+			metrics.OperationErrorsCount.WithLabelValues("pull").Inc()
+		}
+	}()
 	repo := p.image.Name()
 	imageSpec := &cri.ImageSpec{Image: p.image.String()}
 	creds, withCredentials := p.keyring.Lookup(repo)
+	klog.V(2).Infof("remoteimage.Pull(): len(creds)=%d, withCreds=%t", len(creds), withCredentials)
 	if !withCredentials {
 		_, err = p.imageSvc.PullImage(ctx, &cri.PullImageRequest{
 			Image: imageSpec,
 		})
 
+		klog.V(2).Infof("remoteimage.Pull(no creds): completed with err=%v", err)
 		return
 	}
 
@@ -68,11 +82,14 @@ func (p puller) Pull(ctx context.Context) (err error) {
 		})
 
 		if err == nil {
+			klog.V(2).Info("remoteimage.Pull(with creds): completed with err==nil")
 			return
 		}
 
 		pullErrs = append(pullErrs, err)
 	}
 
-	return utilerrors.NewAggregate(pullErrs)
+	err = utilerrors.NewAggregate(pullErrs)
+	klog.V(2).Infof("remoteimage.Pull(): completed with errors, len(pullErrs)=%d, aggErr=%s", len(pullErrs), err.Error())
+	return
 }

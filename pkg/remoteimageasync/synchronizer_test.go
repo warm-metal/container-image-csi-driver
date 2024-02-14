@@ -11,6 +11,37 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
+type chanTestStruct struct {
+	str string
+	err error
+}
+
+func TestChannelStructContent(t *testing.T) {
+	input1 := make(chan chanTestStruct, 1)
+	val1 := chanTestStruct{
+		str: "test1",
+		err: nil,
+	}
+	assert.Nil(t, val1.err)
+	input1 <- val1
+	tmp1 := <-input1
+	tmp1.err = fmt.Errorf("test1")
+	assert.NotNil(t, tmp1.err)
+	assert.Nil(t, val1.err, "pass by value does not update value")
+
+	input2 := make(chan *chanTestStruct, 1)
+	val2 := chanTestStruct{
+		str: "test2",
+		err: nil,
+	}
+	assert.Nil(t, val2.err)
+	input2 <- &val2
+	tmp2 := <-input2
+	tmp2.err = fmt.Errorf("test2")
+	assert.NotNil(t, tmp2.err)
+	assert.NotNil(t, val2.err, "pass by reference does update value")
+}
+
 func TestPullDuration(t *testing.T) {
 	ctx, dontCare := context.WithTimeout(context.TODO(), 5*time.Second)
 	defer dontCare()

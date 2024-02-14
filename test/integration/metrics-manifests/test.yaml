@@ -16,7 +16,7 @@ spec:
           - -c
           - |
             (curl $IP:8080/metrics | grep warm_metal_pull_duration_seconds) && \
-            (curl $IP:8080/metrics | grep warm_metal_mount_duration_seconds) && \
+            (curl $IP:8080/metrics | grep warm_metal_pull_duration_seconds_hist) && \
             (curl $IP:8080/metrics | grep warm_metal_operation_errors_total)
           env:
             - name: IP

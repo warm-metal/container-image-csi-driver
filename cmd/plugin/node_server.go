@@ -143,7 +143,7 @@ func (n NodeServer) NodePublishVolume(ctx context.Context, req *csi.NodePublishV
 		puller := remoteimage.NewPuller(n.imageSvc, namedRef, keyring)
 
 		if n.asyncImagePuller != nil {
-			var session remoteimageasync.PullSession
+			var session *remoteimageasync.PullSession
 			session, err = n.asyncImagePuller.StartPull(image, puller, n.asyncImagePullTimeout)
 			if err != nil {
 				err = status.Errorf(codes.Aborted, "unable to pull image %q: %s", image, err)
@@ -166,6 +166,7 @@ func (n NodeServer) NodePublishVolume(ctx context.Context, req *csi.NodePublishV
 		req.VolumeCapability.AccessMode.Mode == csi.VolumeCapability_AccessMode_MULTI_NODE_READER_ONLY
 	if err = n.mounter.Mount(ctx, req.VolumeId, backend.MountTarget(req.TargetPath), namedRef, ro); err != nil {
 		err = status.Error(codes.Internal, err.Error())
+		metrics.OperationErrorsCount.WithLabelValues("mount").Inc()
 		return
 	}
 

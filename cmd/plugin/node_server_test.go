@@ -434,7 +434,7 @@ func TestMetrics(t *testing.T) {
 	assert.NoError(t, err)
 	respBody := string(b1)
 	assert.Contains(t, respBody, metrics.ImagePullTimeKey)
-	assert.Contains(t, respBody, metrics.ImageMountTimeKey)
+	assert.Contains(t, respBody, metrics.ImagePullTimeHist)
 	assert.Contains(t, respBody, metrics.OperationErrorsCountKey)
 
 	// give some time before stopping the server

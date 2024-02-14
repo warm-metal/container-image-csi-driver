@@ -11,27 +11,26 @@ import (
 const Async = "async"
 const Sync = "sync"
 const ImagePullTimeKey = "pull_duration_seconds"
-const ImageMountTimeKey = "mount_duration_seconds"
+const ImagePullTimeHistKey = "pull_duration_seconds_hist"
 const OperationErrorsCountKey = "operation_errors_total"
 
-var ImagePullTime = prometheus.NewHistogramVec(
+var ImagePullTimeHist = prometheus.NewHistogramVec(
 	prometheus.HistogramOpts{
 		Subsystem: "warm_metal",
-		Name:      ImagePullTimeKey,
+		Name:      ImagePullTimeHistKey,
 		Help:      "The time it took to pull an image",
-		Buckets:   []float64{0, 1, 5, 10, 15, 30, 60, 120, 180},
+		Buckets:   []float64{1, 5, 10, 15, 30, 60, 120, 300, 600, 900},
 	},
-	[]string{"operation_type"},
+	[]string{"error"},
 )
 
-var ImageMountTime = prometheus.NewHistogramVec(
-	prometheus.HistogramOpts{
+var ImagePullTime = prometheus.NewGaugeVec(
+	prometheus.GaugeOpts{
 		Subsystem: "warm_metal",
-		Name:      ImageMountTimeKey,
+		Name:      ImagePullTimeKey,
 		Help:      "The time it took to mount an image",
-		Buckets:   []float64{0, 1, 5, 10, 15, 30, 60, 120, 180},
 	},
-	[]string{"operation_type"},
+	[]string{"image", "error"},
 )
 
 var OperationErrorsCount = prometheus.NewCounterVec(
@@ -46,7 +45,7 @@ var OperationErrorsCount = prometheus.NewCounterVec(
 func RegisterMetrics() *prometheus.Registry {
 	reg := prometheus.NewRegistry()
 	reg.MustRegister(ImagePullTime)
-	reg.MustRegister(ImageMountTime)
+	reg.MustRegister(ImagePullTimeHist)
 	reg.MustRegister(OperationErrorsCount)
 
 	return reg
@@ -58,4 +57,12 @@ func StartMetricsServer(reg *prometheus.Registry) {
 		klog.Info("serving internal metrics at port 8080")
 		klog.Fatal(http.ListenAndServe(":8080", nil))
 	}()
+}
+
+func BoolToString(t bool) string {
+	if t {
+		return "true"
+	} else {
+		return "false"
+	}
 }

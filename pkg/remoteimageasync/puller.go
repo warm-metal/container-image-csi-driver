@@ -10,7 +10,7 @@ import (
 
 func RunPullerLoop(
 	ctx context.Context,
-	sessionChan chan PullSession,
+	sessionChan chan *PullSession,
 	completedChan chan string,
 ) {
 	go func() {
@@ -54,7 +54,7 @@ func RunPullerLoop(
 						ses.isTimedOut = false
 						ses.err = pullErr
 						// if mustPull {
-						klog.V(2).Infof("%s.RunPullerLoop(): pull completed in %v for image %s\n", prefix, time.Since(pullStart), ses.image)
+						klog.V(2).Infof("%s.RunPullerLoop(): pull completed in %v for image %s with error=%v\n", prefix, time.Since(pullStart), ses.image, ses.err)
 						// } else {
 						// 	klog.V(2).Infof("%s.RunPullerLoop(): image already present for %s\n", prefix, ses.image)
 						// }
