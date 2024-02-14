@@ -29,7 +29,7 @@ type PullExecutorOptions struct {
 	AsyncPull          bool
 	ImageServiceClient cri.ImageServiceClient
 	SecretStore        secret.Store
-	Mounter            *backend.SnapshotMounter
+	Mounter            backend.Mounter
 }
 
 // PullOptions are the options for a single pull request
@@ -50,7 +50,7 @@ type PullExecutor struct {
 	mutex          *sync.Mutex
 	asyncErrs      map[docker.Named]error
 	secretStore    secret.Store
-	mounter        *backend.SnapshotMounter
+	mounter        backend.Mounter
 }
 
 // NewPullExecutor initializes a new pull executor object
