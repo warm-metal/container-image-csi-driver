@@ -25,7 +25,7 @@ const (
 // MountExecutorOptions are options passed to mount executor
 type MountExecutorOptions struct {
 	AsyncMount bool
-	Mounter    *backend.SnapshotMounter
+	Mounter    backend.Mounter
 }
 
 // MountOptions are options for a single mount request
@@ -44,7 +44,7 @@ type MountOptions struct {
 type MountExecutor struct {
 	asyncMount bool
 	mutex      *sync.Mutex
-	mounter    *backend.SnapshotMounter
+	mounter    backend.Mounter
 	asyncErrs  map[docker.Named]error
 }
 

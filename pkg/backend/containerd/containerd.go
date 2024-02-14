@@ -22,7 +22,7 @@ type snapshotMounter struct {
 	cli         *containerd.Client
 }
 
-func NewMounter(socketPath string) *backend.SnapshotMounter {
+func NewMounter(socketPath string) backend.Mounter {
 	c, err := containerd.New(socketPath, containerd.WithDefaultNamespace("k8s.io"))
 	if err != nil {
 		klog.Fatalf("containerd connection is broken because the mounted unix socket somehow dose not work,"+
