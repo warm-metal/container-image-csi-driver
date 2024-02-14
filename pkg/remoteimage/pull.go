@@ -48,6 +48,12 @@ func (p puller) Pull(ctx context.Context) (err error) {
 		elapsed := time.Since(startTime).Seconds()
 		metrics.ImagePullTimeHist.WithLabelValues(metrics.BoolToString(err != nil)).Observe(elapsed)
 		metrics.ImagePullTime.WithLabelValues(p.image.String(), metrics.BoolToString(err != nil)).Set(elapsed)
+		go func() {
+			//TODO: this is a hack to ensure data is cleared in a reasonable timeframe and does not build up.
+			// pushgateway may remove the need for this. https://prometheus.io/docs/practices/pushing/
+			time.Sleep(1 * time.Minute)
+			metrics.ImagePullTime.DeleteLabelValues(p.image.String(), metrics.BoolToString(err != nil))
+		}()
 		if err != nil {
 			metrics.OperationErrorsCount.WithLabelValues("pull").Inc()
 		}
