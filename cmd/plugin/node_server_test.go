@@ -77,7 +77,7 @@ func TestNodePublishVolumeAsync(t *testing.T) {
 	assert.NoError(t, err)
 	assert.NotNil(t, f)
 
-	defer os.Remove("/tmp/csi/csi.sock")
+	defer os.Remove("/tmp/csi.sock")
 
 	addr, err := url.Parse("unix:///tmp/csi.sock")
 	assert.NoError(t, err)
