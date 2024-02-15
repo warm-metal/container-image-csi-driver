@@ -1,4 +1,4 @@
-VERSION ?= async-pull-jk
+VERSION ?= v1.1.0
 
 IMAGE_BUILDER ?= docker
 IMAGE_BUILD_CMD ?= buildx
@@ -37,7 +37,7 @@ integration:
 
 .PHONY: image
 image:
-	$(IMAGE_BUILDER) $(IMAGE_BUILD_CMD) build --platform=$(PLATFORM) -t $(REGISTRY)/csi-image:$(VERSION) .
+	$(IMAGE_BUILDER) $(IMAGE_BUILD_CMD) build --platform=$(PLATFORM) -t $(REGISTRY)/csi-image:$(VERSION) --push .
 
 .PHONY: local
 local:
@@ -69,11 +69,5 @@ test-deps:
 .PHONY: install-util
 install-util:
 	GOOS=linux CGO_ENABLED="0" go build \
-	  -ldflags "-X main.Version=$(VERSION) -X main.Registry=$(REGISTRY)" \
-	  -o _output/warm-metal-csi-image-install ./cmd/install
-
-.PHONY: install-util-osx
-install-util-osx:
-	GOOS=darwin CGO_ENABLED="0" go build \
 	  -ldflags "-X main.Version=$(VERSION) -X main.Registry=$(REGISTRY)" \
 	  -o _output/warm-metal-csi-image-install ./cmd/install
