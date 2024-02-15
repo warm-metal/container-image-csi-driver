@@ -1,3 +1,13 @@
+
+<p align="center" width="100%">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="./logo/aqua_horizontal_white.svg">
+    <img src="./logo/logo.svg" alt="logo">
+  </picture>
+</p>
+
+#
+
 [![containerd](https://github.com/warm-metal/container-image-csi-driver/actions/workflows/containerd.yaml/badge.svg)](https://github.com/warm-metal/container-image-csi-driver/actions/workflows/containerd.yaml)
 [![docker-containerd](https://github.com/warm-metal/container-image-csi-driver/actions/workflows/docker-containerd.yaml/badge.svg)](https://github.com/warm-metal/container-image-csi-driver/actions/workflows/docker-containerd.yaml)
 [![cri-o](https://github.com/warm-metal/container-image-csi-driver/actions/workflows/cri-o.yaml/badge.svg)](https://github.com/warm-metal/container-image-csi-driver/actions/workflows/cri-o.yaml)
