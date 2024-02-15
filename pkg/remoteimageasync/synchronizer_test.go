@@ -42,6 +42,20 @@ func TestChannelStructContent(t *testing.T) {
 	assert.NotNil(t, val2.err, "pass by reference does update value")
 }
 
+func TestAsyncPullErrorReturn(t *testing.T) {
+	ctx, dontCare := context.WithTimeout(context.TODO(), 5*time.Second)
+	defer dontCare()
+	puller := StartAsyncPuller(ctx, 100, 20)
+
+	err := pullImage(puller, "nginx:exists", 1, 5, 5)
+	assert.Nil(t, err, "no error should be returned for successful pull")
+
+	err = pullImage(puller, nonExistentImage, 1, 5, 5)
+	assert.NotNil(t, err, "error should be returned for non-existent image")
+
+	<-ctx.Done()
+}
+
 func TestPullDuration(t *testing.T) {
 	ctx, dontCare := context.WithTimeout(context.TODO(), 5*time.Second)
 	defer dontCare()
@@ -197,16 +211,23 @@ func (p pullerMock) Pull(ctx context.Context) (err error) {
 	}
 
 	fmt.Printf("pullerMock: starting to pull image %s\n", p.image)
+	if p.image == nonExistentImage {
+		err = fmt.Errorf("pullerMock: non-existent image specified, returning this error\n")
+		fmt.Println(err.Error())
+		return err
+	}
 	select {
 	case <-time.After(dur):
 		fmt.Printf("pullerMock: finshed pulling image %s\n", p.image)
-		return
+		return nil
 	case <-ctx.Done():
 		fmt.Printf("pullerMock: context cancelled\n")
-		return
+		return nil
 	}
 }
 
 func (p pullerMock) ImageSize(ctx context.Context) int {
 	return 0
 }
+
+const nonExistentImage = "docker.io/warmmetal/container-image-csi-driver-test:simple-fs-doesnt-exist"
