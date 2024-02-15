@@ -98,7 +98,7 @@ func main() {
 			*runtimeAddr = addr.String()
 		}
 
-		var mounter *backend.SnapshotMounter
+		var mounter backend.Mounter
 		if len(*runtimeAddr) > 0 {
 			addr, err := url.Parse(*runtimeAddr)
 			if err != nil {

@@ -15,7 +15,7 @@ jobs:
     name: Delete old unused container images
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/delete-package-versions@v4
+      - uses: actions/delete-package-versions@v5
         if: github.repository != env.BASE_REPOSITORY
         with:
           owner: ${{ github.repository_owner }}
