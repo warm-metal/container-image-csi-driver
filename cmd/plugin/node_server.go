@@ -30,7 +30,7 @@ const (
 
 type ImagePullStatus int
 
-func NewNodeServer(driver *csicommon.CSIDriver, mounter *backend.SnapshotMounter, imageSvc cri.ImageServiceClient, secretStore secret.Store, asyncImagePullTimeout time.Duration) *NodeServer {
+func NewNodeServer(driver *csicommon.CSIDriver, mounter backend.Mounter, imageSvc cri.ImageServiceClient, secretStore secret.Store, asyncImagePullTimeout time.Duration) *NodeServer {
 	ns := NodeServer{
 		DefaultNodeServer:     csicommon.NewDefaultNodeServer(driver),
 		mounter:               mounter,
@@ -51,7 +51,7 @@ func NewNodeServer(driver *csicommon.CSIDriver, mounter *backend.SnapshotMounter
 
 type NodeServer struct {
 	*csicommon.DefaultNodeServer
-	mounter               *backend.SnapshotMounter
+	mounter               backend.Mounter
 	imageSvc              cri.ImageServiceClient
 	secretStore           secret.Store
 	asyncImagePullTimeout time.Duration
