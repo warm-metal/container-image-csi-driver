@@ -2,6 +2,7 @@ package remoteimage
 
 import (
 	"context"
+	"fmt"
 	"time"
 
 	"github.com/containerd/containerd/reference/docker"
@@ -14,7 +15,7 @@ import (
 
 type Puller interface {
 	Pull(context.Context) error
-	ImageSize(context.Context) int
+	ImageSize(context.Context) (int, error)
 }
 
 func NewPuller(imageSvc cri.ImageServiceClient, image docker.Named,
@@ -34,48 +35,76 @@ type puller struct {
 
 // Returns the compressed size of the image that was pulled in bytes
 // see https://github.com/containerd/containerd/issues/9261
-func (p puller) ImageSize(ctx context.Context) int {
+func (p puller) ImageSize(ctx context.Context) (size int, err error) {
+	defer func() {
+		if err != nil {
+			klog.Errorf(err.Error())
+			metrics.OperationErrorsCount.WithLabelValues("size-error").Inc()
+		}
+	}()
 	imageSpec := &cri.ImageSpec{Image: p.image.String()}
-	imageStatusResponse, _ := p.imageSvc.ImageStatus(ctx, &cri.ImageStatusRequest{
+	if imageStatusResponse, err := p.imageSvc.ImageStatus(ctx, &cri.ImageStatusRequest{
 		Image: imageSpec,
-	})
-	return int(imageStatusResponse.Image.Size_)
+	}); err != nil {
+		size = 0
+		err = fmt.Errorf("remoteimage.ImageSize(): call returned an error: %s", err.Error())
+		return size, err
+	} else if imageStatusResponse == nil {
+		size = 0
+		err = fmt.Errorf("remoteimage.ImageSize(): imageStatusResponse is nil")
+		return size, err
+	} else if imageStatusResponse.Image == nil {
+		size = 0
+		err = fmt.Errorf("remoteimage.ImageSize(): imageStatusResponse.Image is nil")
+		return size, err
+	} else {
+		size = imageStatusResponse.Image.Size()
+		err = nil
+		return size, err
+	}
 }
 
 func (p puller) Pull(ctx context.Context) (err error) {
 	startTime := time.Now()
 	defer func() { // must capture final value of "err"
 		elapsed := time.Since(startTime).Seconds()
+		// pull time metrics and logs
+		klog.Infof("remoteimage.Pull(): pulled %s in %d milliseconds", p.image.String(), int(1000*elapsed))
 		metrics.ImagePullTimeHist.WithLabelValues(metrics.BoolToString(err != nil)).Observe(elapsed)
 		metrics.ImagePullTime.WithLabelValues(p.image.String(), metrics.BoolToString(err != nil)).Set(elapsed)
 		if err != nil {
 			metrics.OperationErrorsCount.WithLabelValues("pull-error").Inc()
-		} else {
-			go func() {
-				size := p.ImageSize(ctx)
-				metrics.ImagePullSizeBytes.WithLabelValues(p.image.String()).Set(float64(size))
-			}()
 		}
 		go func() {
-			//TODO: this is a hack to ensure data is cleared in a reasonable timeframe and does not build up.
-			// pushgateway may remove the need for this. https://prometheus.io/docs/practices/pushing/
+			//TODO: this is a hack to ensure data is cleared in a reasonable time frame (after scrape) and does not build up.
 			time.Sleep(1 * time.Minute)
 			metrics.ImagePullTime.DeleteLabelValues(p.image.String(), metrics.BoolToString(err != nil))
-			if err == nil {
-				metrics.ImagePullSizeBytes.DeleteLabelValues(p.image.String())
-			}
 		}()
+		// pull size metrics and logs
+		if err == nil { // only size if pull was successful
+			if size, err2 := p.ImageSize(ctx); err2 != nil {
+				// log entries and error counts emitted inside ImageSize() method
+			} else { // success
+				klog.Infof("remoteimage.Pull(): pulled %s with size of %d bytes", p.image.String(), size)
+				metrics.ImagePullSizeBytes.WithLabelValues(p.image.String()).Set(float64(size))
+				go func() {
+					//TODO: this is a hack to ensure data is cleared in a reasonable time frame (after scrape) and does not build up.
+					time.Sleep(1 * time.Minute)
+					metrics.ImagePullSizeBytes.DeleteLabelValues(p.image.String())
+				}()
+			}
+		}
 	}()
 	repo := p.image.Name()
 	imageSpec := &cri.ImageSpec{Image: p.image.String()}
 	creds, withCredentials := p.keyring.Lookup(repo)
-	klog.V(2).Infof("remoteimage.Pull(): len(creds)=%d, withCreds=%t", len(creds), withCredentials)
+	// klog.V(2).Infof("remoteimage.Pull(): len(creds)=%d, withCreds=%t", len(creds), withCredentials)
 	if !withCredentials {
 		_, err = p.imageSvc.PullImage(ctx, &cri.PullImageRequest{
 			Image: imageSpec,
 		})
 
-		klog.V(2).Infof("remoteimage.Pull(no creds): completed with err=%v", err)
+		klog.V(2).Infof("remoteimage.Pull(no creds): pulling %s completed with err=%v", p.image.String(), err)
 		return
 	}
 
@@ -96,7 +125,7 @@ func (p puller) Pull(ctx context.Context) (err error) {
 		})
 
 		if err == nil {
-			klog.V(2).Info("remoteimage.Pull(with creds): completed with err==nil")
+			klog.V(2).Info("remoteimage.Pull(with creds): pulling %s completed with err==nil", p.image.String())
 			return
 		}
 

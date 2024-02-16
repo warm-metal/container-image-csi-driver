@@ -227,14 +227,11 @@ type pullerMock struct {
 	image          string
 	msDurationLow  int
 	msDurationHigh int
+	size           int // negative size indicates error should be returned
 }
 
 func getPullerMock(image string, ms_duration int) pullerMock {
-	return pullerMock{
-		image:          image,
-		msDurationLow:  ms_duration,
-		msDurationHigh: ms_duration,
-	}
+	return getPullerMockRand(image, ms_duration, ms_duration)
 }
 
 func getPullerMockRand(image string, ms_low, ms_high int) pullerMock {
@@ -242,7 +239,13 @@ func getPullerMockRand(image string, ms_low, ms_high int) pullerMock {
 		image:          image,
 		msDurationLow:  ms_low,
 		msDurationHigh: ms_high,
+		size:           0,
 	}
+}
+
+// negative size indicates error should be returned
+func (p *pullerMock) SetSize(size int) {
+	p.size = size
 }
 
 func (p pullerMock) Pull(ctx context.Context) (err error) {
@@ -268,8 +271,11 @@ func (p pullerMock) Pull(ctx context.Context) (err error) {
 	}
 }
 
-func (p pullerMock) ImageSize(ctx context.Context) int {
-	return 0
+func (p pullerMock) ImageSize(ctx context.Context) (int, error) {
+	if p.size < 0 {
+		return 0, fmt.Errorf("error occurred when checking image size")
+	}
+	return p.size, nil
 }
 
 const nonExistentImage = "docker.io/warmmetal/container-image-csi-driver-test:simple-fs-doesnt-exist"
