@@ -6,6 +6,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/warm-metal/container-image-csi-driver/pkg/metrics"
 	"k8s.io/klog/v2"
 )
 
@@ -44,16 +45,21 @@ func RunPullerLoop(
 					ses.isTimedOut = false
 					ses.err = fmt.Errorf("%s.RunPullerLoop(): shutting down", prefix)
 					klog.V(2).Infof(ses.err.Error())
+					metrics.OperationErrorsCount.WithLabelValues("pull-async-shutdown").Inc()
 				case <-ctxCombined.Done(): // timeout or shutdown
 					ses.isComplete = false
 					ses.isTimedOut = true
 					ses.err = fmt.Errorf("%s.RunPullerLoop(): async pull exceeded timeout of %v for image %s", prefix, ses.timeout, ses.image)
 					klog.V(2).Infof(ses.err.Error())
+					metrics.OperationErrorsCount.WithLabelValues("pull-async-timeout").Inc()
 				default: // completion: success or error
 					ses.isComplete = true
 					ses.isTimedOut = false
 					ses.err = pullErr
 					klog.V(2).Infof("%s.RunPullerLoop(): pull completed in %v for image %s with error=%v\n", prefix, time.Since(pullStart), ses.image, ses.err)
+					if ses.err != nil {
+						metrics.OperationErrorsCount.WithLabelValues("pull-async-error").Inc()
+					}
 				}
 				close(ses.done) // signal done, all waiters should wake
 				//NOTE: completedChan could block until the completion loop catches up, which is ok... it's work is trivial and gated only by sessionMap mutex

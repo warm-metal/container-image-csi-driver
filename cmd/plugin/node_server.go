@@ -147,15 +147,18 @@ func (n NodeServer) NodePublishVolume(ctx context.Context, req *csi.NodePublishV
 			session, err = n.asyncImagePuller.StartPull(image, puller, n.asyncImagePullTimeout)
 			if err != nil {
 				err = status.Errorf(codes.Aborted, "unable to pull image %q: %s", image, err)
+				metrics.OperationErrorsCount.WithLabelValues("pull-async-start").Inc()
 				return
 			}
 			if err = n.asyncImagePuller.WaitForPull(session, ctx); err != nil {
 				err = status.Errorf(codes.Aborted, "unable to pull image %q: %s", image, err)
+				metrics.OperationErrorsCount.WithLabelValues("pull-async-wait").Inc()
 				return
 			}
 		} else {
 			if err = puller.Pull(ctx); err != nil {
 				err = status.Errorf(codes.Aborted, "unable to pull image %q: %s", image, err)
+				metrics.OperationErrorsCount.WithLabelValues("pull-sync-call").Inc()
 				return
 			}
 		}
@@ -193,8 +196,7 @@ func (n NodeServer) NodeUnpublishVolume(ctx context.Context, req *csi.NodeUnpubl
 	}
 
 	if err = n.mounter.Unmount(ctx, req.VolumeId, backend.MountTarget(req.TargetPath)); err != nil {
-		//TODO: evaluate this metric in the absence of previous async implementation. this update makes mounting synchronous, not async (simpler).
-		metrics.OperationErrorsCount.WithLabelValues("StartUnmounting").Inc()
+		metrics.OperationErrorsCount.WithLabelValues("unmount").Inc()
 		err = status.Error(codes.Internal, err.Error())
 		return
 	}

@@ -55,7 +55,7 @@ func (p puller) Pull(ctx context.Context) (err error) {
 			metrics.ImagePullTime.DeleteLabelValues(p.image.String(), metrics.BoolToString(err != nil))
 		}()
 		if err != nil {
-			metrics.OperationErrorsCount.WithLabelValues("pull").Inc()
+			metrics.OperationErrorsCount.WithLabelValues("pull-error").Inc()
 		}
 	}()
 	repo := p.image.Name()
