@@ -3,4 +3,3 @@
 id_rsa*
 .cache
 vendor
-test/integration/metrics-manifests/rendered-test.yaml

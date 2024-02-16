@@ -24,7 +24,7 @@ spec:
             volumeAttributes:
               image: "docker.io/warmmetal/container-image-csi-driver-test:simple-fs"
               # # set pullAlways if you want to ignore local images
-              pullAlways: "true"
+              # pullAlways: "true"
               # # set secret if the image is private
               # secret: "name of the ImagePullSecret"
               # secretNamespace: "namespace of the secret"
