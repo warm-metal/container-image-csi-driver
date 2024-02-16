@@ -8,10 +8,9 @@ import (
 	"k8s.io/klog/v2"
 )
 
-const Async = "async"
-const Sync = "sync"
 const ImagePullTimeKey = "pull_duration_seconds"
 const ImagePullTimeHistKey = "pull_duration_seconds_hist"
+const ImagePullSizeKey = "pull_size_bytes"
 const OperationErrorsCountKey = "operation_errors_total"
 
 var ImagePullTimeHist = prometheus.NewHistogramVec(
@@ -23,7 +22,6 @@ var ImagePullTimeHist = prometheus.NewHistogramVec(
 	},
 	[]string{"error"},
 )
-
 var ImagePullTime = prometheus.NewGaugeVec(
 	prometheus.GaugeOpts{
 		Subsystem: "warm_metal",
@@ -31,6 +29,15 @@ var ImagePullTime = prometheus.NewGaugeVec(
 		Help:      "The time it took to mount an image",
 	},
 	[]string{"image", "error"},
+)
+
+var ImagePullSizeBytes = prometheus.NewGaugeVec(
+	prometheus.GaugeOpts{
+		Subsystem: "warm_metal",
+		Name:      ImagePullSizeKey,
+		Help:      "Size (in bytes) of pulled image",
+	},
+	[]string{"image"},
 )
 
 var OperationErrorsCount = prometheus.NewCounterVec(
@@ -46,6 +53,7 @@ func RegisterMetrics() *prometheus.Registry {
 	reg := prometheus.NewRegistry()
 	reg.MustRegister(ImagePullTime)
 	reg.MustRegister(ImagePullTimeHist)
+	reg.MustRegister(ImagePullSizeBytes)
 	reg.MustRegister(OperationErrorsCount)
 
 	return reg
