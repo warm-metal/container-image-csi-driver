@@ -42,6 +42,10 @@ func (s snapshotMounter) Mount(ctx context.Context, key backend.SnapshotKey, tar
 		return err
 	}
 
+	for _, m := range mounts {
+		m.Options = append(m.Options, `context="system_u:object_r:local_t:s0"`)
+	}
+
 	err = mount.All(mounts, string(target))
 	if err != nil {
 		mountsErr := describeMounts(mounts, string(target))

@@ -115,6 +115,12 @@ spec:
             - mountPath: {{ .Values.crioMountProgram }}
               name: crio-mount-program
             {{- end }}
+            {{- if .Values.seLinuxHost -}}
+            - mountPath: /sys/fs/selinux
+              name: selinuxfs
+            - mountPath: /etc/selinux/config
+              name: selinux-config
+            {{- end }}
       hostNetwork: {{.Values.csiPlugin.hostNetwork}}
       serviceAccountName: {{ include "warm-metal-csi-driver.fullname" . }}-nodeplugin
       volumes:
@@ -146,6 +152,16 @@ spec:
             type: File
           name: crio-mount-program
         {{- end }}
+        {{- if .Values.seLinuxHost -}}
+        - hostPath:
+            path: /sys/fs/selinux
+            type: Directory
+          name: selinuxfs
+        - hostPath:
+            path: /etc/selinux/config
+            type: FileOrCreate
+          name: selinux-config
+        {{- else -}}
         - hostPath:
             path: {{ .Values.snapshotRoot }}
             type: Directory

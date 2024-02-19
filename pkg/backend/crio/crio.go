@@ -40,7 +40,7 @@ func (s snapshotMounter) Mount(_ context.Context, key backend.SnapshotKey, targe
 		return err
 	}
 
-	mountOpts := []string{"rbind"}
+	mountOpts := []string{"rbind", `context="system_u:object_r:local_t:s0"`}
 	if ro {
 		mountOpts = append(mountOpts, "ro")
 	}

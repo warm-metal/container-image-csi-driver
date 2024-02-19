@@ -7,6 +7,7 @@ logLevel: 4
 enableDaemonImageCredentialCache:
 enableAsyncPullMount: false
 pullImageSecretForDaemonset:
+seLinuxHost: false
 
 csiPlugin:
   hostNetwork: false
