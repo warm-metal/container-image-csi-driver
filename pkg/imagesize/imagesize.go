@@ -56,7 +56,7 @@ func Initialize(maxImageSize *resource.Quantity) {
 	eventBroadcaster.StartStructuredLogging(1)
 	eventBroadcaster.StartRecordingToSink(&typedv1.EventSinkImpl{Interface: clientset.CoreV1().Events("")})
 	eventRecorder := eventBroadcaster.NewRecorder(scheme, v1.EventSource{
-		Component: "warm-metal",
+		Component: "container-image-csi-driver",
 	})
 
 	Warner = &warner{
