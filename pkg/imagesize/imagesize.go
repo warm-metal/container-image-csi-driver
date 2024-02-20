@@ -111,7 +111,7 @@ func (w *warner) GetImageSize(creds *cri.AuthConfig, image docker.Named) (*resou
 			RegistryToken: creds.RegistryToken,
 		}
 	}
-	c := client.NewRegistryClient(resolver, "warm-metal", false)
+	c := client.NewRegistryClient(resolver, "container-image-csi-driver", false)
 
 	return w.fetchImageSize(c, image)
 }
