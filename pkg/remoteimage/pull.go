@@ -4,13 +4,15 @@ import (
 	"context"
 
 	"github.com/containerd/containerd/reference/docker"
+	w "github.com/warm-metal/container-image-csi-driver/pkg/imagesize"
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	cri "k8s.io/cri-api/pkg/apis/runtime/v1"
+	"k8s.io/klog/v2"
 	"k8s.io/kubernetes/pkg/credentialprovider"
 )
 
 type Puller interface {
-	Pull(context.Context) error
+	Pull(context.Context, string, string) error
 	ImageSize(context.Context) int
 }
 
@@ -39,11 +41,14 @@ func (p puller) ImageSize(ctx context.Context) int {
 	return int(imageStatusResponse.Image.Size_)
 }
 
-func (p puller) Pull(ctx context.Context) (err error) {
+func (p puller) Pull(ctx context.Context, pod string, ns string) (err error) {
 	repo := p.image.Name()
 	imageSpec := &cri.ImageSpec{Image: p.image.String()}
 	creds, withCredentials := p.keyring.Lookup(repo)
 	if !withCredentials {
+
+		p.checkForImageSize(nil, pod, ns)
+
 		_, err = p.imageSvc.PullImage(ctx, &cri.PullImageRequest{
 			Image: imageSpec,
 		})
@@ -62,6 +67,8 @@ func (p puller) Pull(ctx context.Context) (err error) {
 			RegistryToken: cred.RegistryToken,
 		}
 
+		p.checkForImageSize(auth, pod, ns)
+
 		_, err = p.imageSvc.PullImage(ctx, &cri.PullImageRequest{
 			Image: imageSpec,
 			Auth:  auth,
@@ -75,4 +82,18 @@ func (p puller) Pull(ctx context.Context) (err error) {
 	}
 
 	return utilerrors.NewAggregate(pullErrs)
+}
+
+func (p puller) checkForImageSize(cred *cri.AuthConfig, pod string, ns string) {
+	go func() {
+		klog.Infof("fetching image size from the registry for '%v'", p.image)
+		if w.Warner != nil {
+			size, err := w.Warner.GetImageSize(cred, p.image)
+			if err != nil {
+				klog.Infof("error fetching image size from the registry: %v", err)
+				return
+			}
+			w.Warner.Warn(size, pod, ns)
+		}
+	}()
 }

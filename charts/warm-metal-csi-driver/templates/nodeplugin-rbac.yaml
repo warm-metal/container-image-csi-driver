@@ -13,6 +13,9 @@ metadata:
   name: {{ include "warm-metal-csi-driver.fullname" . }}-nodeplugin
 rules:
   - apiGroups: [""]
+    resources: ["pods"]
+    verbs: ["get", "list"]
+  - apiGroups: [""]
     resources: ["events"]
     verbs: ["get", "list", "watch", "create", "update", "patch"]
   {{- if .Values.pullImageSecretForDaemonset }}

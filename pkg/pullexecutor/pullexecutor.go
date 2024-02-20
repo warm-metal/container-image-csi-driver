@@ -41,6 +41,8 @@ type PullOptions struct {
 	PullSecrets map[string]string
 	Image       string
 	Logger      klog.Logger
+	Pod         string
+	Namespace   string
 }
 
 // PullExecutor executes the pulls
@@ -79,7 +81,7 @@ func (m *PullExecutor) StartPulling(o *PullOptions) error {
 			o.Logger.Info("Pulling image", "image", o.Image)
 			pullstatus.Update(o.NamedRef, pullstatus.StillPulling)
 			startTime := time.Now()
-			if err = puller.Pull(o.Context); err != nil {
+			if err = puller.Pull(o.Context, o.Pod, o.Namespace); err != nil {
 				pullstatus.Update(o.NamedRef, pullstatus.Errored)
 				metrics.OperationErrorsCount.WithLabelValues("StartPulling").Inc()
 				o.Logger.Error(err, "Unable to pull image", "image", o.NamedRef)
@@ -118,7 +120,7 @@ func (m *PullExecutor) StartPulling(o *PullOptions) error {
 				pullstatus.Update(o.NamedRef, pullstatus.StillPulling)
 				startTime := time.Now()
 
-				if err = puller.Pull(c); err != nil {
+				if err = puller.Pull(c, o.Pod, o.Namespace); err != nil {
 					pullstatus.Update(o.NamedRef, pullstatus.Errored)
 					metrics.OperationErrorsCount.WithLabelValues("StartPulling").Inc()
 					o.Logger.Error(err, "Unable to pull image", "image", o.Image)

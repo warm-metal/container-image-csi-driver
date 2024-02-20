@@ -27,6 +27,8 @@ const (
 	ctxKeyImage           = "image"
 	ctxKeyPullAlways      = "pullAlways"
 	ctxKeyEphemeralVolume = "csi.storage.k8s.io/ephemeral"
+	ctxKeyPodName         = "csi.storage.k8s.io/pod.name"
+	ctxKeyPodNamespace    = "csi.storage.k8s.io/pod.namespace"
 )
 
 type ImagePullStatus int
@@ -87,6 +89,16 @@ func (n NodeServer) NodePublishVolume(ctx context.Context, req *csi.NodePublishV
 		return
 	}
 
+	if len(req.VolumeContext[ctxKeyPodName]) == 0 {
+		err = status.Error(codes.InvalidArgument, "VolumeContext must have pod name")
+		return
+	}
+
+	if len(req.VolumeContext[ctxKeyPodNamespace]) == 0 {
+		err = status.Error(codes.InvalidArgument, "VolumeContext must have pod namespace")
+		return
+	}
+
 	if req.VolumeContext[ctxKeyEphemeralVolume] != "true" &&
 		req.VolumeCapability.AccessMode.Mode != csi.VolumeCapability_AccessMode_SINGLE_NODE_READER_ONLY &&
 		req.VolumeCapability.AccessMode.Mode != csi.VolumeCapability_AccessMode_MULTI_NODE_READER_ONLY {
@@ -137,6 +149,8 @@ func (n NodeServer) NodePublishVolume(ctx context.Context, req *csi.NodePublishV
 		Image:       image,
 		PullSecrets: req.Secrets,
 		Logger:      valuesLogger,
+		Pod:         req.VolumeContext[ctxKeyPodName],
+		Namespace:   req.VolumeContext[ctxKeyPodNamespace],
 	}
 
 	if e := n.pullExecutor.StartPulling(po); e != nil {
