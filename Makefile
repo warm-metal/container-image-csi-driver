@@ -4,7 +4,6 @@ IMAGE_BUILDER ?= docker
 IMAGE_BUILD_CMD ?= buildx
 REGISTRY ?= docker.io/warmmetal
 PLATFORM ?= linux/amd64
-KIND ?= kind
 
 export IMG = $(REGISTRY)/csi-image:$(VERSION)
 
@@ -51,22 +50,6 @@ image:
 .PHONY: local
 local:
 	$(IMAGE_BUILDER) $(IMAGE_BUILD_CMD) build --platform=$(PLATFORM) -t $(REGISTRY)/csi-image:$(VERSION) --load .
-
-# builds and loads csi-image into kind registry
-.PHONY: local-kind-load
-local-kind-load:
-	$(IMAGE_BUILDER) $(IMAGE_BUILD_CMD) build --platform=$(PLATFORM) -t $(REGISTRY)/csi-image:$(VERSION) .
-	kind load docker-image $(REGISTRY)/csi-image:$(VERSION) --name $(KIND)
-
-# installs/upgrades csi-driver into kind via helm
-.PHONY: local-kind-install
-local-kind-install:
-	helm upgrade --install container-image-csi-driver charts/warm-metal-csi-driver -n kube-system -f charts/warm-metal-csi-driver/values.yaml --set csiPlugin.image.tag=$(VERSION) --wait --debug
-
-# removes all images which were directly pushed to kind registry
-.PHONY: local-kind-flush
-local-kind-flush:
-	docker exec -e CONTAINERD_NAMESPACE=k8s.io kind-control-plane bash -c "crictl images -o json | jq '.images[] | select((.repoTags == []) or (.repoTags[] | contains(\"docker.io/warmmetal/container-image-csi-driver-test:simple-fs\"))) | .id' -r > '/tmp/TMPFILE';cat /tmp/TMPFILE | awk '{print \"crictl rmi \" \$$1}' | sh;systemctl restart containerd"
 
 .PHONY: test-deps
 test-deps:
