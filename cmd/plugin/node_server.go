@@ -41,7 +41,7 @@ func NewNodeServer(driver *csicommon.CSIDriver, mounter backend.Mounter, imageSv
 	}
 	if asyncImagePullTimeout >= time.Duration(30*time.Second) {
 		klog.Infof("Starting node server in Async mode with %v timeout", asyncImagePullTimeout)
-		ns.asyncImagePuller = remoteimageasync.StartAsyncPuller(context.TODO(), 100, 20)
+		ns.asyncImagePuller = remoteimageasync.StartAsyncPuller(context.TODO(), 100)
 	} else {
 		klog.Info("Starting node server in Sync mode")
 		ns.asyncImagePullTimeout = 0 // set to default value
