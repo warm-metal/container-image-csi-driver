@@ -15,7 +15,6 @@ type PullSession struct {
 	puller     remoteimage.Puller
 	timeout    time.Duration    // this is the session timeout, not the caller timeout
 	done       chan interface{} // chan will block until result
-	isComplete bool
 	isTimedOut bool
 	err        error
 }

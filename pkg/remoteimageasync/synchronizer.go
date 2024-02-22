@@ -56,7 +56,6 @@ func (s synchronizer) StartPull(image string, puller remoteimage.Puller, asyncPu
 			puller:     puller,
 			timeout:    asyncPullTimeout,
 			done:       make(chan interface{}),
-			isComplete: false,
 			isTimedOut: false,
 			err:        nil,
 		}
