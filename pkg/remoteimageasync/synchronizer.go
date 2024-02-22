@@ -11,18 +11,20 @@ import (
 )
 
 // sessionChanDepth : 100 - must give lots of buffer to ensure no deadlock or dropped requests
-// completedChanDepth : 20 - must give some buffer to ensure no deadlock
-func StartAsyncPuller(ctx context.Context, sessionChanDepth, completedChanDepth int) AsyncPuller {
+func StartAsyncPuller(ctx context.Context, sessionChanDepth int) AsyncPuller {
 	klog.Infof("%s.StartAsyncPuller(): starting async puller", prefix)
 	sessionChan := make(chan *PullSession, sessionChanDepth)
-	completedChan := make(chan string, completedChanDepth)
 	async := getSynchronizer(
 		ctx,
 		sessionChan,
-		completedChan,
 	)
-	async.RunCompletionsLoop()
-	RunPullerLoop(ctx, sessionChan, completedChan)
+	completedFunc := func(ses *PullSession) { // remove session from session map (since no longer active for continuation)
+		async.mutex.Lock()
+		defer async.mutex.Unlock()
+		klog.V(2).Infof("%s.StartAsyncPuller(): clearing session for %s", prefix, ses.image)
+		delete(async.sessionMap, ses.image) // no-op if already deleted
+	}
+	RunPullerLoop(ctx, sessionChan, completedFunc)
 	klog.Infof("%s.StartAsyncPuller(): async puller is operational", prefix)
 	return async
 }
@@ -31,20 +33,15 @@ func StartAsyncPuller(ctx context.Context, sessionChanDepth, completedChanDepth 
 func getSynchronizer(
 	ctx context.Context,
 	sessionChan chan *PullSession,
-	completedChan chan string,
 ) synchronizer {
 	if cap(sessionChan) < 50 {
 		klog.Fatalf("%s.getSynchronizer(): session channel must have capacity to buffer events, minimum of 50 is required", prefix)
 	}
-	if cap(completedChan) < 5 {
-		klog.Fatalf("%s.getSynchronizer(): completion channel must have capacity to buffer events, minimum of 5 is required", prefix)
-	}
 	return synchronizer{
-		sessionMap:      make(map[string]*PullSession),
-		mutex:           &sync.Mutex{},
-		sessions:        sessionChan,
-		completedEvents: completedChan,
-		ctx:             ctx,
+		sessionMap: make(map[string]*PullSession),
+		mutex:      &sync.Mutex{},
+		sessions:   sessionChan,
+		ctx:        ctx,
 	}
 }
 
@@ -102,18 +99,4 @@ func (s synchronizer) WaitForPull(session *PullSession, callerTimeout context.Co
 		klog.V(2).Info(err.Error())
 		return err
 	}
-}
-
-// NOTE: all sessions that are successfully submitted to sessionsChan must be submitted to completedEvents
-func (s synchronizer) RunCompletionsLoop() {
-	go func() {
-		klog.V(2).Infof("%s.RunCompletionsLoop(): starting", prefix)
-		for image := range s.completedEvents { // remove session (no longer active)
-			s.mutex.Lock()
-			klog.V(2).Infof("%s.RunCompletionsLoop(): clearing session for %s", prefix, image)
-			delete(s.sessionMap, image) // no-op if already deleted
-			s.mutex.Unlock()
-		}
-		klog.V(2).Infof("%s.RunCompletionsLoop(): exiting loop", prefix)
-	}()
 }

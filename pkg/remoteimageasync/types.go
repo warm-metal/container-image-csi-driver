@@ -21,11 +21,10 @@ type PullSession struct {
 }
 
 type synchronizer struct {
-	sessionMap      map[string]*PullSession
-	mutex           *sync.Mutex
-	sessions        chan *PullSession
-	completedEvents chan string
-	ctx             context.Context
+	sessionMap map[string]*PullSession
+	mutex      *sync.Mutex
+	sessions   chan *PullSession
+	ctx        context.Context
 }
 
 // allows mocking/dependency injection
