@@ -28,10 +28,10 @@ func RunPullerLoop(
 			go func() {
 				klog.V(2).Infof("%s.RunPullerLoop(): asked to pull image %s with timeout %v\n",
 					prefix, ses.image, ses.timeout)
-				ctxCombined, cancelDontCare := context.WithTimeout(ctx, ses.timeout) // combine timeout and shut down signal into one
-				defer cancelDontCare()                                               // IF we exit, this no longer matters. calling to satisfy linter.
+				ctxAsyncPullTimeoutOrShutdown, cancelDontCare := context.WithTimeout(ctx, ses.timeout) // combine session timeout and shut down signal into one
+				defer cancelDontCare()                                                                 // IF we exit, this no longer matters. calling to satisfy linter.
 				pullStart := time.Now()
-				pullErr := ses.puller.Pull(ctxCombined) //NOTE: relying existing tests or history to verify behavior, asyncPull just wraps it
+				pullErr := ses.puller.Pull(ctxAsyncPullTimeoutOrShutdown)
 				// update fields on session before declaring done
 				select {
 				case <-ctx.Done(): // shutting down
@@ -39,7 +39,7 @@ func RunPullerLoop(
 					ses.err = fmt.Errorf("%s.RunPullerLoop(): shutting down", prefix)
 					klog.V(2).Infof(ses.err.Error())
 					metrics.OperationErrorsCount.WithLabelValues("pull-async-shutdown").Inc()
-				case <-ctxCombined.Done(): // timeout or shutdown
+				case <-ctxAsyncPullTimeoutOrShutdown.Done(): // timeout or shutdown
 					ses.isTimedOut = true
 					ses.err = fmt.Errorf("%s.RunPullerLoop(): async pull exceeded timeout of %v for image %s", prefix, ses.timeout, ses.image)
 					klog.V(2).Infof(ses.err.Error())
