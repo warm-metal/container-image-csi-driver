@@ -47,6 +47,7 @@ func NewNodeServer(driver *csicommon.CSIDriver, mounter backend.Mounter, imageSv
 			SecretStore:        secretStore,
 			Mounter:            mounter,
 		}),
+		k8smounter: k8smount.New(""),
 	}
 }
 
@@ -57,6 +58,7 @@ type NodeServer struct {
 	asyncImagePullMount bool
 	mountExecutor       *mountexecutor.MountExecutor
 	pullExecutor        *pullexecutor.PullExecutor
+	k8smounter          k8smount.Interface
 }
 
 func (n NodeServer) NodePublishVolume(ctx context.Context, req *csi.NodePublishVolumeRequest) (resp *csi.NodePublishVolumeResponse, err error) {
@@ -94,7 +96,7 @@ func (n NodeServer) NodePublishVolume(ctx context.Context, req *csi.NodePublishV
 		return
 	}
 
-	notMnt, err := k8smount.New("").IsLikelyNotMountPoint(req.TargetPath)
+	notMnt, err := n.k8smounter.IsLikelyNotMountPoint(req.TargetPath)
 	if err != nil {
 		if !os.IsNotExist(err) {
 			err = status.Error(codes.Internal, err.Error())
@@ -188,7 +190,7 @@ func (n NodeServer) NodeUnpublishVolume(ctx context.Context, req *csi.NodeUnpubl
 		return
 	}
 
-	mnt, err := k8smount.New("").IsMountPoint(req.TargetPath)
+	mnt, err := n.k8smounter.IsMountPoint(req.TargetPath)
 	if err != nil || !mnt {
 		return &csi.NodeUnpublishVolumeResponse{}, err
 	}
