@@ -36,6 +36,10 @@ type ContainerRuntimeMounter interface {
 	// Replace the metadata of the snapshot with the specified key with the given metadata.
 	UpdateSnapshotMetadata(ctx context.Context, key SnapshotKey, metadata SnapshotMetadata) error
 
+	AddLeaseToContext(ctx context.Context, target string) (context.Context, error)
+
+	RemoveLease(ctx context.Context, target string) error
+
 	// Destroy the snapshot with the given key.
 	// It should throw errors if the snapshot doesn't exist.
 	DestroySnapshot(ctx context.Context, key SnapshotKey) error

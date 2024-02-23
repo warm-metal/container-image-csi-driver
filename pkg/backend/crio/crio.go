@@ -53,6 +53,14 @@ func (s snapshotMounter) Mount(_ context.Context, key backend.SnapshotKey, targe
 	return nil
 }
 
+func (s snapshotMounter) AddLeaseToContext(ctx context.Context, target string) (context.Context, error) {
+	return ctx, nil
+}
+
+func (s snapshotMounter) RemoveLease(ctx context.Context, target string) error {
+	return nil
+}
+
 func (s snapshotMounter) Unmount(_ context.Context, target backend.MountTarget) error {
 	if err := k8smount.New("").Unmount(string(target)); err != nil {
 		klog.Errorf("unable to unmount %q: %s", target, err)

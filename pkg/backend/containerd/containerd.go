@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/containerd/containerd"
+	"github.com/containerd/containerd/leases"
 	"github.com/containerd/containerd/mount"
 	"github.com/containerd/containerd/reference/docker"
 	"github.com/containerd/containerd/snapshots"
@@ -18,8 +19,9 @@ import (
 )
 
 type snapshotMounter struct {
-	snapshotter snapshots.Snapshotter
-	cli         *containerd.Client
+	snapshotter   snapshots.Snapshotter
+	leasesService leases.Manager
+	cli           *containerd.Client
 }
 
 func NewMounter(socketPath string) backend.Mounter {
@@ -30,8 +32,9 @@ func NewMounter(socketPath string) backend.Mounter {
 	}
 
 	return backend.NewMounter(&snapshotMounter{
-		snapshotter: c.SnapshotService(""),
-		cli:         c,
+		snapshotter:   c.SnapshotService(""),
+		leasesService: c.LeasesService(),
+		cli:           c,
 	})
 }
 
@@ -55,12 +58,11 @@ func (s snapshotMounter) Mount(ctx context.Context, key backend.SnapshotKey, tar
 	return err
 }
 
-func (s snapshotMounter) Unmount(_ context.Context, target backend.MountTarget) error {
+func (s snapshotMounter) Unmount(ctx context.Context, target backend.MountTarget) error {
 	if err := mount.UnmountAll(string(target), 0); err != nil {
 		klog.Errorf("fail to unmount %s: %s", target, err)
 		return err
 	}
-
 	return nil
 }
 
@@ -86,6 +88,40 @@ func (s snapshotMounter) GetImageIDOrDie(ctx context.Context, image docker.Named
 	}
 
 	return identity.ChainID(diffIDs).String()
+}
+
+func (s snapshotMounter) AddLeaseToContext(ctx context.Context, target string) (context.Context, error) {
+	l, err := s.leasesService.Create(ctx, leases.WithID(target), leases.WithLabels(defaultSnapshotLabels()))
+	if err != nil {
+		klog.Errorf("unable to create lease %q: %s", target, err)
+		return nil, err
+	}
+
+	klog.Infof("lease %q added", l.ID)
+
+	leaseCtx := leases.WithLease(ctx, l.ID)
+
+	return leaseCtx, nil
+}
+
+func (s snapshotMounter) RemoveLease(ctx context.Context, target string) error {
+	l := leases.Lease{
+		ID: target,
+	}
+
+	res, _ := s.leasesService.ListResources(ctx, l)
+
+	for _, r := range res {
+		klog.Infof("resource (%q) %q of lease %q", r.Type, r.ID, l.ID)
+	}
+
+	if err := s.leasesService.Delete(ctx, l); err != nil {
+		klog.Errorf("unable to delete lease %q: %s", target, err)
+		return err
+	}
+
+	klog.Infof("lease %q removed", target)
+	return nil
 }
 
 func (s snapshotMounter) PrepareReadOnlySnapshot(
@@ -163,6 +199,16 @@ func (s snapshotMounter) FindSnapshot(
 func (s snapshotMounter) UpdateSnapshotMetadata(
 	ctx context.Context, key backend.SnapshotKey, metadata backend.SnapshotMetadata,
 ) error {
+
+	l, ok := leases.FromContext(ctx)
+	if ok {
+		klog.Infof("add resource %q to lease %q", string(key), l)
+		s.leasesService.AddResource(ctx, leases.Lease{ID: l}, leases.Resource{
+			Type: "snapshots/overlayfs",
+			ID:   string(key),
+		})
+	}
+
 	klog.Infof("update metadata of snapshot %q to %#v", key, metadata)
 	info, err := s.snapshotter.Stat(ctx, string(key))
 	if err != nil {
@@ -186,6 +232,16 @@ func (s snapshotMounter) UpdateSnapshotMetadata(
 }
 
 func (s snapshotMounter) DestroySnapshot(ctx context.Context, key backend.SnapshotKey) error {
+	allLeases, _ := s.leasesService.List(ctx)
+	for _, l := range allLeases {
+		res, _ := s.leasesService.ListResources(ctx, l)
+		for _, r := range res {
+			if r.ID == string(key) {
+				klog.Errorf("lease %q still holds the resource %q", l.ID, r.ID)
+			}
+		}
+	}
+
 	klog.Infof("remove snapshot %q", key)
 	err := s.snapshotter.Remove(ctx, string(key))
 	if err != nil {
