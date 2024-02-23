@@ -70,6 +70,9 @@ func (s *SnapshotMounter) buildSnapshotCacheOrDie() {
 			if notMount, err := mounter.IsLikelyNotMountPoint(string(target)); err != nil || notMount {
 				klog.Errorf("target %q is not a mountpoint yet. trying to release the ref of snapshot %q",
 					key)
+
+				_ = s.runtime.RemoveLease(ctx, string(target))
+
 				delete(targets, target)
 				continue
 			}
