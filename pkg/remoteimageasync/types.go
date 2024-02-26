@@ -20,10 +20,10 @@ type PullSession struct {
 }
 
 type synchronizer struct {
-	sessionMap map[string]*PullSession
-	mutex      *sync.Mutex
-	sessions   chan *PullSession
-	ctx        context.Context
+	sessionMap map[string]*PullSession // all interactions must be mutex'd
+	mutex      *sync.Mutex             // this exclusively protects the sessionMap
+	sessions   chan *PullSession       // pull activity occurs in puller Go routine when using async mode
+	ctx        context.Context         // top level application context
 }
 
 // allows mocking/dependency injection

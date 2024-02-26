@@ -31,15 +31,15 @@ func RunPullerLoop(
 				ctxAsyncPullTimeoutOrShutdown, cancelDontCare := context.WithTimeout(ctx, ses.timeout) // combine session timeout and shut down signal into one
 				defer cancelDontCare()                                                                 // IF we exit, this no longer matters. calling to satisfy linter.
 				pullStart := time.Now()
-				pullErr := ses.puller.Pull(ctxAsyncPullTimeoutOrShutdown)
+				pullErr := ses.puller.Pull(ctxAsyncPullTimeoutOrShutdown) // the waiting happens here, not in the select
 				// update fields on session before declaring done
-				select {
-				case <-ctx.Done(): // shutting down
+				select { // no waiting here, cases check for reason we exited puller.Pull()
+				case <-ctx.Done(): // application shutting down
 					ses.isTimedOut = false
 					ses.err = fmt.Errorf("%s.RunPullerLoop(): shutting down", prefix)
 					klog.V(2).Infof(ses.err.Error())
 					metrics.OperationErrorsCount.WithLabelValues("pull-async-shutdown").Inc()
-				case <-ctxAsyncPullTimeoutOrShutdown.Done(): // timeout or shutdown
+				case <-ctxAsyncPullTimeoutOrShutdown.Done(): // async pull timeout or shutdown
 					ses.isTimedOut = true
 					ses.err = fmt.Errorf("%s.RunPullerLoop(): async pull exceeded timeout of %v for image %s", prefix, ses.timeout, ses.image)
 					klog.V(2).Infof(ses.err.Error())
