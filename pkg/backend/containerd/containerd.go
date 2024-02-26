@@ -286,8 +286,18 @@ func (s snapshotMounter) ListSnapshots(ctx context.Context) (ss []backend.Snapsh
 		targets := make(map[backend.MountTarget]struct{}, 0)
 
 		if os.Getenv("USE_LEASE_ONLY") == "true" {
-			for _, lease := range resourceToLeases[info.Name] {
-				targets[backend.MountTarget(lease)] = struct{}{}
+			managedSnapshot := false
+			for k := range info.Labels {
+				if k == typeLabel && info.Labels[k] == "lease-only" {
+					// We only care about the snapshots created by the driver itself.
+					managedSnapshot = true
+					break
+				}
+			}
+			if managedSnapshot {
+				for _, lease := range resourceToLeases[info.Name] {
+					targets[backend.MountTarget(lease)] = struct{}{}
+				}
 			}
 		} else {
 			if len(info.Labels) == 0 {
@@ -345,11 +355,14 @@ const (
 	targetLabelPrefix   = labelPrefix + "/target"
 	volumeIdLabelPrefix = labelPrefix + "/id"
 	gcLabel             = "containerd.io/gc.root"
+	typeLabel           = labelPrefix + "/type"
 )
 
 func defaultSnapshotLabels() map[string]string {
 	if os.Getenv("USE_LEASE_ONLY") == "true" {
-		return map[string]string{}
+		return map[string]string{
+			typeLabel: "lease-only",
+		}
 	}
 
 	return map[string]string{
