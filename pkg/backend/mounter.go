@@ -190,11 +190,11 @@ func (s *SnapshotMounter) Mount(
 
 		defer func() {
 			if err != nil {
+				_ = s.runtime.RemoveLease(leaseCtx, string(target))
 				klog.Infof("unref read-only snapshot because of error %s", err)
 				if !s.unrefROSnapshot(leaseCtx, target) {
 					klog.Fatalf("target %q not found in the snapshot cache", target)
 				}
-				_ = s.runtime.RemoveLease(leaseCtx, string(target))
 			}
 		}()
 	} else {
@@ -208,8 +208,8 @@ func (s *SnapshotMounter) Mount(
 		defer func() {
 			if err != nil {
 				klog.Infof("unref read-write snapshot because of error %s", err)
-				s.runtime.DestroySnapshot(leaseCtx, key)
 				_ = s.runtime.RemoveLease(ctx, string(target))
+				s.runtime.DestroySnapshot(leaseCtx, key)
 			}
 		}()
 	}

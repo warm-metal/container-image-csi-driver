@@ -3,10 +3,8 @@ package containerd
 import (
 	"context"
 	"errors"
-	"fmt"
 	"os"
 	"strings"
-	"time"
 
 	"github.com/containerd/containerd"
 	"github.com/containerd/containerd/leases"
@@ -132,9 +130,6 @@ func (s snapshotMounter) PrepareReadOnlySnapshot(
 	ctx context.Context, imageID string, key backend.SnapshotKey, metadata backend.SnapshotMetadata,
 ) error {
 	labels := defaultSnapshotLabels()
-	if metadata != nil && os.Getenv("USE_LEASE_ONLY") != "true" {
-		labels = withTargets(defaultSnapshotLabels(), metadata.GetTargets())
-	}
 
 	klog.Infof("create ro snapshot %q for image %q with metadata %#v", key, imageID, labels)
 	info, err := s.FindSnapshot(ctx, string(key), imageID, snapshots.KindView, labels)
@@ -153,9 +148,6 @@ func (s snapshotMounter) PrepareRWSnapshot(
 	ctx context.Context, imageID string, key backend.SnapshotKey, metadata backend.SnapshotMetadata,
 ) error {
 	labels := defaultSnapshotLabels()
-	if metadata != nil && os.Getenv("USE_LEASE_ONLY") != "true" {
-		labels = withTargets(defaultSnapshotLabels(), metadata.GetTargets())
-	}
 
 	klog.Infof("create rw snapshot %q for image %q with metadata %#v", key, imageID, labels)
 	info, err := s.FindSnapshot(ctx, string(key), imageID, snapshots.KindActive, labels)
@@ -181,10 +173,6 @@ func (s snapshotMounter) FindSnapshot(
 	if stat.Kind == kind && stat.Parent == parent {
 		extactMatch := true
 		for k, v := range labels {
-			if k == gcLabel {
-				continue
-			}
-
 			if stat.Labels[k] != v {
 				extactMatch = false
 				break
@@ -204,10 +192,7 @@ func (s snapshotMounter) FindSnapshot(
 func (s snapshotMounter) UpdateSnapshotMetadata(
 	ctx context.Context, key backend.SnapshotKey, metadata backend.SnapshotMetadata,
 ) error {
-
-	l, ok := leases.FromContext(ctx)
-	if ok {
-
+	if l, ok := leases.FromContext(ctx); ok {
 		err := s.leasesService.AddResource(ctx, leases.Lease{ID: l}, leases.Resource{
 			Type: "snapshots/overlayfs",
 			ID:   string(key),
@@ -221,30 +206,7 @@ func (s snapshotMounter) UpdateSnapshotMetadata(
 		klog.Infof("resource %q added to lease %q", string(key), l)
 	}
 
-	if os.Getenv("USE_LEASE_ONLY") == "true" {
-		return nil
-	}
-
-	klog.Infof("update metadata of snapshot %q to %#v", key, metadata)
-	info, err := s.snapshotter.Stat(ctx, string(key))
-	if err != nil {
-		klog.Errorf("unable to fetch stat of snapshot %q: %s", key, err)
-		return err
-	}
-
-	for k := range info.Labels {
-		if strings.HasPrefix(k, labelPrefix) {
-			delete(info.Labels, k)
-		}
-	}
-
-	info.Labels = withTargets(info.Labels, metadata.GetTargets())
-	klog.Infof("labels of snapshot %q are %#v", key, info.Labels)
-	_, err = s.snapshotter.Update(ctx, info)
-	if err != nil {
-		klog.Errorf("unable to update metadata of snapshot %q: %s", key, err)
-	}
-	return err
+	return nil
 }
 
 func (s snapshotMounter) DestroySnapshot(ctx context.Context, key backend.SnapshotKey) error {
@@ -258,78 +220,43 @@ func (s snapshotMounter) DestroySnapshot(ctx context.Context, key backend.Snapsh
 		}
 	}
 
-	if os.Getenv("USE_LEASE_ONLY") == "true" {
-		return nil
-	}
-
-	klog.Infof("remove snapshot %q", key)
-	err := s.snapshotter.Remove(ctx, string(key))
-	if err != nil {
-		klog.Errorf("unable to remove the snapshot %q: %s", key, err)
-	}
-
-	return err
+	return nil
 }
 
-func (s snapshotMounter) ListSnapshots(ctx context.Context) (ss []backend.SnapshotMetadata, err error) {
-	resourceToLeases := make(map[string][]string)
+func (s snapshotMounter) ListSnapshots(ctx context.Context) ([]backend.SnapshotMetadata, error) {
+	var ss []backend.SnapshotMetadata 
+	
+	resourceToLeases := make(map[string]map[backend.MountTarget]struct{})
 
 	allLeases, _ := s.leasesService.List(ctx)
 	for _, l := range allLeases {
 		res, _ := s.leasesService.ListResources(ctx, l)
 		for _, r := range res {
-			resourceToLeases[r.ID] = append(resourceToLeases[r.ID], l.ID)
+			if (r.Type != "snapshots/overlayfs") || (r.ID == "") {
+				continue
+			}
+			if _, ok := resourceToLeases[r.ID]; !ok {
+				resourceToLeases[r.ID] = make(map[backend.MountTarget]struct{})
+			}
+			resourceToLeases[r.ID][backend.MountTarget(l.ID)] = struct{}{}
 		}
 	}
 
-	err = s.snapshotter.Walk(ctx, func(ctx context.Context, info snapshots.Info) error {
-		targets := make(map[backend.MountTarget]struct{}, 0)
-
-		if os.Getenv("USE_LEASE_ONLY") == "true" {
-			managedSnapshot := false
-			for k := range info.Labels {
-				if k == typeLabel && info.Labels[k] == "lease-only" {
-					// We only care about the snapshots created by the driver itself.
-					managedSnapshot = true
-					break
-				}
-			}
-			if managedSnapshot {
-				for _, lease := range resourceToLeases[info.Name] {
-					targets[backend.MountTarget(lease)] = struct{}{}
-				}
-			}
-		} else {
-			if len(info.Labels) == 0 {
-				return nil
-			}
-
-			for k := range info.Labels {
-				// To be compatible with old snapshots(prior to v0.4.2), we must filter read-write snapshots out.
-				// The read-write snapshot always has a key of leading with "csi-", while the key of a read-only snapshot
-				// is its image ID.
-				if strings.HasPrefix(k, volumeIdLabelPrefix) {
-					if strings.HasPrefix(info.Name[len(labelPrefix)+1:], "csi-") {
-						klog.Infof("rw snapshot %q with labels %#v is created by an old versioned driver, skip it",
-							info.Name, info.Labels)
-						targets = nil
-						break
-					}
-
-					if _, err := docker.ParseNamed(info.Name[len(labelPrefix)+1:]); err == nil {
-						klog.Warningf("snapshot %q with labels %#v is an old versioned snapshot used by a PV. "+
-							"It will be excluded from the ro snapshot cache, but it still can be unmounted normally.",
-							info.Name, info.Labels)
-						targets = nil
-						break
-					}
-				}
-
-				if strings.HasPrefix(k, targetLabelPrefix) {
-					targets[backend.MountTarget(k[len(targetLabelPrefix)+1:])] = struct{}{}
-				}
+	err := s.snapshotter.Walk(ctx, func(ctx context.Context, info snapshots.Info) error {
+		managedSnapshot := true
+		for key, value := range info.Labels {
+			if key == typeLabel && value == "lease-only" {
+				// We only care about the snapshots created by the driver itself.
+				managedSnapshot = true
+				break
 			}
 		}
+
+		if !managedSnapshot {
+			return nil
+		}
+
+		targets := resourceToLeases[info.Name]
 
 		if len(targets) > 0 {
 			metadata := make(backend.SnapshotMetadata)
@@ -347,43 +274,18 @@ func (s snapshotMounter) ListSnapshots(ctx context.Context) (ss []backend.Snapsh
 		return nil, err
 	}
 
-	return
+	return ss, nil
 }
 
 const (
-	labelPrefix         = "csi-image.warm-metal.tech"
-	targetLabelPrefix   = labelPrefix + "/target"
-	volumeIdLabelPrefix = labelPrefix + "/id"
-	gcLabel             = "containerd.io/gc.root"
-	typeLabel           = labelPrefix + "/type"
+	labelPrefix = "csi-image.warm-metal.tech"
+	typeLabel   = labelPrefix + "/type"
 )
 
 func defaultSnapshotLabels() map[string]string {
-	if os.Getenv("USE_LEASE_ONLY") == "true" {
-		return map[string]string{
-			typeLabel: "lease-only",
-		}
-	}
-
 	return map[string]string{
-		gcLabel: time.Now().UTC().Format(time.RFC3339),
+		typeLabel: "lease-only",
 	}
-}
-
-func genTargetLabel(target string) string {
-	return fmt.Sprintf("%s|%s", targetLabelPrefix, target)
-}
-
-func withTarget(labels map[string]string, target string) map[string]string {
-	labels[genTargetLabel(target)] = "√"
-	return labels
-}
-
-func withTargets(labels map[string]string, targets map[backend.MountTarget]struct{}) map[string]string {
-	for target := range targets {
-		withTarget(labels, string(target))
-	}
-	return labels
 }
 
 func describeMounts(mounts []mount.Mount, target string) string {
