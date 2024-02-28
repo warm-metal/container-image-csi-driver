@@ -2,9 +2,12 @@ package remoteimageasync
 
 import (
 	"fmt"
+	"strings"
 	"testing"
 
+	"github.com/containerd/containerd/reference/docker"
 	"github.com/stretchr/testify/assert"
+	"github.com/warm-metal/container-image-csi-driver/pkg/remoteimage"
 )
 
 // demonstrates session channel structure's pass-by-reference is appropriate
@@ -71,4 +74,13 @@ func TestChannelClose(t *testing.T) {
 	}, "write should not panic")
 	assert.NotNil(t, err, "error should have been returned")
 	assert.Contains(t, err.Error(), "closed", "error should indicate channel closed")
+}
+
+func TestNamedImageExtraction(t *testing.T) {
+	parsed, err := docker.ParseDockerRef(nonExistentImage)
+	assert.Nil(t, err, "parsing image name should succeed")
+	puller := remoteimage.NewPuller(nil, parsed, nil)
+	assert.Equal(t, nonExistentImage, puller.ImageWithTag(), "extracted value should match exactly %v", puller)
+	repo := strings.Split(nonExistentImage, ":")[0]
+	assert.Equal(t, repo, puller.ImageWithoutTag(), "extracted value should match exactly %v", puller)
 }

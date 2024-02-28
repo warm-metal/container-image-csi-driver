@@ -15,7 +15,8 @@ import (
 
 type Puller interface {
 	Pull(context.Context) error
-	Image() string
+	ImageWithTag() string
+	ImageWithoutTag() string
 	ImageSize(context.Context) (int, error)
 }
 
@@ -34,7 +35,11 @@ type puller struct {
 	keyring  credentialprovider.DockerKeyring
 }
 
-func (p puller) Image() string {
+func (p puller) ImageWithTag() string {
+	return p.image.String()
+}
+
+func (p puller) ImageWithoutTag() string {
 	return p.image.Name()
 }
 
@@ -100,8 +105,8 @@ func (p puller) Pull(ctx context.Context) (err error) {
 			}
 		}
 	}()
-	repo := p.Image()
-	imageSpec := &cri.ImageSpec{Image: p.Image()}
+	repo := p.ImageWithoutTag()
+	imageSpec := &cri.ImageSpec{Image: p.ImageWithTag()}
 	creds, withCredentials := p.keyring.Lookup(repo)
 	// klog.V(2).Infof("remoteimage.Pull(): len(creds)=%d, withCreds=%t", len(creds), withCredentials)
 	if !withCredentials {

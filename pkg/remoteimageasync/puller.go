@@ -27,7 +27,7 @@ func RunPullerLoop(
 			}
 			go func() {
 				klog.V(2).Infof("%s.RunPullerLoop(): asked to pull image %s with timeout %v\n",
-					prefix, ses.Image(), ses.timeout)
+					prefix, ses.ImageWithTag(), ses.timeout)
 				ctxAsyncPullTimeoutOrShutdown, cancelDontCare := context.WithTimeout(ctx, ses.timeout) // combine session timeout and shut down signal into one
 				defer cancelDontCare()                                                                 // IF we exit, this no longer matters. calling to satisfy linter.
 				pullStart := time.Now()
@@ -41,13 +41,13 @@ func RunPullerLoop(
 					metrics.OperationErrorsCount.WithLabelValues("pull-async-shutdown").Inc()
 				case <-ctxAsyncPullTimeoutOrShutdown.Done(): // async pull timeout or shutdown
 					ses.isTimedOut = true
-					ses.err = fmt.Errorf("%s.RunPullerLoop(): async pull exceeded timeout of %v for image %s", prefix, ses.timeout, ses.Image())
+					ses.err = fmt.Errorf("%s.RunPullerLoop(): async pull exceeded timeout of %v for image %s", prefix, ses.timeout, ses.ImageWithTag())
 					klog.V(2).Infof(ses.err.Error())
 					metrics.OperationErrorsCount.WithLabelValues("pull-async-timeout").Inc()
 				default: // completion: success or error
 					ses.isTimedOut = false
 					ses.err = pullErr
-					klog.V(2).Infof("%s.RunPullerLoop(): pull completed in %v for image %s with error=%v\n", prefix, time.Since(pullStart), ses.Image(), ses.err)
+					klog.V(2).Infof("%s.RunPullerLoop(): pull completed in %v for image %s with error=%v\n", prefix, time.Since(pullStart), ses.ImageWithTag(), ses.err)
 					if ses.err != nil {
 						metrics.OperationErrorsCount.WithLabelValues("pull-async-error").Inc()
 					}

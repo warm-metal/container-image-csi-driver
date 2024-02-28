@@ -18,8 +18,8 @@ type PullSession struct {
 	err        error
 }
 
-func (p PullSession) Image() string {
-	return p.puller.Image()
+func (p PullSession) ImageWithTag() string {
+	return p.puller.ImageWithTag()
 }
 
 type synchronizer struct {

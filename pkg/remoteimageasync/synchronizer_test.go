@@ -212,8 +212,12 @@ func (p pullerMock) Pull(ctx context.Context) (err error) {
 	}
 }
 
-func (p pullerMock) Image() string {
+func (p pullerMock) ImageWithTag() string {
 	return p.image
+}
+
+func (p pullerMock) ImageWithoutTag() string {
+	panic("Not implemented")
 }
 
 func (p pullerMock) ImageSize(ctx context.Context) (int, error) {
