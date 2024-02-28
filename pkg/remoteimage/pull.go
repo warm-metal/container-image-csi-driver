@@ -2,12 +2,20 @@ package remoteimage
 
 import (
 	"context"
+	"sync"
 
 	"github.com/containerd/containerd/reference/docker"
+	"golang.org/x/sync/semaphore"
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	cri "k8s.io/cri-api/pkg/apis/runtime/v1"
+	"k8s.io/klog/v2"
 	"k8s.io/kubernetes/pkg/credentialprovider"
 )
+
+type CurrentPull struct {
+	semaphore *semaphore.Weighted
+	err       error
+}
 
 type Puller interface {
 	Pull(context.Context) error
@@ -24,9 +32,11 @@ func NewPuller(imageSvc cri.ImageServiceClient, image docker.Named,
 }
 
 type puller struct {
-	imageSvc cri.ImageServiceClient
-	image    docker.Named
-	keyring  credentialprovider.DockerKeyring
+	imageSvc     cri.ImageServiceClient
+	image        docker.Named
+	keyring      credentialprovider.DockerKeyring
+	lock         *sync.Mutex
+	parallelPull map[string]*CurrentPull
 }
 
 // Returns the compressed size of the image that was pulled in bytes
@@ -51,6 +61,41 @@ func (p puller) Pull(ctx context.Context) (err error) {
 		return
 	}
 
+	p.lock.Lock()
+	if p.parallelPull == nil {
+		p.parallelPull = make(map[string]*CurrentPull)
+	}
+
+	currentPullLock, ok := p.parallelPull[repo]
+	if !ok {
+		p.parallelPull[repo] = &CurrentPull{
+			semaphore: semaphore.NewWeighted(1),
+		}
+		currentPullLock = p.parallelPull[repo]
+	}
+	p.lock.Unlock()
+
+	doingPull := currentPullLock.semaphore.TryAcquire(1)
+	if !doingPull {
+		klog.Info("Pulling of image %s is already in progress wait until completed", repo)
+		currentPullLock.semaphore.Acquire(ctx, 1)
+	} else {
+		klog.Info("Pulling of image %s not in progress, starting now", repo)
+	}
+
+	defer currentPullLock.semaphore.Release(1)
+
+	if !doingPull {
+		klog.Info("Pulling of image %s is completed", repo)
+		return currentPullLock.err
+	}
+
+	defer func() {
+		p.lock.Lock()
+		delete(p.parallelPull, repo)
+		p.lock.Unlock()
+	}()
+
 	var pullErrs []error
 	for _, cred := range creds {
 		auth := &cri.AuthConfig{
@@ -68,11 +113,13 @@ func (p puller) Pull(ctx context.Context) (err error) {
 		})
 
 		if err == nil {
+			klog.Info("Image pull completed successfully")
 			return
 		}
 
 		pullErrs = append(pullErrs, err)
 	}
 
-	return utilerrors.NewAggregate(pullErrs)
+	currentPullLock.err = utilerrors.NewAggregate(pullErrs)
+	return err
 }

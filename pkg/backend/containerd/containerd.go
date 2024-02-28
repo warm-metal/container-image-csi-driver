@@ -3,6 +3,7 @@ package containerd
 import (
 	"context"
 	"errors"
+	"fmt"
 	"os"
 	"strings"
 
@@ -112,11 +113,6 @@ func (s snapshotMounter) RemoveLease(ctx context.Context, target string) error {
 		ID: target,
 	}
 
-	res, _ := s.leasesService.ListResources(ctx, l)
-	for _, r := range res {
-		klog.Infof("resource %q attachment of lease %q", r.ID, l.ID)
-	}
-
 	if err := s.leasesService.Delete(ctx, l); err != nil {
 		klog.Errorf("unable to delete lease %q: %s", target, err)
 		return err
@@ -180,13 +176,11 @@ func (s snapshotMounter) FindSnapshot(
 		}
 
 		if extactMatch {
-			klog.Infof("found existed snapshot %q, use it", key)
-			return &stat, nil
+			return &stat, fmt.Errorf("snapshot %q already exists with exact match", key)
 		}
 	}
 
-	klog.Infof("found existed snapshot %q with different configuration %#v", key, &stat)
-	return &stat, nil
+	return &stat, fmt.Errorf("snapshot %q already exists with different configuration", key)
 }
 
 func (s snapshotMounter) UpdateSnapshotMetadata(
@@ -210,25 +204,20 @@ func (s snapshotMounter) UpdateSnapshotMetadata(
 }
 
 func (s snapshotMounter) DestroySnapshot(ctx context.Context, key backend.SnapshotKey) error {
-	allLeases, _ := s.leasesService.List(ctx)
-	for _, l := range allLeases {
-		res, _ := s.leasesService.ListResources(ctx, l)
-		for _, r := range res {
-			if r.ID == string(key) {
-				klog.Errorf("lease %q still holds the resource %q", l.ID, r.ID)
-			}
-		}
-	}
-
 	return nil
 }
 
 func (s snapshotMounter) ListSnapshots(ctx context.Context) ([]backend.SnapshotMetadata, error) {
-	var ss []backend.SnapshotMetadata 
-	
+	var ss []backend.SnapshotMetadata
+
 	resourceToLeases := make(map[string]map[backend.MountTarget]struct{})
 
-	allLeases, _ := s.leasesService.List(ctx)
+	allLeases, err := s.leasesService.List(ctx)
+	if err != nil {
+		klog.Errorf("unable to list leases: %s", err)
+		return nil, err
+	}
+
 	for _, l := range allLeases {
 		res, _ := s.leasesService.ListResources(ctx, l)
 		for _, r := range res {
@@ -242,7 +231,11 @@ func (s snapshotMounter) ListSnapshots(ctx context.Context) ([]backend.SnapshotM
 		}
 	}
 
-	err := s.snapshotter.Walk(ctx, func(ctx context.Context, info snapshots.Info) error {
+	err = s.snapshotter.Walk(ctx, func(ctx context.Context, info snapshots.Info) error {
+		if len(resourceToLeases[info.Name]) == 0 {
+			return nil
+		}
+		
 		managedSnapshot := true
 		for key, value := range info.Labels {
 			if key == typeLabel && value == "lease-only" {
@@ -257,14 +250,11 @@ func (s snapshotMounter) ListSnapshots(ctx context.Context) ([]backend.SnapshotM
 		}
 
 		targets := resourceToLeases[info.Name]
-
-		if len(targets) > 0 {
-			metadata := make(backend.SnapshotMetadata)
-			metadata.SetSnapshotKey(info.Name)
-			metadata.SetTargets(targets)
-			ss = append(ss, metadata)
-			klog.Infof("got ro snapshot %q with %d targets %#v", info.Name, len(targets), targets)
-		}
+		metadata := make(backend.SnapshotMetadata)
+		metadata.SetSnapshotKey(info.Name)
+		metadata.SetTargets(targets)
+		ss = append(ss, metadata)
+		klog.Infof("got ro snapshot %q with %d targets %#v", info.Name, len(targets), targets)
 
 		return nil
 	})
