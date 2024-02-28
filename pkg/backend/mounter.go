@@ -71,8 +71,6 @@ func (s *SnapshotMounter) buildSnapshotCacheOrDie() {
 				klog.Errorf("target %q is not a mountpoint yet. trying to release the ref of snapshot %q",
 					key)
 
-				_ = s.runtime.RemoveLease(ctx, string(target))
-
 				delete(targets, target)
 				continue
 			}
@@ -169,13 +167,8 @@ func (s *SnapshotMounter) unrefROSnapshot(ctx context.Context, target MountTarge
 func (s *SnapshotMounter) Mount(
 	ctx context.Context, volumeId string, target MountTarget, image docker.Named, ro bool) (err error) {
 
-	leaseCtx, err := s.runtime.AddLeaseToContext(ctx, string(target))
-	if err != nil {
-		return err
-	}
-
 	var key SnapshotKey
-	imageID := s.runtime.GetImageIDOrDie(leaseCtx, image)
+	imageID := s.runtime.GetImageIDOrDie(ctx, image)
 	if ro {
 		// Use the image ID as the key of the read-only snapshot
 		if imageID == "" {
@@ -184,15 +177,14 @@ func (s *SnapshotMounter) Mount(
 
 		key = GenSnapshotKey(imageID)
 		klog.Infof("refer read-only snapshot of image %q with key %q", image, key)
-		if err := s.refROSnapshot(leaseCtx, target, imageID, key, createSnapshotMetaData(target)); err != nil {
+		if err := s.refROSnapshot(ctx, target, imageID, key, createSnapshotMetaData(target)); err != nil {
 			return err
 		}
 
 		defer func() {
 			if err != nil {
-				_ = s.runtime.RemoveLease(leaseCtx, string(target))
 				klog.Infof("unref read-only snapshot because of error %s", err)
-				if !s.unrefROSnapshot(leaseCtx, target) {
+				if !s.unrefROSnapshot(ctx, target) {
 					klog.Fatalf("target %q not found in the snapshot cache", target)
 				}
 			}
@@ -201,20 +193,19 @@ func (s *SnapshotMounter) Mount(
 		// For read-write volumes, they must be ephemeral volumes, that which volumeIDs are unique strings.
 		key = GenSnapshotKey(volumeId)
 		klog.Infof("create read-write snapshot of image %q with key %q", image, key)
-		if err := s.runtime.PrepareRWSnapshot(leaseCtx, imageID, key, nil); err != nil {
+		if err := s.runtime.PrepareRWSnapshot(ctx, imageID, key, nil); err != nil {
 			return err
 		}
 
 		defer func() {
 			if err != nil {
 				klog.Infof("unref read-write snapshot because of error %s", err)
-				_ = s.runtime.RemoveLease(ctx, string(target))
-				s.runtime.DestroySnapshot(leaseCtx, key)
+				s.runtime.DestroySnapshot(ctx, key)
 			}
 		}()
 	}
 
-	err = s.runtime.Mount(leaseCtx, key, target, ro)
+	err = s.runtime.Mount(ctx, key, target, ro)
 	return err
 }
 
@@ -223,8 +214,6 @@ func (s *SnapshotMounter) Unmount(ctx context.Context, volumeId string, target M
 	if err := s.runtime.Unmount(ctx, target); err != nil {
 		return err
 	}
-
-	_ = s.runtime.RemoveLease(ctx, string(target))
 
 	klog.Infof("try to unref read-only snapshot")
 	// Try to unref a read-only snapshot.
