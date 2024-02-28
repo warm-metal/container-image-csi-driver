@@ -47,6 +47,8 @@ type ContainerRuntimeMounter interface {
 	// List metadata of all snapshots created by the driver.
 	// The snapshot key must also be saved in the returned map with the key "FakeMetaDataSnapshotKey".
 	ListSnapshots(ctx context.Context) ([]SnapshotMetadata, error)
+
+	MigrateOldSnapshotFormat(ctx context.Context) error
 }
 
 // Mounter is a generic interface used for mounting images

@@ -20,8 +20,7 @@ type SnapshotMounter struct {
 	umountlimiter *rate.Limiter
 }
 
-// todo find better name
-func NewMounter2(runtime backend.ContainerRuntimeMounter) *SnapshotMounter {
+func NewContainerdMounter(runtime backend.ContainerRuntimeMounter) *SnapshotMounter {
 	mounter := &SnapshotMounter{
 		runtime: runtime,
 		guard:   sync.Mutex{},
@@ -41,6 +40,10 @@ func (s *SnapshotMounter) buildSnapshotCacheOrDie() {
 	ctx, cancel := context.WithTimeout(context.TODO(), 20*time.Second)
 	defer cancel()
 
+	if err := s.runtime.MigrateOldSnapshotFormat(ctx); err != nil {
+		klog.Fatalf("unable to migrate old snapshot format: %s", err)
+	}
+
 	snapshots, err := s.runtime.ListSnapshots(ctx)
 	if err != nil {
 		klog.Fatalf("unable to list snapshots: %s", err)
@@ -57,8 +60,6 @@ func (s *SnapshotMounter) buildSnapshotCacheOrDie() {
 		}
 
 		for target := range metadata.GetTargets() {
-			// FIXME Considering using checksum of target instead to shorten metadata.
-			// But the mountpoint checking become unavailable any more.
 			if notMount, err := mounter.IsLikelyNotMountPoint(string(target)); err != nil || notMount {
 				klog.Errorf("target %q is not a mountpoint yet. trying to release the ref of snapshot %q",
 					key)

@@ -30,7 +30,7 @@ func NewMounter(socketPath string) backend.Mounter {
 			"recreate the container may fix: %s", err)
 	}
 
-	return NewMounter2(&snapshotMounter{
+	return NewContainerdMounter(&snapshotMounter{
 		snapshotter:   c.SnapshotService(""),
 		leasesService: c.LeasesService(),
 		cli:           c,
@@ -169,11 +169,11 @@ func (s snapshotMounter) FindSnapshot(
 	if stat.Kind == kind && stat.Parent == parent {
 		extactMatch := true
 		for k, v := range labels {
-			if k == "containerd.io/gc.root" {
+			if k == gcLabel { // skip gc label from version <= 1.1.0
 				continue
 			}
 
-			if k == "csi-image.warm-metal.tech/target" {
+			if k == targetLabelPrefix { // skip target label from version <= 1.1.0
 				continue
 			}
 
@@ -216,12 +216,77 @@ func (s snapshotMounter) DestroySnapshot(ctx context.Context, key backend.Snapsh
 	return nil
 }
 
+func (s snapshotMounter) MigrateOldSnapshotFormat(ctx context.Context) error {
+	oldImages := make(map[*snapshots.Info]map[backend.MountTarget]struct{})
+	err := s.snapshotter.Walk(ctx, func(ctx context.Context, info snapshots.Info) error {
+		targets := make(map[backend.MountTarget]struct{}, len(info.Labels))
+		infoP := &info
+		for k := range info.Labels {
+			// To be compatible with old snapshots(prior to v0.4.2), we must filter read-write snapshots out.
+			// The read-write snapshot always has a key of leading with "csi-", while the key of a read-only snapshot
+			// is its image ID.
+			if strings.HasPrefix(k, volumeIdLabelPrefix) {
+				if strings.HasPrefix(info.Name[len(labelPrefix)+1:], "csi-") {
+					klog.Infof("rw snapshot %q with labels %#v is created by an old versioned driver, skip it",
+						info.Name, info.Labels)
+					targets = nil
+					break
+				}
+
+				if _, err := docker.ParseNamed(info.Name[len(labelPrefix)+1:]); err == nil {
+					klog.Warningf("snapshot %q with labels %#v is an old versioned snapshot used by a PV. "+
+						"It will be excluded from the ro snapshot cache, but it still can be unmounted normally.",
+						info.Name, info.Labels)
+					targets = nil
+					break
+				}
+			}
+
+			if strings.HasPrefix(k, targetLabelPrefix) {
+				targets[backend.MountTarget(k[len(targetLabelPrefix)+1:])] = struct{}{}
+			}
+		}
+
+		if len(targets) > 0 {
+			oldImages[infoP] = targets
+		}
+
+		return nil
+	})
+
+	if err != nil {
+		klog.Errorf("unable to list snapshots for migration: %s", err)
+		return err
+	}
+
+	for oldImage, targets := range oldImages {
+		for target := range targets {
+			s.leasesService.Create(ctx, leases.WithID(string(target)), leases.WithLabels(defaultSnapshotLabels()))
+			s.leasesService.AddResource(ctx, leases.Lease{ID: string(target)}, leases.Resource{
+				Type: "snapshots/overlayfs",
+				ID:   oldImage.Name,
+			})
+			klog.Infof("migrated target %q for snapshot %q by adding lease", target, oldImage.Name)
+		}
+		oldImage.Labels = defaultSnapshotLabels()
+		_, err := s.snapshotter.Update(ctx, *oldImage)
+		if err != nil {
+			klog.Errorf("unable to update snapshot %q: %s", oldImage.Name, err)
+			return err
+		}
+		klog.Infof("snapshot %q migrated", oldImage.Name)
+	}
+
+	return err
+}
+
 func (s snapshotMounter) ListSnapshots(ctx context.Context) ([]backend.SnapshotMetadata, error) {
 	var ss []backend.SnapshotMetadata
 
 	resourceToLeases := make(map[string]map[backend.MountTarget]struct{})
 
 	// todo: add migration of previous format without lease
+	s.MigrateOldSnapshotFormat(ctx)
 
 	allLeases, err := s.leasesService.List(ctx)
 	if err != nil {
@@ -287,6 +352,11 @@ func (s snapshotMounter) ListSnapshots(ctx context.Context) ([]backend.SnapshotM
 const (
 	labelPrefix = "csi-image.warm-metal.tech"
 	typeLabel   = labelPrefix + "/type"
+
+	// old format labels
+	volumeIdLabelPrefix = labelPrefix + "/id"
+	targetLabelPrefix   = labelPrefix + "/target"
+	gcLabel             = "containerd.io/gc.root"
 )
 
 func defaultSnapshotLabels() map[string]string {
