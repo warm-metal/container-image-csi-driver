@@ -22,6 +22,11 @@ type Puller interface {
 	ImageSize(context.Context) int
 }
 
+var (
+	parallelLock *sync.Mutex             = &sync.Mutex{}
+	parallelPull map[string]*CurrentPull = make(map[string]*CurrentPull)
+)
+
 func NewPuller(imageSvc cri.ImageServiceClient, image docker.Named,
 	keyring credentialprovider.DockerKeyring) Puller {
 	return &puller{
@@ -32,11 +37,9 @@ func NewPuller(imageSvc cri.ImageServiceClient, image docker.Named,
 }
 
 type puller struct {
-	imageSvc     cri.ImageServiceClient
-	image        docker.Named
-	keyring      credentialprovider.DockerKeyring
-	lock         *sync.Mutex
-	parallelPull map[string]*CurrentPull
+	imageSvc cri.ImageServiceClient
+	image    docker.Named
+	keyring  credentialprovider.DockerKeyring
 }
 
 // Returns the compressed size of the image that was pulled in bytes
@@ -61,39 +64,35 @@ func (p puller) Pull(ctx context.Context) (err error) {
 		return
 	}
 
-	p.lock.Lock()
-	if p.parallelPull == nil {
-		p.parallelPull = make(map[string]*CurrentPull)
-	}
-
-	currentPullLock, ok := p.parallelPull[repo]
+	parallelLock.Lock()
+	currentPullLock, ok := parallelPull[repo]
 	if !ok {
-		p.parallelPull[repo] = &CurrentPull{
+		parallelPull[repo] = &CurrentPull{
 			semaphore: semaphore.NewWeighted(1),
 		}
-		currentPullLock = p.parallelPull[repo]
+		currentPullLock = parallelPull[repo]
 	}
-	p.lock.Unlock()
+	parallelLock.Unlock()
 
 	doingPull := currentPullLock.semaphore.TryAcquire(1)
 	if !doingPull {
-		klog.Info("Pulling of image %s is already in progress wait until completed", repo)
+		klog.Infof("Pulling of image %s is already in progress wait until completed", repo)
 		currentPullLock.semaphore.Acquire(ctx, 1)
 	} else {
-		klog.Info("Pulling of image %s not in progress, starting now", repo)
+		klog.Infof("Pulling of image %s not in progress, starting now", repo)
 	}
 
 	defer currentPullLock.semaphore.Release(1)
 
 	if !doingPull {
-		klog.Info("Pulling of image %s is completed", repo)
+		klog.Infof("Pulling of image %s is completed", repo)
 		return currentPullLock.err
 	}
 
 	defer func() {
-		p.lock.Lock()
-		delete(p.parallelPull, repo)
-		p.lock.Unlock()
+		parallelLock.Lock()
+		delete(parallelPull, repo)
+		parallelLock.Unlock()
 	}()
 
 	var pullErrs []error

@@ -30,7 +30,7 @@ func NewMounter(socketPath string) backend.Mounter {
 			"recreate the container may fix: %s", err)
 	}
 
-	return backend.NewMounter(&snapshotMounter{
+	return NewMounter2(&snapshotMounter{
 		snapshotter:   c.SnapshotService(""),
 		leasesService: c.LeasesService(),
 		cli:           c,
@@ -79,8 +79,8 @@ func (s snapshotMounter) GetImageIDOrDie(ctx context.Context, image docker.Named
 	if err = localImage.Unpack(ctx, ""); err != nil {
 		klog.Fatalf("unable to unpack image %q: %s", image, err)
 	}
-
 	klog.Infof("image %q unpacked", image)
+
 	diffIDs, err := localImage.RootFS(ctx)
 	if err != nil {
 		klog.Fatalf("unable to fetch rootfs of image %q: %s", image, err)
@@ -128,8 +128,8 @@ func (s snapshotMounter) PrepareReadOnlySnapshot(
 	labels := defaultSnapshotLabels()
 
 	klog.Infof("create ro snapshot %q for image %q with metadata %#v", key, imageID, labels)
-	info, err := s.FindSnapshot(ctx, string(key), imageID, snapshots.KindView, labels)
-	if info != nil {
+	_, err := s.FindSnapshot(ctx, string(key), imageID, snapshots.KindView, labels)
+	if err != nil {
 		return err
 	}
 
@@ -146,8 +146,8 @@ func (s snapshotMounter) PrepareRWSnapshot(
 	labels := defaultSnapshotLabels()
 
 	klog.Infof("create rw snapshot %q for image %q with metadata %#v", key, imageID, labels)
-	info, err := s.FindSnapshot(ctx, string(key), imageID, snapshots.KindActive, labels)
-	if info != nil {
+	_, err := s.FindSnapshot(ctx, string(key), imageID, snapshots.KindActive, labels)
+	if err != nil {
 		return err
 	}
 
@@ -169,6 +169,14 @@ func (s snapshotMounter) FindSnapshot(
 	if stat.Kind == kind && stat.Parent == parent {
 		extactMatch := true
 		for k, v := range labels {
+			if k == "containerd.io/gc.root" {
+				continue
+			}
+
+			if k == "csi-image.warm-metal.tech/target" {
+				continue
+			}
+
 			if stat.Labels[k] != v {
 				extactMatch = false
 				break
@@ -180,7 +188,7 @@ func (s snapshotMounter) FindSnapshot(
 		}
 	}
 
-	return &stat, fmt.Errorf("snapshot %q already exists with different configuration", key)
+	return &stat, fmt.Errorf("snapshot %q already exists with different configuration %v", key, stat)
 }
 
 func (s snapshotMounter) UpdateSnapshotMetadata(
@@ -198,8 +206,9 @@ func (s snapshotMounter) UpdateSnapshotMetadata(
 		}
 
 		klog.Infof("resource %q added to lease %q", string(key), l)
+	} else {
+		klog.Errorf("lease is not found in context")
 	}
-
 	return nil
 }
 
@@ -212,6 +221,8 @@ func (s snapshotMounter) ListSnapshots(ctx context.Context) ([]backend.SnapshotM
 
 	resourceToLeases := make(map[string]map[backend.MountTarget]struct{})
 
+	// todo: add migration of previous format without lease
+
 	allLeases, err := s.leasesService.List(ctx)
 	if err != nil {
 		klog.Errorf("unable to list leases: %s", err)
@@ -219,6 +230,11 @@ func (s snapshotMounter) ListSnapshots(ctx context.Context) ([]backend.SnapshotM
 	}
 
 	for _, l := range allLeases {
+		if l.Labels[typeLabel] != "lease-only" {
+			klog.Info("skip lease %q", l.ID)
+			continue
+		}
+
 		res, _ := s.leasesService.ListResources(ctx, l)
 		for _, r := range res {
 			if (r.Type != "snapshots/overlayfs") || (r.ID == "") {
@@ -235,7 +251,7 @@ func (s snapshotMounter) ListSnapshots(ctx context.Context) ([]backend.SnapshotM
 		if len(resourceToLeases[info.Name]) == 0 {
 			return nil
 		}
-		
+
 		managedSnapshot := true
 		for key, value := range info.Labels {
 			if key == typeLabel && value == "lease-only" {
@@ -246,6 +262,7 @@ func (s snapshotMounter) ListSnapshots(ctx context.Context) ([]backend.SnapshotM
 		}
 
 		if !managedSnapshot {
+			klog.Infof("skip snapshot %q", info.Name)
 			return nil
 		}
 
