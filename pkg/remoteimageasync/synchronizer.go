@@ -21,8 +21,8 @@ func StartAsyncPuller(ctx context.Context, sessionChanDepth int) AsyncPuller {
 	completedFunc := func(ses *PullSession) { // remove session from session map (since no longer active for continuation)
 		async.mutex.Lock()
 		defer async.mutex.Unlock()
-		klog.V(2).Infof("%s.StartAsyncPuller(): clearing session for %s", prefix, ses.image)
-		delete(async.sessionMap, ses.image) // no-op if already deleted
+		klog.V(2).Infof("%s.StartAsyncPuller(): clearing session for %s", prefix, ses.Image())
+		delete(async.sessionMap, ses.Image()) // no-op if already deleted
 	}
 	RunPullerLoop(ctx, sessionChan, completedFunc)
 	klog.Infof("%s.StartAsyncPuller(): async puller is operational", prefix)
@@ -52,7 +52,6 @@ func (s synchronizer) StartPull(image string, puller remoteimage.Puller, asyncPu
 	ses, ok := s.sessionMap[image] // try get session
 	if !ok {                       // if no session, create session
 		ses = &PullSession{
-			image:      image,
 			puller:     puller,
 			timeout:    asyncPullTimeout,
 			done:       make(chan interface{}),
@@ -64,37 +63,37 @@ func (s synchronizer) StartPull(image string, puller remoteimage.Puller, asyncPu
 			if rec := recover(); rec != nil { // handle session write panic due to closed sessionChan
 				// override named return values
 				ses = nil
-				err = fmt.Errorf("%s.StartPull(): cannot create pull session for %s at this time, reason: %v", prefix, ses.image, rec)
+				err = fmt.Errorf("%s.StartPull(): cannot create pull session for %s at this time, reason: %v", prefix, ses.Image(), rec)
 				klog.V(2).Info(err.Error())
 			}
 		}()
 		select {
 		case s.sessions <- ses: // start session, check for deadlock... possibility of panic but only during app shutdown where Puller has already ceased to operate, handle with defer/recover
-			klog.V(2).Infof("%s.StartPull(): new session created for %s with timeout %v", prefix, ses.image, ses.timeout)
+			klog.V(2).Infof("%s.StartPull(): new session created for %s with timeout %v", prefix, ses.Image(), ses.timeout)
 			s.sessionMap[image] = ses // add session to map to allow continuation... only do this because was passed to puller via sessions channel
 			return ses, nil
 		default: // catch deadlock or throttling (they may look the same)
-			err := fmt.Errorf("%s.StartPull(): cannot create pull session for %s at this time, throttling or deadlock condition exists, retry if throttling", prefix, ses.image)
+			err := fmt.Errorf("%s.StartPull(): cannot create pull session for %s at this time, throttling or deadlock condition exists, retry if throttling", prefix, ses.Image())
 			klog.V(2).Info(err.Error())
 			return nil, err
 		}
 	} else {
-		klog.V(2).Infof("%s.StartPull(): found open session for %s", prefix, ses.image)
+		klog.V(2).Infof("%s.StartPull(): found open session for %s", prefix, ses.Image())
 		// return session and unlock
 		return ses, nil
 	}
 }
 
 func (s synchronizer) WaitForPull(session *PullSession, callerTimeout context.Context) error {
-	klog.V(2).Infof("%s.WaitForPull(): starting to wait for image %s", prefix, session.image)
-	defer klog.V(2).Infof("%s.WaitForPull(): exiting wait for image %s", prefix, session.image)
+	klog.V(2).Infof("%s.WaitForPull(): starting to wait for image %s", prefix, session.Image())
+	defer klog.V(2).Infof("%s.WaitForPull(): exiting wait for image %s", prefix, session.Image())
 	select {
 	case <-session.done: // success or error (including session timeout and shutting down)
-		klog.V(2).Infof("%s.WaitForPull(): session completed with success or error for image %s, error=%v", prefix, session.image, session.err)
+		klog.V(2).Infof("%s.WaitForPull(): session completed with success or error for image %s, error=%v", prefix, session.Image(), session.err)
 		return session.err
 	case <-callerTimeout.Done(): // caller timeout
 		err := fmt.Errorf("%s.WaitForPull(): this wait for image %s has timed out due to caller context cancellation, pull likely continues in the background",
-			prefix, session.image)
+			prefix, session.Image())
 		klog.V(2).Info(err.Error())
 		return err
 	}

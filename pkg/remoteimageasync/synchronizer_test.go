@@ -212,6 +212,10 @@ func (p pullerMock) Pull(ctx context.Context) (err error) {
 	}
 }
 
+func (p pullerMock) Image() string {
+	return p.image
+}
+
 func (p pullerMock) ImageSize(ctx context.Context) (int, error) {
 	if p.size < 0 {
 		return 0, fmt.Errorf("error occurred when checking image size")

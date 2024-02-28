@@ -11,8 +11,7 @@ import (
 func TestChannelStructContent(t *testing.T) {
 	input1 := make(chan PullSession, 1)
 	val1 := PullSession{
-		image: "test1",
-		err:   nil,
+		err: nil,
 	}
 	assert.Nil(t, val1.err)
 	input1 <- val1
@@ -23,8 +22,7 @@ func TestChannelStructContent(t *testing.T) {
 
 	input2 := make(chan *PullSession, 1)
 	val2 := PullSession{
-		image: "test2",
-		err:   nil,
+		err: nil,
 	}
 	assert.Nil(t, val2.err)
 	input2 <- &val2

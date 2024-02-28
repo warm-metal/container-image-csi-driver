@@ -15,6 +15,7 @@ import (
 
 type Puller interface {
 	Pull(context.Context) error
+	Image() string
 	ImageSize(context.Context) (int, error)
 }
 
@@ -31,6 +32,10 @@ type puller struct {
 	imageSvc cri.ImageServiceClient
 	image    docker.Named
 	keyring  credentialprovider.DockerKeyring
+}
+
+func (p puller) Image() string {
+	return p.image.Name()
 }
 
 // Returns the compressed size of the image that was pulled in bytes
@@ -95,8 +100,8 @@ func (p puller) Pull(ctx context.Context) (err error) {
 			}
 		}
 	}()
-	repo := p.image.Name()
-	imageSpec := &cri.ImageSpec{Image: p.image.String()}
+	repo := p.Image()
+	imageSpec := &cri.ImageSpec{Image: p.Image()}
 	creds, withCredentials := p.keyring.Lookup(repo)
 	// klog.V(2).Infof("remoteimage.Pull(): len(creds)=%d, withCreds=%t", len(creds), withCredentials)
 	if !withCredentials {

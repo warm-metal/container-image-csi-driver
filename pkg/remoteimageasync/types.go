@@ -11,12 +11,15 @@ import (
 const prefix = "remoteimageasync"
 
 type PullSession struct {
-	image      string
 	puller     remoteimage.Puller
 	timeout    time.Duration    // this is the session timeout, not the caller timeout
 	done       chan interface{} // chan will block until result
 	isTimedOut bool
 	err        error
+}
+
+func (p PullSession) Image() string {
+	return p.puller.Image()
 }
 
 type synchronizer struct {
