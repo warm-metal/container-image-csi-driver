@@ -169,14 +169,6 @@ func (s snapshotMounter) FindSnapshot(
 	if stat.Kind == kind && stat.Parent == parent {
 		extactMatch := true
 		for k, v := range labels {
-			if k == gcLabel { // skip gc label from version <= 1.1.0
-				continue
-			}
-
-			if k == targetLabelPrefix { // skip target label from version <= 1.1.0
-				continue
-			}
-
 			if stat.Labels[k] != v {
 				extactMatch = false
 				break
@@ -283,9 +275,6 @@ func (s snapshotMounter) MigrateOldSnapshotFormat(ctx context.Context) error {
 func (s snapshotMounter) ListSnapshots(ctx context.Context) ([]backend.SnapshotMetadata, error) {
 	var ss []backend.SnapshotMetadata
 
-	resourceToLeases := make(map[string]map[backend.MountTarget]struct{})
-
-	// todo: add migration of previous format without lease
 	s.MigrateOldSnapshotFormat(ctx)
 
 	allLeases, err := s.leasesService.List(ctx)
@@ -294,6 +283,7 @@ func (s snapshotMounter) ListSnapshots(ctx context.Context) ([]backend.SnapshotM
 		return nil, err
 	}
 
+	resourceToLeases := make(map[string]map[backend.MountTarget]struct{})
 	for _, l := range allLeases {
 		if l.Labels[typeLabel] != "lease-only" {
 			klog.Infof("skip lease %s", l.ID)

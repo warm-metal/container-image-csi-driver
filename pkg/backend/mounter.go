@@ -70,7 +70,6 @@ func (s *SnapshotMounter) buildSnapshotCacheOrDie() {
 			if notMount, err := mounter.IsLikelyNotMountPoint(string(target)); err != nil || notMount {
 				klog.Errorf("target %q is not a mountpoint yet. trying to release the ref of snapshot %q",
 					key)
-
 				delete(targets, target)
 				continue
 			}
@@ -166,7 +165,6 @@ func (s *SnapshotMounter) unrefROSnapshot(ctx context.Context, target MountTarge
 
 func (s *SnapshotMounter) Mount(
 	ctx context.Context, volumeId string, target MountTarget, image docker.Named, ro bool) (err error) {
-
 	var key SnapshotKey
 	imageID := s.runtime.GetImageIDOrDie(ctx, image)
 	if ro {
