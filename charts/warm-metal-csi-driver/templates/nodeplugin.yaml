@@ -64,7 +64,7 @@ spec:
             - --enable-daemon-image-credential-cache
             {{- end }}
             {{- if .Values.enableAsyncPull }}
-            - --async-pull-timeout=10m
+            - --async-pull-timeout={{ .Values.asyncPullTimeout }}
             {{- end }}
             - "-v={{ .Values.logLevel }}"
             - "--mode=node"
