@@ -231,7 +231,7 @@ func (s snapshotMounter) ListSnapshots(ctx context.Context) ([]backend.SnapshotM
 
 	for _, l := range allLeases {
 		if l.Labels[typeLabel] != "lease-only" {
-			klog.Info("skip lease %q", l.ID)
+			klog.Infof("skip lease %s", l.ID)
 			continue
 		}
 

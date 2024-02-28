@@ -23,8 +23,9 @@ type Puller interface {
 }
 
 var (
-	parallelLock *sync.Mutex             = &sync.Mutex{}
-	parallelPull map[string]*CurrentPull = make(map[string]*CurrentPull)
+	parallelLock  *sync.Mutex             = &sync.Mutex{}
+	parallelPull  map[string]*CurrentPull = make(map[string]*CurrentPull)
+	totalParallel *semaphore.Weighted     = semaphore.NewWeighted(10)
 )
 
 func NewPuller(imageSvc cri.ImageServiceClient, image docker.Named,
@@ -88,6 +89,12 @@ func (p puller) Pull(ctx context.Context) (err error) {
 		klog.Infof("Pulling of image %s is completed", repo)
 		return currentPullLock.err
 	}
+
+	err = totalParallel.Acquire(ctx, 1)
+	if err != nil {
+		return err
+	}
+	defer totalParallel.Release(1)
 
 	defer func() {
 		parallelLock.Lock()
