@@ -46,6 +46,7 @@ spec:
           args:
             - "--csi-address=/csi/csi.sock"
             - "--http-endpoint=:9809"
+            - "--probe-timeout=3s"
             - "-v={{ .Values.logLevel }}"
           {{- with .Values.csiLivenessProbe.resources }}
           resources:
