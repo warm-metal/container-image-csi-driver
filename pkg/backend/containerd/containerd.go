@@ -297,7 +297,11 @@ func (s snapshotMounter) ListSnapshotsWithFilter(ctx context.Context, filters ..
 
 	resourceToLeases := make(map[string]map[backend.MountTarget]struct{})
 	for _, l := range allLeases {
-		res, _ := s.leasesService.ListResources(ctx, l)
+		res, err := s.leasesService.ListResources(ctx, l)
+		if err != nil {
+			klog.Errorf("unable to list resources of lease %q: %s", l.ID, err)
+			return nil, err
+		}
 		for _, r := range res {
 			if (r.Type != "snapshots/overlayfs") || (r.ID == "") {
 				continue
@@ -319,7 +323,7 @@ func (s snapshotMounter) ListSnapshotsWithFilter(ctx context.Context, filters ..
 		metadata.SetSnapshotKey(info.Name)
 		metadata.SetTargets(targets)
 		ss = append(ss, metadata)
-		klog.Infof("got ro snapshot %q with %d targets %#v", info.Name, len(targets), targets)
+		klog.Infof("got ro snapshot %q with %d targets %#v using filter %#v", info.Name, len(targets), targets, filters)
 
 		return nil
 	}, filters...)
