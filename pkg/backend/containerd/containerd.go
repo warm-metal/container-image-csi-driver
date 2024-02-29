@@ -244,7 +244,7 @@ func (s snapshotMounter) MigrateOldSnapshotFormat(ctx context.Context) error {
 		}
 
 		return nil
-	})
+	}, "labels.\""+typeLabel+"\"!=lease-only")
 
 	if err != nil {
 		klog.Errorf("unable to list snapshots for migration: %s", err)
@@ -273,11 +273,13 @@ func (s snapshotMounter) MigrateOldSnapshotFormat(ctx context.Context) error {
 }
 
 func (s snapshotMounter) ListSnapshots(ctx context.Context) ([]backend.SnapshotMetadata, error) {
+	return s.ListSnapshotsWithFilter(ctx, filter)
+}
+
+func (s snapshotMounter) ListSnapshotsWithFilter(ctx context.Context, filters ...string) ([]backend.SnapshotMetadata, error) {
 	var ss []backend.SnapshotMetadata
 
-	s.MigrateOldSnapshotFormat(ctx)
-
-	allLeases, err := s.leasesService.List(ctx)
+	allLeases, err := s.leasesService.List(ctx, filter)
 	if err != nil {
 		klog.Errorf("unable to list leases: %s", err)
 		return nil, err
@@ -285,11 +287,6 @@ func (s snapshotMounter) ListSnapshots(ctx context.Context) ([]backend.SnapshotM
 
 	resourceToLeases := make(map[string]map[backend.MountTarget]struct{})
 	for _, l := range allLeases {
-		if l.Labels[typeLabel] != "lease-only" {
-			klog.Infof("skip lease %s", l.ID)
-			continue
-		}
-
 		res, _ := s.leasesService.ListResources(ctx, l)
 		for _, r := range res {
 			if (r.Type != "snapshots/overlayfs") || (r.ID == "") {
@@ -307,20 +304,6 @@ func (s snapshotMounter) ListSnapshots(ctx context.Context) ([]backend.SnapshotM
 			return nil
 		}
 
-		managedSnapshot := true
-		for key, value := range info.Labels {
-			if key == typeLabel && value == "lease-only" {
-				// We only care about the snapshots created by the driver itself.
-				managedSnapshot = true
-				break
-			}
-		}
-
-		if !managedSnapshot {
-			klog.Infof("skip snapshot %q", info.Name)
-			return nil
-		}
-
 		targets := resourceToLeases[info.Name]
 		metadata := make(backend.SnapshotMetadata)
 		metadata.SetSnapshotKey(info.Name)
@@ -329,7 +312,7 @@ func (s snapshotMounter) ListSnapshots(ctx context.Context) ([]backend.SnapshotM
 		klog.Infof("got ro snapshot %q with %d targets %#v", info.Name, len(targets), targets)
 
 		return nil
-	})
+	}, filters...)
 
 	if err != nil {
 		klog.Errorf("unable to list snapshots: %s", err)
@@ -342,6 +325,7 @@ func (s snapshotMounter) ListSnapshots(ctx context.Context) ([]backend.SnapshotM
 const (
 	labelPrefix = "csi-image.warm-metal.tech"
 	typeLabel   = labelPrefix + "/type"
+	filter      = "labels.\"" + typeLabel + "\"==lease-only"
 
 	// old format labels
 	volumeIdLabelPrefix = labelPrefix + "/id"

@@ -48,6 +48,8 @@ type ContainerRuntimeMounter interface {
 	// The snapshot key must also be saved in the returned map with the key "FakeMetaDataSnapshotKey".
 	ListSnapshots(ctx context.Context) ([]SnapshotMetadata, error)
 
+	ListSnapshotsWithFilter(ctx context.Context, filter ...string) ([]SnapshotMetadata, error)
+
 	MigrateOldSnapshotFormat(ctx context.Context) error
 }
 

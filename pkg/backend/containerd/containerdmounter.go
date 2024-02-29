@@ -74,23 +74,16 @@ func (s *SnapshotMounter) buildSnapshotCacheOrDie() {
 }
 
 func (s *SnapshotMounter) refROSnapshot(
-	ctx context.Context, target backend.MountTarget, imageID string, key backend.SnapshotKey,
+	ctx context.Context, _ backend.MountTarget, imageID string, key backend.SnapshotKey,
 ) (err error) {
 	s.guard.Lock()
 	defer s.guard.Unlock()
 
-	snapshotExists := false
-	currentSnapshots, err := s.runtime.ListSnapshots(ctx)
+	currentSnapshots, err := s.runtime.ListSnapshotsWithFilter(ctx, "name==\""+string(key)+"\"")
 	if err != nil {
 		return err
 	}
-	for _, metadata := range currentSnapshots {
-		if metadata.GetSnapshotKey() == key {
-			snapshotExists = true
-			break
-		}
-	}
-
+	snapshotExists := len(currentSnapshots) > 0
 	if snapshotExists {
 		return s.runtime.UpdateSnapshotMetadata(ctx, key, buildSnapshotMetaData())
 	} else {

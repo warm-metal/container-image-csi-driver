@@ -188,6 +188,10 @@ func (s snapshotMounter) MigrateOldSnapshotFormat(_ context.Context) error {
 	return nil
 }
 
+func (s snapshotMounter) ListSnapshotsWithFilter(context.Context, ...string) ([]backend.SnapshotMetadata, error) {
+	return nil, fmt.Errorf("not implemented")
+}
+
 func (s snapshotMounter) ListSnapshots(context.Context) (ss []backend.SnapshotMetadata, err error) {
 	containers, err := s.imageStore.Containers()
 	if err != nil {
