@@ -52,7 +52,7 @@ func (p puller) ImageSize(ctx context.Context) (size int, err error) {
 			metrics.OperationErrorsCount.WithLabelValues("size-error").Inc()
 		}
 	}()
-	imageSpec := &cri.ImageSpec{Image: p.image.String()}
+	imageSpec := &cri.ImageSpec{Image: p.ImageWithTag()}
 	if imageStatusResponse, err := p.imageSvc.ImageStatus(ctx, &cri.ImageStatusRequest{
 		Image: imageSpec,
 	}); err != nil {
@@ -79,28 +79,28 @@ func (p puller) Pull(ctx context.Context) (err error) {
 	defer func() { // must capture final value of "err"
 		elapsed := time.Since(startTime).Seconds()
 		// pull time metrics and logs
-		klog.Infof("remoteimage.Pull(): pulled %s in %d milliseconds", p.image.String(), int(1000*elapsed))
+		klog.Infof("remoteimage.Pull(): pulled %s in %d milliseconds", p.ImageWithTag(), int(1000*elapsed))
 		metrics.ImagePullTimeHist.WithLabelValues(metrics.BoolToString(err != nil)).Observe(elapsed)
-		metrics.ImagePullTime.WithLabelValues(p.image.String(), metrics.BoolToString(err != nil)).Set(elapsed)
+		metrics.ImagePullTime.WithLabelValues(p.ImageWithTag(), metrics.BoolToString(err != nil)).Set(elapsed)
 		if err != nil {
 			metrics.OperationErrorsCount.WithLabelValues("pull-error").Inc()
 		}
 		go func() {
 			//TODO: this is a hack to ensure data is cleared in a reasonable time frame (after scrape) and does not build up.
 			time.Sleep(1 * time.Minute)
-			metrics.ImagePullTime.DeleteLabelValues(p.image.String(), metrics.BoolToString(err != nil))
+			metrics.ImagePullTime.DeleteLabelValues(p.ImageWithTag(), metrics.BoolToString(err != nil))
 		}()
 		// pull size metrics and logs
 		if err == nil { // only size if pull was successful
 			if size, err2 := p.ImageSize(ctx); err2 != nil {
 				// log entries and error counts emitted inside ImageSize() method
 			} else { // success
-				klog.Infof("remoteimage.Pull(): pulled %s with size of %d bytes", p.image.String(), size)
-				metrics.ImagePullSizeBytes.WithLabelValues(p.image.String()).Set(float64(size))
+				klog.Infof("remoteimage.Pull(): pulled %s with size of %d bytes", p.ImageWithTag(), size)
+				metrics.ImagePullSizeBytes.WithLabelValues(p.ImageWithTag()).Set(float64(size))
 				go func() {
 					//TODO: this is a hack to ensure data is cleared in a reasonable time frame (after scrape) and does not build up.
 					time.Sleep(1 * time.Minute)
-					metrics.ImagePullSizeBytes.DeleteLabelValues(p.image.String())
+					metrics.ImagePullSizeBytes.DeleteLabelValues(p.ImageWithTag())
 				}()
 			}
 		}
@@ -108,13 +108,12 @@ func (p puller) Pull(ctx context.Context) (err error) {
 	repo := p.ImageWithoutTag()
 	imageSpec := &cri.ImageSpec{Image: p.ImageWithTag()}
 	creds, withCredentials := p.keyring.Lookup(repo)
-	// klog.V(2).Infof("remoteimage.Pull(): len(creds)=%d, withCreds=%t", len(creds), withCredentials)
 	if !withCredentials {
 		_, err = p.imageSvc.PullImage(ctx, &cri.PullImageRequest{
 			Image: imageSpec,
 		})
 
-		klog.V(2).Infof("remoteimage.Pull(no creds): pulling %s completed with err=%v", p.image.String(), err)
+		klog.V(2).Infof("remoteimage.Pull(no creds): pulling %s completed with err=%v", p.ImageWithTag(), err)
 		return
 	}
 
@@ -135,7 +134,7 @@ func (p puller) Pull(ctx context.Context) (err error) {
 		})
 
 		if err == nil {
-			klog.V(2).Info("remoteimage.Pull(with creds): pulling %s completed with err==nil", p.image.String())
+			klog.V(2).Infof("remoteimage.Pull(with creds): pulling %s completed with err==nil", p.ImageWithTag())
 			return
 		}
 
