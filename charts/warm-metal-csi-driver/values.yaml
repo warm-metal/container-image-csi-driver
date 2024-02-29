@@ -51,3 +51,10 @@ podMonitor:
   enabled: true
   interval: 30s
   timeout: 10s
+
+containerd:
+  mountRate: 5
+  mountBurst: 5
+  unmountRate: 10
+  unmountBurst: 10
+  startupTimeout: 20s

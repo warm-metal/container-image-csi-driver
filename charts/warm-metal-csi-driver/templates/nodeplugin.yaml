@@ -69,6 +69,13 @@ spec:
             {{- end }}
             - "-v={{ .Values.logLevel }}"
             - "--mode=node"
+            {{ - if eq .Values.runtime.engine "containerd" }}
+            - "--containerd-mount-rate={{ .Values.containerd.mountRate }}"
+            - "--containerd-mount-burst={{ .Values.containerd.mountBurst }}"
+            - "--containerd-umount-rate={{ .Values.containerd.umountRate }}"
+            - "--containerd-umount-burst={{ .Values.containerd.umountBurst }}"
+            - "--containerd-startup-timeout={{ .Values.containerd.startupTimeout }}"
+            {{- end }}
           env:
             - name: CSI_ENDPOINT
               value: unix:///csi/csi.sock
