@@ -20,24 +20,28 @@ type SnapshotMounter struct {
 	umountlimiter *rate.Limiter
 }
 
-func NewContainerdMounter(runtime backend.ContainerRuntimeMounter) *SnapshotMounter {
+func NewContainerdMounter(runtime backend.ContainerRuntimeMounter, o *Options) *SnapshotMounter {
+	if o.MountRate <= 0 || o.MountBurst <= 0 || o.UmountRate <= 0 || o.UmountBurst <= 0 {
+		klog.Fatalf("invalid rate or burst limit: %+v", o)
+	}
+
 	mounter := &SnapshotMounter{
 		runtime: runtime,
 		guard:   sync.Mutex{},
 		// we need to limit the rate of mount and unmount to avoid the system being overwhelmed
 		// because the mount operation is causing way more load than the unmount operation on containerd
 		// we are using different limits for mount and unmount
-		mountlimiter:  rate.NewLimiter(rate.Limit(5), 5),
-		umountlimiter: rate.NewLimiter(rate.Limit(10), 10),
+		mountlimiter:  rate.NewLimiter(rate.Limit(o.MountRate), o.MountBurst),
+		umountlimiter: rate.NewLimiter(rate.Limit(o.UmountRate), o.UmountBurst),
 	}
 
-	mounter.buildSnapshotCacheOrDie()
+	mounter.buildSnapshotCacheOrDie(o.StartupTimeout)
 	return mounter
 }
 
-func (s *SnapshotMounter) buildSnapshotCacheOrDie() {
+func (s *SnapshotMounter) buildSnapshotCacheOrDie(timeout time.Duration) {
 	// FIXME the timeout can be a flag.
-	ctx, cancel := context.WithTimeout(context.TODO(), 20*time.Second)
+	ctx, cancel := context.WithTimeout(context.TODO(), timeout)
 	defer cancel()
 
 	if err := s.runtime.MigrateOldSnapshotFormat(ctx); err != nil {

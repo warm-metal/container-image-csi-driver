@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"os"
 	"strings"
+	"time"
 
 	"github.com/containerd/containerd"
 	"github.com/containerd/containerd/leases"
@@ -23,8 +24,17 @@ type snapshotMounter struct {
 	cli           *containerd.Client
 }
 
-func NewMounter(socketPath string) backend.Mounter {
-	c, err := containerd.New(socketPath, containerd.WithDefaultNamespace("k8s.io"))
+type Options struct {
+	SocketPath     string
+	MountRate      int
+	UmountRate     int
+	MountBurst     int
+	UmountBurst    int
+	StartupTimeout time.Duration
+}
+
+func NewMounter(o *Options) backend.Mounter {
+	c, err := containerd.New(o.SocketPath, containerd.WithDefaultNamespace("k8s.io"))
 	if err != nil {
 		klog.Fatalf("containerd connection is broken because the mounted unix socket somehow does not work,"+
 			"recreate the container may fix: %s", err)
@@ -34,7 +44,7 @@ func NewMounter(socketPath string) backend.Mounter {
 		snapshotter:   c.SnapshotService(""),
 		leasesService: c.LeasesService(),
 		cli:           c,
-	})
+	}, o)
 }
 
 func (s snapshotMounter) Mount(ctx context.Context, key backend.SnapshotKey, target backend.MountTarget, ro bool) error {

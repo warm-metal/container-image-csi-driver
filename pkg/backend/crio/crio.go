@@ -22,8 +22,12 @@ type snapshotMounter struct {
 	imageStore storage.Store
 }
 
-func NewMounter(socketPath string) *backend.SnapshotMounter {
-	store, err := storage.GetStore(fetchCriOConfigOrDie(socketPath))
+type Options struct {
+	SocketPath string
+}
+
+func NewMounter(o *Options) *backend.SnapshotMounter {
+	store, err := storage.GetStore(fetchCriOConfigOrDie(o.SocketPath))
 	if err != nil {
 		klog.Fatalf("unable to create image store: %s", err)
 	}

@@ -53,9 +53,14 @@ var (
 			"If set to false, secrets will be fetched from the API server on every image pull.")
 	asyncImagePullMount = flag.Bool("async-pull-mount", false,
 		"Whether to pull images asynchronously (helps prevent timeout for larger images)")
-	watcherResyncPeriod = flag.Duration("watcher-resync-period", 30*time.Minute, "The resync period of the pvc watcher.")
-	mode                = flag.String("mode", "", "The mode of the driver. Valid values are: node, controller")
-	nodePluginSA        = flag.String("node-plugin-sa", "csi-image-warm-metal", "The name of the ServiceAccount used by the node plugin.")
+	watcherResyncPeriod      = flag.Duration("watcher-resync-period", 30*time.Minute, "The resync period of the pvc watcher.")
+	mode                     = flag.String("mode", "", "The mode of the driver. Valid values are: node, controller")
+	nodePluginSA             = flag.String("node-plugin-sa", "csi-image-warm-metal", "The name of the ServiceAccount used by the node plugin.")
+	containerDMountRate      = flag.Int("containerd-mount-rate", 5, "The rate limit of containerd mount operations per second.")
+	containerDUmountRate     = flag.Int("containerd-umount-rate", 10, "The rate limit of containerd umount operations per second.")
+	containerDMountBurst     = flag.Int("containerd-mount-burst", 5, "The burst of containerd mount operations.")
+	containerDUmountBurst    = flag.Int("containerd-umount-burst", 10, "The burst of containerd umount operations.")
+	contaienrDStartupTimeout = flag.Duration("containerd-startup-timeout", 20*time.Second, "The timeout for containerd startup.")
 )
 
 func main() {
@@ -108,9 +113,18 @@ func main() {
 			klog.Infof("runtime %s at %q", addr.Scheme, addr.Path)
 			switch addr.Scheme {
 			case containerdScheme:
-				mounter = containerd.NewMounter(addr.Path)
+				mounter = containerd.NewMounter(&containerd.Options{
+					SocketPath:     addr.Path,
+					MountRate:      *containerDMountRate,
+					MountBurst:     *containerDMountBurst,
+					UmountRate:     *containerDUmountRate,
+					UmountBurst:    *containerDUmountBurst,
+					StartupTimeout: *contaienrDStartupTimeout,
+				})
 			case criOScheme:
-				mounter = crio.NewMounter(addr.Path)
+				mounter = crio.NewMounter(&crio.Options{
+					SocketPath: addr.Path,
+				})
 			default:
 				klog.Fatalf("unknown container runtime %q", addr.Scheme)
 			}
