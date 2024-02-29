@@ -273,13 +273,13 @@ func (s snapshotMounter) MigrateOldSnapshotFormat(ctx context.Context) error {
 }
 
 func (s snapshotMounter) ListSnapshots(ctx context.Context) ([]backend.SnapshotMetadata, error) {
-	return s.ListSnapshotsWithFilter(ctx, filter)
+	return s.ListSnapshotsWithFilter(ctx, managedFilter)
 }
 
 func (s snapshotMounter) ListSnapshotsWithFilter(ctx context.Context, filters ...string) ([]backend.SnapshotMetadata, error) {
 	var ss []backend.SnapshotMetadata
 
-	allLeases, err := s.leasesService.List(ctx, filter)
+	allLeases, err := s.leasesService.List(ctx, managedFilter)
 	if err != nil {
 		klog.Errorf("unable to list leases: %s", err)
 		return nil, err
@@ -323,9 +323,9 @@ func (s snapshotMounter) ListSnapshotsWithFilter(ctx context.Context, filters ..
 }
 
 const (
-	labelPrefix = "csi-image.warm-metal.tech"
-	typeLabel   = labelPrefix + "/type"
-	filter      = "labels.\"" + typeLabel + "\"==lease-only"
+	labelPrefix   = "csi-image.warm-metal.tech"
+	typeLabel     = labelPrefix + "/type"
+	managedFilter = "labels.\"" + typeLabel + "\"==lease-only"
 
 	// old format labels
 	volumeIdLabelPrefix = labelPrefix + "/id"
