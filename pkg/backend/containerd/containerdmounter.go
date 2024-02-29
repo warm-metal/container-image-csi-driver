@@ -100,9 +100,7 @@ func (s *SnapshotMounter) unrefROSnapshot(ctx context.Context, target backend.Mo
 }
 
 func buildSnapshotMetaData() backend.SnapshotMetadata {
-	return backend.SnapshotMetadata{
-		backend.MetaDataKeyTargets: map[backend.MountTarget]struct{}{},
-	}
+	return backend.SnapshotMetadata{}
 }
 
 func (s *SnapshotMounter) Mount(

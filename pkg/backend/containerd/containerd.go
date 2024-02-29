@@ -133,7 +133,7 @@ func (s snapshotMounter) RemoveLease(ctx context.Context, target string) error {
 }
 
 func (s snapshotMounter) PrepareReadOnlySnapshot(
-	ctx context.Context, imageID string, key backend.SnapshotKey, metadata backend.SnapshotMetadata,
+	ctx context.Context, imageID string, key backend.SnapshotKey, _ backend.SnapshotMetadata,
 ) error {
 	labels := defaultSnapshotLabels()
 
@@ -151,7 +151,7 @@ func (s snapshotMounter) PrepareReadOnlySnapshot(
 }
 
 func (s snapshotMounter) PrepareRWSnapshot(
-	ctx context.Context, imageID string, key backend.SnapshotKey, metadata backend.SnapshotMetadata,
+	ctx context.Context, imageID string, key backend.SnapshotKey, _ backend.SnapshotMetadata,
 ) error {
 	labels := defaultSnapshotLabels()
 
@@ -173,6 +173,10 @@ func (s snapshotMounter) FindSnapshot(
 ) (*snapshots.Info, error) {
 	stat, err := s.snapshotter.Stat(ctx, key)
 	if err != nil {
+		if strings.Contains(err.Error(), "does not exist") {
+			// this is the expected case of this function, all other are cases are errors
+			return nil, nil
+		}
 		return nil, err
 	}
 
