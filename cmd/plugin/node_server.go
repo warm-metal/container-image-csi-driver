@@ -191,6 +191,11 @@ func (n NodeServer) NodeUnpublishVolume(ctx context.Context, req *csi.NodeUnpubl
 	}
 
 	mnt, err := n.k8smounter.IsMountPoint(req.TargetPath)
+	if !mnt || !os.IsNotExist(err) {
+		klog.Warningf("mount cleanup skipped: %s is not a mount point", req.TargetPath)
+		return &csi.NodeUnpublishVolumeResponse{}, nil
+	}
+
 	if err != nil || !mnt {
 		return &csi.NodeUnpublishVolumeResponse{}, err
 	}
