@@ -36,6 +36,10 @@ type ContainerRuntimeMounter interface {
 	// Replace the metadata of the snapshot with the specified key with the given metadata.
 	UpdateSnapshotMetadata(ctx context.Context, key SnapshotKey, metadata SnapshotMetadata) error
 
+	AddLeaseToContext(ctx context.Context, target string) (context.Context, error)
+
+	RemoveLease(ctx context.Context, target string) error
+
 	// Destroy the snapshot with the given key.
 	// It should throw errors if the snapshot doesn't exist.
 	DestroySnapshot(ctx context.Context, key SnapshotKey) error
@@ -43,6 +47,10 @@ type ContainerRuntimeMounter interface {
 	// List metadata of all snapshots created by the driver.
 	// The snapshot key must also be saved in the returned map with the key "FakeMetaDataSnapshotKey".
 	ListSnapshots(ctx context.Context) ([]SnapshotMetadata, error)
+
+	ListSnapshotsWithFilter(ctx context.Context, filter ...string) ([]SnapshotMetadata, error)
+
+	MigrateOldSnapshotFormat(ctx context.Context) error
 }
 
 // Mounter is a generic interface used for mounting images

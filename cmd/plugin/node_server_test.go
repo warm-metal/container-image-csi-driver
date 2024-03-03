@@ -294,7 +294,13 @@ func TestMetrics(t *testing.T) {
 	assert.NoError(t, err)
 	assert.NotNil(t, criClient)
 
-	mounter := containerd.NewMounter(addr.Path)
+	mounter := containerd.NewMounter(&containerd.Options{
+		SocketPath:  addr.Path,
+		MountRate:   10,
+		MountBurst:  10,
+		UmountRate:  10,
+		UmountBurst: 10,
+	})
 	assert.NotNil(t, mounter)
 
 	driver := csicommon.NewCSIDriver(driverName, driverVersion, "fake-node")

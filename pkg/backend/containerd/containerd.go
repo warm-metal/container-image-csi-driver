@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/containerd/containerd"
+	"github.com/containerd/containerd/leases"
 	"github.com/containerd/containerd/mount"
 	"github.com/containerd/containerd/reference/docker"
 	"github.com/containerd/containerd/snapshots"
@@ -18,21 +19,32 @@ import (
 )
 
 type snapshotMounter struct {
-	snapshotter snapshots.Snapshotter
-	cli         *containerd.Client
+	snapshotter   snapshots.Snapshotter
+	leasesService leases.Manager
+	cli           *containerd.Client
 }
 
-func NewMounter(socketPath string) backend.Mounter {
-	c, err := containerd.New(socketPath, containerd.WithDefaultNamespace("k8s.io"))
+type Options struct {
+	SocketPath     string
+	MountRate      int
+	UmountRate     int
+	MountBurst     int
+	UmountBurst    int
+	StartupTimeout time.Duration
+}
+
+func NewMounter(o *Options) backend.Mounter {
+	c, err := containerd.New(o.SocketPath, containerd.WithDefaultNamespace("k8s.io"))
 	if err != nil {
-		klog.Fatalf("containerd connection is broken because the mounted unix socket somehow dose not work,"+
+		klog.Fatalf("containerd connection is broken because the mounted unix socket somehow does not work,"+
 			"recreate the container may fix: %s", err)
 	}
 
-	return backend.NewMounter(&snapshotMounter{
-		snapshotter: c.SnapshotService(""),
-		cli:         c,
-	})
+	return NewContainerdMounter(&snapshotMounter{
+		snapshotter:   c.SnapshotService(""),
+		leasesService: c.LeasesService(),
+		cli:           c,
+	}, o)
 }
 
 func (s snapshotMounter) Mount(ctx context.Context, key backend.SnapshotKey, target backend.MountTarget, ro bool) error {
@@ -60,7 +72,6 @@ func (s snapshotMounter) Unmount(_ context.Context, target backend.MountTarget) 
 		klog.Errorf("fail to unmount %s: %s", target, err)
 		return err
 	}
-
 	return nil
 }
 
@@ -70,7 +81,11 @@ func (s snapshotMounter) ImageExists(ctx context.Context, image docker.Named) bo
 }
 
 func (s snapshotMounter) GetImageIDOrDie(ctx context.Context, image docker.Named) string {
-	localImage, err := s.cli.GetImage(ctx, image.String())
+	return s.getImageIDOrDieByName(ctx, image.String())
+}
+
+func (s snapshotMounter) getImageIDOrDieByName(ctx context.Context, image string) string {
+	localImage, err := s.cli.GetImage(ctx, image)
 	if err != nil {
 		klog.Fatalf("unable to retrieve local image %q: %s", image, err)
 	}
@@ -78,8 +93,8 @@ func (s snapshotMounter) GetImageIDOrDie(ctx context.Context, image docker.Named
 	if err = localImage.Unpack(ctx, ""); err != nil {
 		klog.Fatalf("unable to unpack image %q: %s", image, err)
 	}
-
 	klog.Infof("image %q unpacked", image)
+
 	diffIDs, err := localImage.RootFS(ctx)
 	if err != nil {
 		klog.Fatalf("unable to fetch rootfs of image %q: %s", image, err)
@@ -88,43 +103,73 @@ func (s snapshotMounter) GetImageIDOrDie(ctx context.Context, image docker.Named
 	return identity.ChainID(diffIDs).String()
 }
 
-func (s snapshotMounter) PrepareReadOnlySnapshot(
-	ctx context.Context, imageID string, key backend.SnapshotKey, metadata backend.SnapshotMetadata,
-) error {
-	labels := defaultSnapshotLabels()
-	if metadata != nil {
-		labels = withTargets(defaultSnapshotLabels(), metadata.GetTargets())
+func (s snapshotMounter) AddLeaseToContext(ctx context.Context, target string) (context.Context, error) {
+	l, err := s.leasesService.Create(ctx, leases.WithID(target), leases.WithLabels(defaultSnapshotLabels()))
+	if err != nil {
+		if strings.Contains(err.Error(), "already exists") {
+			klog.Infof("lease %q already exists", target)
+			l = leases.Lease{ID: target}
+		} else {
+			klog.Errorf("unable to create lease %q: %s", target, err)
+			return nil, err
+		}
+	} else {
+		klog.Infof("lease %q added", l.ID)
 	}
 
-	klog.Infof("create ro snapshot %q for image %q with metadata %#v", key, imageID, labels)
-	info, err := s.FindSnapshot(ctx, string(key), imageID, snapshots.KindView, labels)
-	if info != nil {
+	leaseCtx := leases.WithLease(ctx, l.ID)
+
+	return leaseCtx, nil
+}
+
+func (s snapshotMounter) RemoveLease(ctx context.Context, target string) error {
+	l := leases.Lease{
+		ID: target,
+	}
+
+	if err := s.leasesService.Delete(ctx, l); err != nil {
+		klog.Errorf("unable to delete lease %q: %s", target, err)
 		return err
 	}
 
-	if _, err = s.snapshotter.View(ctx, string(key), imageID, snapshots.WithLabels(labels)); err != nil {
-		klog.Errorf("unable to create read-only snapshot %q of image %q: %s", key, imageID, err)
+	klog.Infof("lease %q removed", target)
+	return nil
+}
+
+func (s snapshotMounter) PrepareReadOnlySnapshot(
+	ctx context.Context, image string, key backend.SnapshotKey, _ backend.SnapshotMetadata,
+) error {
+	labels := defaultSnapshotLabels()
+
+	parent := s.getImageIDOrDieByName(ctx, image)
+
+	klog.Infof("create ro snapshot %q for image %q with metadata %#v", key, image, labels)
+	_, err := s.FindSnapshot(ctx, string(key), parent, snapshots.KindView, labels)
+	if err != nil {
+		return err
+	}
+
+	if _, err = s.snapshotter.View(ctx, string(key), parent, snapshots.WithLabels(labels)); err != nil {
+		klog.Errorf("unable to create read-only snapshot %q of image %q: %s", key, image, err)
 	}
 
 	return err
 }
 
 func (s snapshotMounter) PrepareRWSnapshot(
-	ctx context.Context, imageID string, key backend.SnapshotKey, metadata backend.SnapshotMetadata,
+	ctx context.Context, image string, key backend.SnapshotKey, _ backend.SnapshotMetadata,
 ) error {
 	labels := defaultSnapshotLabels()
-	if metadata != nil {
-		labels = withTargets(defaultSnapshotLabels(), metadata.GetTargets())
-	}
+	parent := s.getImageIDOrDieByName(ctx, image)
 
-	klog.Infof("create rw snapshot %q for image %q with metadata %#v", key, imageID, labels)
-	info, err := s.FindSnapshot(ctx, string(key), imageID, snapshots.KindActive, labels)
-	if info != nil {
+	klog.Infof("create rw snapshot %q for image %q with metadata %#v", key, parent, labels)
+	_, err := s.FindSnapshot(ctx, string(key), parent, snapshots.KindActive, labels)
+	if err != nil {
 		return err
 	}
 
-	if _, err = s.snapshotter.Prepare(ctx, string(key), imageID, snapshots.WithLabels(labels)); err != nil {
-		klog.Errorf("unable to create snapshot %q of image %q: %s", key, imageID, err)
+	if _, err = s.snapshotter.Prepare(ctx, string(key), parent, snapshots.WithLabels(labels)); err != nil {
+		klog.Errorf("unable to create snapshot %q of image %q: %s", key, parent, err)
 	}
 
 	return err
@@ -132,76 +177,63 @@ func (s snapshotMounter) PrepareRWSnapshot(
 
 func (s snapshotMounter) FindSnapshot(
 	ctx context.Context, key, parent string, kind snapshots.Kind, labels map[string]string,
-) (info *snapshots.Info, err error) {
+) (*snapshots.Info, error) {
 	stat, err := s.snapshotter.Stat(ctx, key)
 	if err != nil {
-		return
+		if strings.Contains(err.Error(), "does not exist") {
+			// this is the expected case of this function, all other are cases are errors
+			return nil, nil
+		}
+		return nil, err
 	}
 
-	info = &stat
-
-	if info.Kind == kind && info.Parent == parent {
+	if stat.Kind == kind && stat.Parent == parent {
+		extactMatch := true
 		for k, v := range labels {
-			if k == gcLabel {
-				continue
-			}
-
-			if info.Labels[k] != v {
-				err = fmt.Errorf("found existed snapshot %q with different configuration %#v", key, info)
-				return
+			if stat.Labels[k] != v {
+				extactMatch = false
+				break
 			}
 		}
 
-		klog.Infof("found existed snapshot %q, use it", key)
-		return
+		if extactMatch {
+			return &stat, fmt.Errorf("snapshot %q already exists with exact match", key)
+		}
 	}
 
-	err = fmt.Errorf("found existed snapshot %q with different configuration %#v", key, info)
-	return
+	return &stat, fmt.Errorf("snapshot %q already exists with different configuration %v", key, stat)
 }
 
 func (s snapshotMounter) UpdateSnapshotMetadata(
 	ctx context.Context, key backend.SnapshotKey, metadata backend.SnapshotMetadata,
 ) error {
-	klog.Infof("update metadata of snapshot %q to %#v", key, metadata)
-	info, err := s.snapshotter.Stat(ctx, string(key))
-	if err != nil {
-		klog.Errorf("unable to fetch stat of snapshot %q: %s", key, err)
-		return err
-	}
+	if l, ok := leases.FromContext(ctx); ok {
+		err := s.leasesService.AddResource(ctx, leases.Lease{ID: l}, leases.Resource{
+			Type: "snapshots/overlayfs",
+			ID:   string(key),
+		})
 
-	for k := range info.Labels {
-		if strings.HasPrefix(k, labelPrefix) {
-			delete(info.Labels, k)
+		if err != nil {
+			klog.Errorf("unable to add resource %q to lease %q: %s", string(key), l, err)
+			return err
 		}
-	}
 
-	info.Labels = withTargets(info.Labels, metadata.GetTargets())
-	klog.Infof("labels of snapshot %q are %#v", key, info.Labels)
-	_, err = s.snapshotter.Update(ctx, info)
-	if err != nil {
-		klog.Errorf("unable to update metadata of snapshot %q: %s", key, err)
+		klog.Infof("resource %q added to lease %q", string(key), l)
+	} else {
+		klog.Errorf("lease is not found in context")
 	}
-	return err
+	return nil
 }
 
 func (s snapshotMounter) DestroySnapshot(ctx context.Context, key backend.SnapshotKey) error {
-	klog.Infof("remove snapshot %q", key)
-	err := s.snapshotter.Remove(ctx, string(key))
-	if err != nil {
-		klog.Errorf("unable to remove the snapshot %q: %s", key, err)
-	}
-
-	return err
+	return nil
 }
 
-func (s snapshotMounter) ListSnapshots(ctx context.Context) (ss []backend.SnapshotMetadata, err error) {
-	err = s.snapshotter.Walk(ctx, func(ctx context.Context, info snapshots.Info) error {
-		if len(info.Labels) == 0 {
-			return nil
-		}
-
+func (s snapshotMounter) MigrateOldSnapshotFormat(ctx context.Context) error {
+	oldImages := make(map[*snapshots.Info]map[backend.MountTarget]struct{})
+	err := s.snapshotter.Walk(ctx, func(ctx context.Context, info snapshots.Info) error {
 		targets := make(map[backend.MountTarget]struct{}, len(info.Labels))
+		infoP := &info
 		for k := range info.Labels {
 			// To be compatible with old snapshots(prior to v0.4.2), we must filter read-write snapshots out.
 			// The read-write snapshot always has a key of leading with "csi-", while the key of a read-only snapshot
@@ -229,51 +261,107 @@ func (s snapshotMounter) ListSnapshots(ctx context.Context) (ss []backend.Snapsh
 		}
 
 		if len(targets) > 0 {
-			metadata := make(backend.SnapshotMetadata)
-			metadata.SetSnapshotKey(info.Name)
-			metadata.SetTargets(targets)
-			ss = append(ss, metadata)
-			klog.Infof("got ro snapshot %q with targets %#v", info.Name, targets)
+			oldImages[infoP] = targets
 		}
 
 		return nil
-	})
+	}, "labels.\""+typeLabel+"\"!=lease-only")
+
+	if err != nil {
+		klog.Errorf("unable to list snapshots for migration: %s", err)
+		return err
+	}
+
+	for oldImage, targets := range oldImages {
+		for target := range targets {
+			s.leasesService.Create(ctx, leases.WithID(string(target)), leases.WithLabels(defaultSnapshotLabels()))
+			s.leasesService.AddResource(ctx, leases.Lease{ID: string(target)}, leases.Resource{
+				Type: "snapshots/overlayfs",
+				ID:   oldImage.Name,
+			})
+			klog.Infof("migrated target %q for snapshot %q by adding lease", target, oldImage.Name)
+		}
+		oldImage.Labels = defaultSnapshotLabels()
+		_, err := s.snapshotter.Update(ctx, *oldImage)
+		if err != nil {
+			klog.Errorf("unable to update snapshot %q: %s", oldImage.Name, err)
+			return err
+		}
+		klog.Infof("snapshot %q migrated", oldImage.Name)
+	}
+
+	return err
+}
+
+func (s snapshotMounter) ListSnapshots(ctx context.Context) ([]backend.SnapshotMetadata, error) {
+	return s.ListSnapshotsWithFilter(ctx, managedFilter)
+}
+
+func (s snapshotMounter) ListSnapshotsWithFilter(ctx context.Context, filters ...string) ([]backend.SnapshotMetadata, error) {
+	var ss []backend.SnapshotMetadata
+
+	allLeases, err := s.leasesService.List(ctx, managedFilter)
+	if err != nil {
+		klog.Errorf("unable to list leases: %s", err)
+		return nil, err
+	}
+
+	resourceToLeases := make(map[string]map[backend.MountTarget]struct{})
+	for _, l := range allLeases {
+		res, err := s.leasesService.ListResources(ctx, l)
+		if err != nil {
+			klog.Errorf("unable to list resources of lease %q: %s", l.ID, err)
+			return nil, err
+		}
+		for _, r := range res {
+			if (r.Type != "snapshots/overlayfs") || (r.ID == "") {
+				continue
+			}
+			if _, ok := resourceToLeases[r.ID]; !ok {
+				resourceToLeases[r.ID] = make(map[backend.MountTarget]struct{})
+			}
+			resourceToLeases[r.ID][backend.MountTarget(l.ID)] = struct{}{}
+		}
+	}
+
+	err = s.snapshotter.Walk(ctx, func(ctx context.Context, info snapshots.Info) error {
+		if len(resourceToLeases[info.Name]) == 0 {
+			return nil
+		}
+
+		targets := resourceToLeases[info.Name]
+		metadata := make(backend.SnapshotMetadata)
+		metadata.SetSnapshotKey(info.Name)
+		metadata.SetTargets(targets)
+		ss = append(ss, metadata)
+		klog.Infof("got ro snapshot %q with %d targets %#v using filter %#v", info.Name, len(targets), targets, filters)
+
+		return nil
+	}, filters...)
 
 	if err != nil {
 		klog.Errorf("unable to list snapshots: %s", err)
 		return nil, err
 	}
 
-	return
+	return ss, nil
 }
 
 const (
-	labelPrefix         = "csi-image.warm-metal.tech"
-	targetLabelPrefix   = labelPrefix + "/target"
+	labelPrefix   = "csi-image.warm-metal.tech"
+	typeLabel     = labelPrefix + "/type"
+	managedFilter = "labels.\"" + typeLabel + "\"==lease-only"
+
+	// old format labels
 	volumeIdLabelPrefix = labelPrefix + "/id"
+	targetLabelPrefix   = labelPrefix + "/target"
 	gcLabel             = "containerd.io/gc.root"
 )
 
 func defaultSnapshotLabels() map[string]string {
 	return map[string]string{
-		gcLabel: time.Now().UTC().Format(time.RFC3339),
+		typeLabel: "lease-only",
 	}
-}
-
-func genTargetLabel(target string) string {
-	return fmt.Sprintf("%s|%s", targetLabelPrefix, target)
-}
-
-func withTarget(labels map[string]string, target string) map[string]string {
-	labels[genTargetLabel(target)] = "√"
-	return labels
-}
-
-func withTargets(labels map[string]string, targets map[backend.MountTarget]struct{}) map[string]string {
-	for target := range targets {
-		withTarget(labels, string(target))
-	}
-	return labels
 }
 
 func describeMounts(mounts []mount.Mount, target string) string {
