@@ -81,7 +81,11 @@ func (s snapshotMounter) ImageExists(ctx context.Context, image docker.Named) bo
 }
 
 func (s snapshotMounter) GetImageIDOrDie(ctx context.Context, image docker.Named) string {
-	localImage, err := s.cli.GetImage(ctx, image.String())
+	return s.getImageIDOrDieByName(ctx, image.String())
+}
+
+func (s snapshotMounter) getImageIDOrDieByName(ctx context.Context, image string) string {
+	localImage, err := s.cli.GetImage(ctx, image)
 	if err != nil {
 		klog.Fatalf("unable to retrieve local image %q: %s", image, err)
 	}
@@ -133,36 +137,39 @@ func (s snapshotMounter) RemoveLease(ctx context.Context, target string) error {
 }
 
 func (s snapshotMounter) PrepareReadOnlySnapshot(
-	ctx context.Context, imageID string, key backend.SnapshotKey, _ backend.SnapshotMetadata,
+	ctx context.Context, image string, key backend.SnapshotKey, _ backend.SnapshotMetadata,
 ) error {
 	labels := defaultSnapshotLabels()
 
-	klog.Infof("create ro snapshot %q for image %q with metadata %#v", key, imageID, labels)
-	_, err := s.FindSnapshot(ctx, string(key), imageID, snapshots.KindView, labels)
+	parent := s.getImageIDOrDieByName(ctx, image)
+
+	klog.Infof("create ro snapshot %q for image %q with metadata %#v", key, image, labels)
+	_, err := s.FindSnapshot(ctx, string(key), parent, snapshots.KindView, labels)
 	if err != nil {
 		return err
 	}
 
-	if _, err = s.snapshotter.View(ctx, string(key), imageID, snapshots.WithLabels(labels)); err != nil {
-		klog.Errorf("unable to create read-only snapshot %q of image %q: %s", key, imageID, err)
+	if _, err = s.snapshotter.View(ctx, string(key), parent, snapshots.WithLabels(labels)); err != nil {
+		klog.Errorf("unable to create read-only snapshot %q of image %q: %s", key, image, err)
 	}
 
 	return err
 }
 
 func (s snapshotMounter) PrepareRWSnapshot(
-	ctx context.Context, imageID string, key backend.SnapshotKey, _ backend.SnapshotMetadata,
+	ctx context.Context, image string, key backend.SnapshotKey, _ backend.SnapshotMetadata,
 ) error {
 	labels := defaultSnapshotLabels()
+	parent := s.getImageIDOrDieByName(ctx, image)
 
-	klog.Infof("create rw snapshot %q for image %q with metadata %#v", key, imageID, labels)
-	_, err := s.FindSnapshot(ctx, string(key), imageID, snapshots.KindActive, labels)
+	klog.Infof("create rw snapshot %q for image %q with metadata %#v", key, parent, labels)
+	_, err := s.FindSnapshot(ctx, string(key), parent, snapshots.KindActive, labels)
 	if err != nil {
 		return err
 	}
 
-	if _, err = s.snapshotter.Prepare(ctx, string(key), imageID, snapshots.WithLabels(labels)); err != nil {
-		klog.Errorf("unable to create snapshot %q of image %q: %s", key, imageID, err)
+	if _, err = s.snapshotter.Prepare(ctx, string(key), parent, snapshots.WithLabels(labels)); err != nil {
+		klog.Errorf("unable to create snapshot %q of image %q: %s", key, parent, err)
 	}
 
 	return err

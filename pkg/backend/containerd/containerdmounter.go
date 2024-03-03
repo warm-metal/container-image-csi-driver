@@ -40,7 +40,6 @@ func NewContainerdMounter(runtime backend.ContainerRuntimeMounter, o *Options) *
 }
 
 func (s *SnapshotMounter) buildSnapshotCacheOrDie(timeout time.Duration) {
-	// FIXME the timeout can be a flag.
 	ctx, cancel := context.WithTimeout(context.TODO(), timeout)
 	defer cancel()
 
@@ -78,7 +77,7 @@ func (s *SnapshotMounter) buildSnapshotCacheOrDie(timeout time.Duration) {
 }
 
 func (s *SnapshotMounter) refROSnapshot(
-	ctx context.Context, _ backend.MountTarget, imageID string, key backend.SnapshotKey,
+	ctx context.Context, _ backend.MountTarget, image string, key backend.SnapshotKey,
 ) (err error) {
 	s.guard.Lock()
 	defer s.guard.Unlock()
@@ -91,7 +90,7 @@ func (s *SnapshotMounter) refROSnapshot(
 	if snapshotExists {
 		return s.runtime.UpdateSnapshotMetadata(ctx, key, buildSnapshotMetaData())
 	} else {
-		return s.runtime.PrepareReadOnlySnapshot(ctx, imageID, key, buildSnapshotMetaData())
+		return s.runtime.PrepareReadOnlySnapshot(ctx, image, key, buildSnapshotMetaData())
 	}
 }
 
@@ -120,16 +119,10 @@ func (s *SnapshotMounter) Mount(
 	}
 
 	var key backend.SnapshotKey
-	imageID := s.runtime.GetImageIDOrDie(leaseCtx, image)
 	if ro {
-		// Use the image ID as the key of the read-only snapshot
-		if imageID == "" {
-			klog.Fatalf("invalid image id of image %q", image)
-		}
-
-		key = GenSnapshotKey(imageID)
-		klog.Infof("refer read-only snapshot of image %q with key %q", image, key)
-		if err := s.refROSnapshot(leaseCtx, target, imageID, key); err != nil {
+		key = GenSnapshotKey(image.String())
+		klog.Infof("refer read-only snapshot of image %q with key %q", image.String(), key)
+		if err := s.refROSnapshot(leaseCtx, target, image.String(), key); err != nil {
 			return err
 		}
 
@@ -140,10 +133,11 @@ func (s *SnapshotMounter) Mount(
 			}
 		}()
 	} else {
+		
 		// For read-write volumes, they must be ephemeral volumes, that which volumeIDs are unique strings.
 		key = GenSnapshotKey(volumeId)
 		klog.Infof("create read-write snapshot of image %q with key %q", image, key)
-		if err := s.runtime.PrepareRWSnapshot(leaseCtx, imageID, key, nil); err != nil {
+		if err := s.runtime.PrepareRWSnapshot(leaseCtx, image.String(), key, nil); err != nil {
 			return err
 		}
 
