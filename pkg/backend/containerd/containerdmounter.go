@@ -133,7 +133,7 @@ func (s *SnapshotMounter) Mount(
 			}
 		}()
 	} else {
-		
+
 		// For read-write volumes, they must be ephemeral volumes, that which volumeIDs are unique strings.
 		key = GenSnapshotKey(volumeId)
 		klog.Infof("create read-write snapshot of image %q with key %q", image, key)
