@@ -4,15 +4,14 @@ import (
 	"context"
 	"os"
 	"strings"
+	"time"
 
 	"github.com/container-storage-interface/spec/lib/go/csi"
 	"github.com/containerd/containerd/reference/docker"
-	"github.com/google/uuid"
 	"github.com/warm-metal/container-image-csi-driver/pkg/backend"
 	"github.com/warm-metal/container-image-csi-driver/pkg/metrics"
-	"github.com/warm-metal/container-image-csi-driver/pkg/mountexecutor"
-	"github.com/warm-metal/container-image-csi-driver/pkg/mountstatus"
-	"github.com/warm-metal/container-image-csi-driver/pkg/pullexecutor"
+	"github.com/warm-metal/container-image-csi-driver/pkg/remoteimage"
+	"github.com/warm-metal/container-image-csi-driver/pkg/remoteimageasync"
 	"github.com/warm-metal/container-image-csi-driver/pkg/secret"
 	csicommon "github.com/warm-metal/csi-drivers/pkg/csi-common"
 	"google.golang.org/grpc/codes"
@@ -31,36 +30,36 @@ const (
 
 type ImagePullStatus int
 
-func NewNodeServer(driver *csicommon.CSIDriver, mounter backend.Mounter, imageSvc cri.ImageServiceClient, secretStore secret.Store, asyncImagePullMount bool) *NodeServer {
-	return &NodeServer{
-		DefaultNodeServer:   csicommon.NewDefaultNodeServer(driver),
-		mounter:             mounter,
-		secretStore:         secretStore,
-		asyncImagePullMount: asyncImagePullMount,
-		mountExecutor: mountexecutor.NewMountExecutor(&mountexecutor.MountExecutorOptions{
-			AsyncMount: asyncImagePullMount,
-			Mounter:    mounter,
-		}),
-		pullExecutor: pullexecutor.NewPullExecutor(&pullexecutor.PullExecutorOptions{
-			AsyncPull:          asyncImagePullMount,
-			ImageServiceClient: imageSvc,
-			SecretStore:        secretStore,
-			Mounter:            mounter,
-		}),
+func NewNodeServer(driver *csicommon.CSIDriver, mounter backend.Mounter, imageSvc cri.ImageServiceClient, secretStore secret.Store, asyncImagePullTimeout time.Duration) *NodeServer {
+	ns := NodeServer{
+		DefaultNodeServer:     csicommon.NewDefaultNodeServer(driver),
+		mounter:               mounter,
+		imageSvc:              imageSvc,
+		secretStore:           secretStore,
+		asyncImagePullTimeout: asyncImagePullTimeout,
+		asyncImagePuller:      nil,
 	}
+	if asyncImagePullTimeout >= time.Duration(30*time.Second) {
+		klog.Infof("Starting node server in Async mode with %v timeout", asyncImagePullTimeout)
+		ns.asyncImagePuller = remoteimageasync.StartAsyncPuller(context.TODO(), 100)
+	} else {
+		klog.Info("Starting node server in Sync mode")
+		ns.asyncImagePullTimeout = 0 // set to default value
+	}
+	return &ns
 }
 
 type NodeServer struct {
 	*csicommon.DefaultNodeServer
-	mounter             backend.Mounter
-	secretStore         secret.Store
-	asyncImagePullMount bool
-	mountExecutor       *mountexecutor.MountExecutor
-	pullExecutor        *pullexecutor.PullExecutor
+	mounter               backend.Mounter
+	imageSvc              cri.ImageServiceClient
+	secretStore           secret.Store
+	asyncImagePullTimeout time.Duration
+	asyncImagePuller      remoteimageasync.AsyncPuller
 }
 
 func (n NodeServer) NodePublishVolume(ctx context.Context, req *csi.NodePublishVolumeRequest) (resp *csi.NodePublishVolumeResponse, err error) {
-	valuesLogger := klog.LoggerWithValues(klog.NewKlogr(), "pod-name", req.VolumeContext["pod-name"], "namespace", req.VolumeContext["namespace"], "uid", req.VolumeContext["uid"], "request-id", uuid.NewString())
+	valuesLogger := klog.LoggerWithValues(klog.NewKlogr(), "pod-name", req.VolumeContext["pod-name"], "namespace", req.VolumeContext["namespace"], "uid", req.VolumeContext["uid"])
 	valuesLogger.Info("Incoming NodePublishVolume request", "request string", req.String())
 	if len(req.VolumeId) == 0 {
 		err = status.Error(codes.InvalidArgument, "VolumeId is missing")
@@ -122,56 +121,59 @@ func (n NodeServer) NodePublishVolume(ctx context.Context, req *csi.NodePublishV
 		image = req.VolumeContext[ctxKeyImage]
 	}
 
+	pullAlways := strings.ToLower(req.VolumeContext[ctxKeyPullAlways]) == "true"
+
+	keyring, err := n.secretStore.GetDockerKeyring(ctx, req.Secrets)
+	if err != nil {
+		err = status.Errorf(codes.Aborted, "unable to fetch keyring: %s", err)
+		return
+	}
+
 	namedRef, err := docker.ParseDockerRef(image)
 	if err != nil {
 		klog.Errorf("unable to normalize image %q: %s", image, err)
 		return
 	}
 
-	pullAlways := strings.ToLower(req.VolumeContext[ctxKeyPullAlways]) == "true"
+	//NOTE: we are relying on n.mounter.ImageExists() to return false when
+	//      a first-time pull is in progress, else this logic may not be
+	//      correct. should test this.
+	if pullAlways || !n.mounter.ImageExists(ctx, namedRef) {
+		klog.Errorf("pull image %q", image)
+		puller := remoteimage.NewPuller(n.imageSvc, namedRef, keyring)
 
-	po := &pullexecutor.PullOptions{
-		Context:     ctx,
-		NamedRef:    namedRef,
-		PullAlways:  pullAlways,
-		Image:       image,
-		PullSecrets: req.Secrets,
-		Logger:      valuesLogger,
+		if n.asyncImagePuller != nil {
+			var session *remoteimageasync.PullSession
+			session, err = n.asyncImagePuller.StartPull(image, puller, n.asyncImagePullTimeout)
+			if err != nil {
+				err = status.Errorf(codes.Aborted, "unable to pull image %q: %s", image, err)
+				metrics.OperationErrorsCount.WithLabelValues("pull-async-start").Inc()
+				return
+			}
+			if err = n.asyncImagePuller.WaitForPull(session, ctx); err != nil {
+				err = status.Errorf(codes.Aborted, "unable to pull image %q: %s", image, err)
+				metrics.OperationErrorsCount.WithLabelValues("pull-async-wait").Inc()
+				return
+			}
+		} else {
+			if err = puller.Pull(ctx); err != nil {
+				err = status.Errorf(codes.Aborted, "unable to pull image %q: %s", image, err)
+				metrics.OperationErrorsCount.WithLabelValues("pull-sync-call").Inc()
+				return
+			}
+		}
 	}
 
-	if e := n.pullExecutor.StartPulling(po); e != nil {
-		err = status.Errorf(codes.Aborted, "unable to pull image %q: %s", image, e)
+	ro := req.Readonly ||
+		req.VolumeCapability.AccessMode.Mode == csi.VolumeCapability_AccessMode_SINGLE_NODE_READER_ONLY ||
+		req.VolumeCapability.AccessMode.Mode == csi.VolumeCapability_AccessMode_MULTI_NODE_READER_ONLY
+	if err = n.mounter.Mount(ctx, req.VolumeId, backend.MountTarget(req.TargetPath), namedRef, ro); err != nil {
+		err = status.Error(codes.Internal, err.Error())
+		metrics.OperationErrorsCount.WithLabelValues("mount").Inc()
 		return
 	}
 
-	if e := n.pullExecutor.WaitForPull(po); e != nil {
-		err = status.Errorf(codes.DeadlineExceeded, e.Error())
-		return
-	}
-
-	if mountstatus.Get(req.VolumeId) == mountstatus.Mounted {
-		return &csi.NodePublishVolumeResponse{}, nil
-	}
-
-	o := &mountexecutor.MountOptions{
-		Context:          ctx,
-		NamedRef:         namedRef,
-		VolumeId:         req.VolumeId,
-		TargetPath:       req.TargetPath,
-		VolumeCapability: req.VolumeCapability,
-		ReadOnly:         req.Readonly,
-		Logger:           valuesLogger,
-	}
-
-	if e := n.mountExecutor.StartMounting(o); e != nil {
-		err = status.Error(codes.Internal, e.Error())
-		return
-	}
-
-	if e := n.mountExecutor.WaitForMount(o); e != nil {
-		err = status.Errorf(codes.DeadlineExceeded, e.Error())
-		return
-	}
+	valuesLogger.Info("Successfully completed NodePublishVolume request", "request string", req.String())
 
 	return &csi.NodePublishVolumeResponse{}, nil
 }
@@ -194,16 +196,10 @@ func (n NodeServer) NodeUnpublishVolume(ctx context.Context, req *csi.NodeUnpubl
 	}
 
 	if err = n.mounter.Unmount(ctx, req.VolumeId, backend.MountTarget(req.TargetPath)); err != nil {
-		// TODO(vadasambar): move this to mountexecutor once mountexecutor has `StartUnmounting` function
-		metrics.OperationErrorsCount.WithLabelValues("StartUnmounting").Inc()
+		metrics.OperationErrorsCount.WithLabelValues("unmount").Inc()
 		err = status.Error(codes.Internal, err.Error())
 		return
 	}
-
-	// Clear the mountstatus since the volume has been unmounted
-	// Not doing this will make mount not work properly if the same volume is
-	// attempted to mount twice
-	mountstatus.Delete(req.VolumeId)
 
 	return &csi.NodeUnpublishVolumeResponse{}, nil
 }

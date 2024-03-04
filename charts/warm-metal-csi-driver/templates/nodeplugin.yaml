@@ -63,8 +63,8 @@ spec:
             {{- if .Values.enableDaemonImageCredentialCache }}
             - --enable-daemon-image-credential-cache
             {{- end }}
-            {{- if .Values.enableAsyncPullMount }}
-            - --async-pull-mount=true
+            {{- if .Values.enableAsyncPull }}
+            - --async-pull-timeout={{ .Values.asyncPullTimeout }}
             {{- end }}
             - "-v={{ .Values.logLevel }}"
             - "--mode=node"

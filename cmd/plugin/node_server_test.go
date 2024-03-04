@@ -41,7 +41,7 @@ func TestNodePublishVolumeAsync(t *testing.T) {
 	driver := csicommon.NewCSIDriver(driverName, driverVersion, "fake-node")
 	assert.NotNil(t, driver)
 
-	asyncImagePulls := true
+	asyncImagePulls := 15 * time.Minute //TODO: determine intended value for this in the context of this test
 	ns := NewNodeServer(driver, mounter, criClient, &testSecretStore{}, asyncImagePulls)
 
 	// based on kubelet's csi mounter plugin code
@@ -168,7 +168,7 @@ func TestNodePublishVolumeSync(t *testing.T) {
 	driver := csicommon.NewCSIDriver(driverName, driverVersion, "fake-node")
 	assert.NotNil(t, driver)
 
-	asyncImagePulls := false
+	asyncImagePulls := 0 * time.Minute //TODO: determine intended value for this in the context of this test
 	ns := NewNodeServer(driver, mounter, criClient, &testSecretStore{}, asyncImagePulls)
 
 	// based on kubelet's csi mounter plugin code
@@ -300,7 +300,7 @@ func TestMetrics(t *testing.T) {
 	driver := csicommon.NewCSIDriver(driverName, driverVersion, "fake-node")
 	assert.NotNil(t, driver)
 
-	asyncImagePulls := true
+	asyncImagePulls := 15 * time.Minute //TODO: determine intended value for this in the context of this test
 	ns := NewNodeServer(driver, mounter, criClient, &testSecretStore{}, asyncImagePulls)
 
 	// based on kubelet's csi mounter plugin code
@@ -437,7 +437,7 @@ func TestMetrics(t *testing.T) {
 	assert.NoError(t, err)
 	respBody := string(b1)
 	assert.Contains(t, respBody, metrics.ImagePullTimeKey)
-	assert.Contains(t, respBody, metrics.ImageMountTimeKey)
+	assert.Contains(t, respBody, metrics.ImagePullTimeHist)
 	assert.Contains(t, respBody, metrics.OperationErrorsCountKey)
 
 	// give some time before stopping the server

@@ -5,7 +5,8 @@ kubeletRoot: /var/lib/kubelet
 snapshotRoot: /var/lib/containerd/io.containerd.snapshotter.v1.overlayfs
 logLevel: 4
 enableDaemonImageCredentialCache:
-enableAsyncPullMount: false
+enableAsyncPull: false
+asyncPullTimeout: "10m"
 pullImageSecretForDaemonset:
 
 csiPlugin:

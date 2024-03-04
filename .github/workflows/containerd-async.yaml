@@ -1,0 +1,39 @@
+name: containerd-async-11mins
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+jobs:
+  integration:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Start a kind cluster with containerd
+        uses: helm/kind-action@v1.9.0
+        with:
+          cluster_name: kind-${{ github.run_id }}
+          kubectl_version: "v1.25.2"
+          config: ./hack/ci/containerd-cluster-conf.yaml
+      - name: Install private registry
+        run: ./hack/ci/setup_private_registry.sh
+      - name: Build image
+        run: ./hack/ci/build.sh
+      - name: Set image version
+        run: |
+          echo "VALUE_FILE=charts/warm-metal-csi-driver/values.yaml" >> "$GITHUB_ENV"
+          echo "IMAGE_TAG=$(git rev-parse --short HEAD)" >> "$GITHUB_ENV"
+          echo "HELM_NAME=wm-csi-integration-tests" >> "$GITHUB_ENV"
+      - name: Install the CSI Driver
+        run: |
+          helm install ${HELM_NAME} charts/warm-metal-csi-driver -n kube-system \
+            -f ${VALUE_FILE} \
+            --set csiPlugin.image.tag=${IMAGE_TAG} \
+            --set enableAsyncPull=true \
+            --wait \
+            --debug
+      - name: Run integration Tests
+        run: ./hack/ci/test.sh
+      - name: Uninstall the CSI Driver
+        run: helm uninstall -n kube-system ${HELM_NAME} --wait
