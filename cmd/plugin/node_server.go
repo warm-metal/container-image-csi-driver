@@ -8,6 +8,7 @@ import (
 
 	"github.com/container-storage-interface/spec/lib/go/csi"
 	"github.com/containerd/containerd/reference/docker"
+	"github.com/kubernetes-csi/csi-lib-utils/protosanitizer"
 	"github.com/warm-metal/container-image-csi-driver/pkg/backend"
 	"github.com/warm-metal/container-image-csi-driver/pkg/metrics"
 	"github.com/warm-metal/container-image-csi-driver/pkg/remoteimage"
@@ -17,6 +18,7 @@ import (
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 	cri "k8s.io/cri-api/pkg/apis/runtime/v1"
+
 	"k8s.io/klog/v2"
 	k8smount "k8s.io/mount-utils"
 )
@@ -60,7 +62,7 @@ type NodeServer struct {
 
 func (n NodeServer) NodePublishVolume(ctx context.Context, req *csi.NodePublishVolumeRequest) (resp *csi.NodePublishVolumeResponse, err error) {
 	valuesLogger := klog.LoggerWithValues(klog.NewKlogr(), "pod-name", req.VolumeContext["pod-name"], "namespace", req.VolumeContext["namespace"], "uid", req.VolumeContext["uid"])
-	valuesLogger.Info("Incoming NodePublishVolume request", "request string", req.String())
+	valuesLogger.Info("Incoming NodePublishVolume request", "request string", protosanitizer.StripSecrets(req))
 	if len(req.VolumeId) == 0 {
 		err = status.Error(codes.InvalidArgument, "VolumeId is missing")
 		return
@@ -173,13 +175,13 @@ func (n NodeServer) NodePublishVolume(ctx context.Context, req *csi.NodePublishV
 		return
 	}
 
-	valuesLogger.Info("Successfully completed NodePublishVolume request", "request string", req.String())
+	valuesLogger.Info("Successfully completed NodePublishVolume request", "request string", protosanitizer.StripSecrets(req))
 
 	return &csi.NodePublishVolumeResponse{}, nil
 }
 
 func (n NodeServer) NodeUnpublishVolume(ctx context.Context, req *csi.NodeUnpublishVolumeRequest) (resp *csi.NodeUnpublishVolumeResponse, err error) {
-	klog.Infof("unmount request: %s", req.String())
+	klog.Infof("unmount request: %s", protosanitizer.StripSecrets(req))
 	if len(req.VolumeId) == 0 {
 		err = status.Error(codes.InvalidArgument, "VolumeId is missing")
 		return
