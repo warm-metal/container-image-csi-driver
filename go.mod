@@ -5,9 +5,10 @@ go 1.19
 require (
 	github.com/BurntSushi/toml v1.2.0
 	github.com/container-storage-interface/spec v1.6.0
-	github.com/containerd/containerd v1.6.18
+	github.com/containerd/containerd v1.6.26
 	github.com/containers/storage v1.43.0
 	github.com/golang/protobuf v1.5.4
+	github.com/kubernetes-csi/csi-lib-utils v0.9.1
 	github.com/mitchellh/go-ps v1.0.0
 	github.com/opencontainers/image-spec v1.1.0
 	github.com/pkg/errors v0.9.1
@@ -15,7 +16,7 @@ require (
 	github.com/spf13/pflag v1.0.5
 	github.com/stretchr/testify v1.8.4
 	github.com/warm-metal/csi-drivers v0.5.0-alpha.0.0.20210404173852-9ec9cb097dd2
-	golang.org/x/net v0.22.0
+	golang.org/x/net v0.23.0
 	google.golang.org/grpc v1.62.1
 	k8s.io/api v0.25.16
 	k8s.io/apimachinery v0.25.16
@@ -49,13 +50,14 @@ require (
 	github.com/containerd/cgroups v1.1.0 // indirect
 	github.com/containerd/continuity v0.4.3 // indirect
 	github.com/containerd/fifo v1.1.0 // indirect
+	github.com/containerd/log v0.1.0 // indirect
 	github.com/containerd/ttrpc v1.2.3 // indirect
 	github.com/containerd/typeurl v1.0.2 // indirect
 	github.com/davecgh/go-spew v1.1.1 // indirect
-	github.com/docker/distribution v2.8.1+incompatible // indirect
+	github.com/docker/distribution v2.8.2+incompatible // indirect
 	github.com/docker/go-events v0.0.0-20190806004212-e31b211e4f1c // indirect
 	github.com/docker/go-units v0.5.0 // indirect
-	github.com/emicklei/go-restful/v3 v3.8.0 // indirect
+	github.com/emicklei/go-restful/v3 v3.10.1 // indirect
 	github.com/go-logr/logr v1.2.3 // indirect
 	github.com/go-openapi/jsonpointer v0.19.5 // indirect
 	github.com/go-openapi/jsonreference v0.19.5 // indirect
@@ -78,11 +80,10 @@ require (
 	github.com/json-iterator/go v1.1.12 // indirect
 	github.com/klauspost/compress v1.17.7 // indirect
 	github.com/klauspost/pgzip v1.2.5 // indirect
-	github.com/kubernetes-csi/csi-lib-utils v0.9.1 // indirect
 	github.com/mailru/easyjson v0.7.6 // indirect
 	github.com/mattn/go-shellwords v1.0.12 // indirect
 	github.com/matttproud/golang_protobuf_extensions v1.0.4 // indirect
-	github.com/mistifyio/go-zfs/v3 v3.0.0 // indirect
+	github.com/mistifyio/go-zfs/v3 v3.0.1 // indirect
 	github.com/moby/locker v1.0.1 // indirect
 	github.com/moby/sys/mountinfo v0.7.1 // indirect
 	github.com/moby/sys/signal v0.7.0 // indirect
