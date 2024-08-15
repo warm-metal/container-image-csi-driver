@@ -19,7 +19,7 @@ kubectl delete --ignore-not-found -f "${TestBase}/compatible-manifests/pre-provi
 
 export VALUE_FILE=$(dirname "${BASH_SOURCE[0]}")/../../charts/warm-metal-csi-driver/values.yaml
 export IMAGE_TAG=$(git rev-parse --short HEAD)
-export HELM_NAME="wm-csi-integration-tests"
+export HELM_NAME="container-image-integration-tests"
 export NAMESPACE="container-image-compatibility-test-ns"
 
 trap "kubectl -n kube-system describe po" ERR
