@@ -1,36 +1,36 @@
 kind: StorageClass
 apiVersion: storage.k8s.io/v1
 metadata:
-  name: csi-image.warm-metal.tech
-provisioner: csi-image.warm-metal.tech
+  name: container-image.csi.k8s.io
+provisioner: container-image.csi.k8s.io
 ---
 apiVersion: v1
 kind: PersistentVolume
 metadata:
-  name: pv-test-csi-image-rwx
+  name: pv-test-container-image-rwx
 spec:
-  storageClassName: csi-image.warm-metal.tech
+  storageClassName: container-image.csi.k8s.io
   capacity:
     storage: 5Gi
   accessModes:
     - ReadWriteMany
   persistentVolumeReclaimPolicy: Retain
   csi:
-    driver: csi-image.warm-metal.tech
+    driver: container-image.csi.k8s.io
     volumeHandle: "docker.io/warmmetal/container-image-csi-driver-test:simple-fs"
 ---
 apiVersion: v1
 kind: PersistentVolumeClaim
 metadata:
-  name: pvc-test-csi-image-rwx
+  name: pvc-test-container-image-rwx
 spec:
-  storageClassName: csi-image.warm-metal.tech
+  storageClassName: container-image.csi.k8s.io
   accessModes:
     - ReadWriteMany
   resources:
     requests:
       storage: 5Gi
-  volumeName: pv-test-csi-image-rwx
+  volumeName: pv-test-container-image-rwx
 ---
 apiVersion: batch/v1
 kind: Job
@@ -54,5 +54,5 @@ spec:
       volumes:
         - name: target
           persistentVolumeClaim:
-            claimName: pvc-test-csi-image-rwx
+            claimName: pvc-test-container-image-rwx
   backoffLimit: 0

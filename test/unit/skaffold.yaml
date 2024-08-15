@@ -4,7 +4,7 @@ metadata:
   name: libgitgo
 build:
   artifacts:
-    - image: warmmetal/csi-image
+    - image: warmmetal/container-image-csi-driver
       docker:
         dockerfile: Dockerfile
     - image: warmmetal/container-image-csi-driver-test

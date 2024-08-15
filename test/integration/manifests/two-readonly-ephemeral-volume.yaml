@@ -24,14 +24,14 @@ spec:
       volumes:
         - name: target1
           csi:
-            driver: csi-image.warm-metal.tech
+            driver: container-image.csi.k8s.io
             readOnly: true
             volumeAttributes:
               image: "docker.io/warmmetal/container-image-csi-driver-test:simple-fs"
               pullAlways: "true"
         - name: target2
           csi:
-            driver: csi-image.warm-metal.tech
+            driver: container-image.csi.k8s.io
             readOnly: true
             volumeAttributes:
               image: "docker.io/warmmetal/container-image-csi-driver-test:simple-fs"
