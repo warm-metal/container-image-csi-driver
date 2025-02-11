@@ -1,4 +1,4 @@
-VERSION ?= v1.2.4
+VERSION ?= v1.2.5
 
 IMAGE_BUILDER ?= docker
 IMAGE_BUILD_CMD ?= buildx
