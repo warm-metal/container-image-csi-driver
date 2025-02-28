@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"fmt"
 	"os"
 	"strings"
 	"time"
@@ -137,7 +138,7 @@ func (n NodeServer) NodePublishVolume(ctx context.Context, req *csi.NodePublishV
 		return
 	}
 
-	//NOTE: we are relying on n.mounter.ImageExists() to return false when
+	// NOTE: we are relying on n.mounter.ImageExists() to return false when
 	//      a first-time pull is in progress, else this logic may not be
 	//      correct. should test this.
 	if pullAlways || !n.mounter.ImageExists(ctx, namedRef) {
@@ -181,28 +182,42 @@ func (n NodeServer) NodePublishVolume(ctx context.Context, req *csi.NodePublishV
 }
 
 func (n NodeServer) NodeUnpublishVolume(ctx context.Context, req *csi.NodeUnpublishVolumeRequest) (resp *csi.NodeUnpublishVolumeResponse, err error) {
-	klog.Infof("unmount request: %s", protosanitizer.StripSecrets(req))
+	klog.V(4).Infof("NodeUnpublishVolume: unmount request: %s", protosanitizer.StripSecrets(req))
+
+	// Validate required fields
 	if len(req.VolumeId) == 0 {
-		err = status.Error(codes.InvalidArgument, "VolumeId is missing")
-		return
+		return nil, status.Error(codes.InvalidArgument, "VolumeId is missing")
 	}
 
 	if len(req.TargetPath) == 0 {
-		err = status.Error(codes.InvalidArgument, "TargetPath is missing")
-		return
+		return nil, status.Error(codes.InvalidArgument, "TargetPath is missing")
 	}
 
+	// Check if it's a mount point
 	mnt, err := k8smount.New("").IsMountPoint(req.TargetPath)
-	if err != nil || !mnt {
-		return &csi.NodeUnpublishVolumeResponse{}, err
+	if err != nil {
+		if os.IsNotExist(err) {
+			// Path doesn't exist, volume is already unmounted
+			klog.V(4).Infof("NodeUnpublishVolume: target path %s does not exist, assuming volume is already unmounted", req.TargetPath)
+			return &csi.NodeUnpublishVolumeResponse{}, nil
+		}
+		// Other errors should be reported
+		return nil, status.Error(codes.Internal, fmt.Sprintf("failed to check if path %s is a mount point: %v", req.TargetPath, err))
 	}
 
+	// If not mounted, return success
+	if !mnt {
+		klog.V(4).Infof("NodeUnpublishVolume: %s is not a mount point, no unmount needed", req.TargetPath)
+		return &csi.NodeUnpublishVolumeResponse{}, nil
+	}
+
+	// Attempt to unmount
 	if err = n.mounter.Unmount(ctx, req.VolumeId, backend.MountTarget(req.TargetPath)); err != nil {
 		metrics.OperationErrorsCount.WithLabelValues("unmount").Inc()
-		err = status.Error(codes.Internal, err.Error())
-		return
+		return nil, status.Error(codes.Internal, fmt.Sprintf("failed to unmount volume at %s: %v", req.TargetPath, err))
 	}
 
+	klog.V(4).Infof("NodeUnpublishVolume: volume %s has been unmounted successfully", req.VolumeId)
 	return &csi.NodeUnpublishVolumeResponse{}, nil
 }
 
