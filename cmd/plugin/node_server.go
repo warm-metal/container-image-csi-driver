@@ -19,7 +19,6 @@ import (
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 	cri "k8s.io/cri-api/pkg/apis/runtime/v1"
-
 	"k8s.io/klog/v2"
 	k8smount "k8s.io/mount-utils"
 )
@@ -33,9 +32,22 @@ const (
 
 type ImagePullStatus int
 
+type NodeServer struct {
+	driver                *csicommon.CSIDriver
+	mounter               backend.Mounter
+	imageSvc              cri.ImageServiceClient
+	secretStore           secret.Store
+	asyncImagePullTimeout time.Duration
+	asyncImagePuller      remoteimageasync.AsyncPuller
+	csi.UnimplementedNodeServer
+}
+
+// Remove exported method and keep only unexported one
+func (ns *NodeServer) mustEmbedUnimplementedNodeServer() {}
+
 func NewNodeServer(driver *csicommon.CSIDriver, mounter backend.Mounter, imageSvc cri.ImageServiceClient, secretStore secret.Store, asyncImagePullTimeout time.Duration) *NodeServer {
-	ns := NodeServer{
-		DefaultNodeServer:     csicommon.NewDefaultNodeServer(driver),
+	ns := &NodeServer{
+		driver:                driver,
 		mounter:               mounter,
 		imageSvc:              imageSvc,
 		secretStore:           secretStore,
@@ -49,16 +61,7 @@ func NewNodeServer(driver *csicommon.CSIDriver, mounter backend.Mounter, imageSv
 		klog.Info("Starting node server in Sync mode")
 		ns.asyncImagePullTimeout = 0 // set to default value
 	}
-	return &ns
-}
-
-type NodeServer struct {
-	*csicommon.DefaultNodeServer
-	mounter               backend.Mounter
-	imageSvc              cri.ImageServiceClient
-	secretStore           secret.Store
-	asyncImagePullTimeout time.Duration
-	asyncImagePuller      remoteimageasync.AsyncPuller
+	return ns
 }
 
 func (n NodeServer) NodePublishVolume(ctx context.Context, req *csi.NodePublishVolumeRequest) (resp *csi.NodePublishVolumeResponse, err error) {

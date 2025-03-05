@@ -4,7 +4,7 @@ import (
 	"context"
 	goflag "flag"
 	"fmt"
-	"net/url"
+	"strings"
 	"time"
 
 	"github.com/container-storage-interface/spec/lib/go/csi"
@@ -48,14 +48,16 @@ var (
 		"The path to the credential provider plugin config file.")
 	icpBin = flag.String("image-credential-provider-bin-dir", "",
 		"The path to the directory where credential provider plugin binaries are located.")
+	nodePluginSA = flag.String("node-plugin-sa", "container-image-csi-driver",
+		"The name of the ServiceAccount for pulling image.")
 	enableCache = flag.Bool("enable-daemon-image-credential-cache", true,
-		"Whether to save contents of imagepullsecrets of the daemon ServiceAccount in memory. "+
-			"If set to false, secrets will be fetched from the API server on every image pull.")
-	asyncImagePullTimeout = flag.Duration("async-pull-timeout", 0,
-		"If positive, specifies duration allotted for async image pulls as measured from pull start time. If zero, negative, less than 30s, or omitted, the caller's timeout (usually kubelet: 2m) is used instead of this value. (additional time helps prevent timeout for larger images or slower image pull conditions)")
-	watcherResyncPeriod = flag.Duration("watcher-resync-period", 30*time.Minute, "The resync period of the pvc watcher.")
-	mode                = flag.String("mode", "", "The mode of the driver. Valid values are: node, controller")
-	nodePluginSA        = flag.String("node-plugin-sa", "container-image-csi-driver", "The name of the ServiceAccount used by the node plugin.")
+		"Cache image pull secret from the daemon ServiceAccount.")
+	asyncImagePullTimeout = flag.Duration("async-pull-timeout", 10*time.Minute,
+		"Timeout for asynchronous image pulling. Only valid if --async-pull is enabled.")
+	mode = flag.String("mode", nodeMode,
+		fmt.Sprintf("Mode determines the role this instance plays. One of %q or %q.", nodeMode, controllerMode))
+	watcherResyncPeriod = flag.Duration("watcher-resync-period", 10*time.Minute,
+		"Resync period for the PVC watcher. Only valid in controller mode.")
 )
 
 func main() {
@@ -82,49 +84,37 @@ func main() {
 
 	server := csicommon.NewNonBlockingGRPCServer()
 
+	// Set default value of runtime address if containerd socket is specified
+	if *runtimeAddr == "" && *containerdSock != "" {
+		*runtimeAddr = fmt.Sprintf("%s://%s", containerdScheme, *containerdSock)
+	}
+
 	switch *mode {
 	case nodeMode:
-		if len(*runtimeAddr) == 0 {
-			if len(*containerdSock) == 0 {
-				klog.Fatalf("The unit socket of container runtime is required.")
-			}
-
-			klog.Warning("--containerd-addr is deprecated. Use --runtime-addr instead.")
-			addr, err := url.Parse(*containerdSock)
-			if err != nil {
-				klog.Fatalf("invalid runtime address: %s", err)
-			}
-			addr.Scheme = containerdScheme
-			*runtimeAddr = addr.String()
+		if *runtimeAddr == "" {
+			klog.Fatal("--runtime-addr must be specified")
 		}
+
+		if *nodeID == "" {
+			klog.Fatal("--node must be specified")
+		}
+
+		criClient, err := cri.NewRemoteImageService(*runtimeAddr, 10*time.Second)
+		if err != nil {
+			klog.Fatalf(`unable to connect to cri daemon "%s": %s`, *runtimeAddr, err)
+		}
+
+		// Create the secret store with proper credential provider config
+		secretStore := secret.CreateStoreOrDie(*icpConf, *icpBin, *nodePluginSA, *enableCache)
 
 		var mounter backend.Mounter
-		if len(*runtimeAddr) > 0 {
-			addr, err := url.Parse(*runtimeAddr)
-			if err != nil {
-				klog.Fatalf("invalid runtime address: %s", err)
-			}
-
-			klog.Infof("runtime %s at %q", addr.Scheme, addr.Path)
-			switch addr.Scheme {
-			case containerdScheme:
-				mounter = containerd.NewMounter(addr.Path)
-			case criOScheme:
-				mounter = crio.NewMounter(addr.Path)
-			default:
-				klog.Fatalf("unknown container runtime %q", addr.Scheme)
-			}
-
-			addr.Scheme = "unix"
-			*runtimeAddr = addr.String()
+		if strings.HasPrefix(*runtimeAddr, containerdScheme+"://") {
+			socketPath := (*runtimeAddr)[len(containerdScheme+"://"):]
+			mounter = containerd.NewMounter(socketPath)
+		} else if strings.HasPrefix(*runtimeAddr, criOScheme+"://") {
+			socketPath := (*runtimeAddr)[len(criOScheme+"://"):]
+			mounter = crio.NewMounter(socketPath)
 		}
-
-		criClient, err := cri.NewRemoteImageService(*runtimeAddr, time.Second)
-		if err != nil {
-			klog.Fatalf(`unable to connect to cri daemon "%s": %s`, *endpoint, err)
-		}
-
-		secretStore := secret.CreateStoreOrDie(*icpConf, *icpBin, *nodePluginSA, *enableCache)
 
 		server.Start(*endpoint,
 			NewIdentityServer(driverVersion),

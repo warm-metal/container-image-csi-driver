@@ -14,6 +14,7 @@ func NewIdentityServer(version string) *IdentityServer {
 
 type IdentityServer struct {
 	version string
+	csi.UnimplementedIdentityServer
 }
 
 func (ids *IdentityServer) GetPluginInfo(_ context.Context, _ *csi.GetPluginInfoRequest) (*csi.GetPluginInfoResponse, error) {
@@ -42,3 +43,6 @@ func (ids *IdentityServer) GetPluginCapabilities(_ context.Context, _ *csi.GetPl
 		},
 	}, nil
 }
+
+// Keep only unexported method
+func (is *IdentityServer) mustEmbedUnimplementedIdentityServer() {}
