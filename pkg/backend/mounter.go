@@ -69,7 +69,7 @@ func (s *SnapshotMounter) buildSnapshotCacheOrDie() {
 			// But the mountpoint checking become unavailable any more.
 			if notMount, err := mounter.IsLikelyNotMountPoint(string(target)); err != nil || notMount {
 				klog.Errorf("target %q is not a mountpoint yet. trying to release the ref of snapshot %q",
-					key)
+					target, key)
 				delete(targets, target)
 				continue
 			}

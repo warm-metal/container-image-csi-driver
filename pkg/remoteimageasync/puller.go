@@ -37,12 +37,12 @@ func RunPullerLoop(
 				case <-ctx.Done(): // application shutting down
 					ses.isTimedOut = false
 					ses.err = fmt.Errorf("%s.RunPullerLoop(): shutting down", prefix)
-					klog.V(2).Infof(ses.err.Error())
+					klog.V(2).Infof("%s", ses.err.Error())
 					metrics.OperationErrorsCount.WithLabelValues("pull-async-shutdown").Inc()
 				case <-ctxAsyncPullTimeoutOrShutdown.Done(): // async pull timeout or shutdown
 					ses.isTimedOut = true
 					ses.err = fmt.Errorf("%s.RunPullerLoop(): async pull exceeded timeout of %v for image %s", prefix, ses.timeout, ses.ImageWithTag())
-					klog.V(2).Infof(ses.err.Error())
+					klog.V(2).Infof("%s", ses.err.Error())
 					metrics.OperationErrorsCount.WithLabelValues("pull-async-timeout").Inc()
 				default: // completion: success or error
 					ses.isTimedOut = false

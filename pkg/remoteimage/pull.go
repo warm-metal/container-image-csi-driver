@@ -48,7 +48,7 @@ func (p puller) ImageWithoutTag() string {
 func (p puller) ImageSize(ctx context.Context) (size int, err error) {
 	defer func() {
 		if err != nil {
-			klog.Errorf(err.Error())
+			klog.Errorf("%s", err.Error())
 			metrics.OperationErrorsCount.WithLabelValues("size-error").Inc()
 		}
 	}()

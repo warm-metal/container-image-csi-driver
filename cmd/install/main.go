@@ -108,12 +108,12 @@ func main() {
 
 	manifest := &bytes.Buffer{}
 	if err := t.Execute(manifest, conf); err != nil {
-		fmt.Fprintf(os.Stderr, err.Error())
+		fmt.Fprintf(os.Stderr, "%s", err.Error())
 	}
 
 	ds := appsv1.DaemonSet{}
 	if err := yaml.Unmarshal(manifest.Bytes(), &ds); err != nil {
-		fmt.Fprintf(os.Stderr, manifest.String())
+		fmt.Fprintf(os.Stderr, "%s", manifest.String())
 		panic(err)
 	}
 

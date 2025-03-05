@@ -6,15 +6,15 @@ import (
 	"golang.org/x/net/context"
 )
 
+type IdentityServer struct {
+	version string
+	csi.UnimplementedIdentityServer
+}
+
 func NewIdentityServer(version string) *IdentityServer {
 	return &IdentityServer{
 		version: version,
 	}
-}
-
-type IdentityServer struct {
-	version string
-	csi.UnimplementedIdentityServer
 }
 
 func (ids *IdentityServer) GetPluginInfo(_ context.Context, _ *csi.GetPluginInfoRequest) (*csi.GetPluginInfoResponse, error) {
