@@ -11,10 +11,10 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - name: Start a kind cluster with containerd
-        uses: helm/kind-action@v1.9.0
+        uses: helm/kind-action@v1.12.0
         with:
           cluster_name: kind-${{ github.run_id }}
-          kubectl_version: "v1.25.2"
+          kubectl_version: "v1.32.2"
           config: ./hack/ci/containerd-cluster-conf.yaml
       - name: Install private registry
         run: ./hack/ci/setup_private_registry.sh
