@@ -247,3 +247,17 @@ func (n NodeServer) NodeGetInfo(ctx context.Context, req *csi.NodeGetInfoRequest
 		},
 	}, nil
 }
+
+func (n NodeServer) NodeGetCapabilities(ctx context.Context, req *csi.NodeGetCapabilitiesRequest) (*csi.NodeGetCapabilitiesResponse, error) {
+	return &csi.NodeGetCapabilitiesResponse{
+		Capabilities: []*csi.NodeServiceCapability{
+			{
+				Type: &csi.NodeServiceCapability_Rpc{
+					Rpc: &csi.NodeServiceCapability_RPC{
+						Type: csi.NodeServiceCapability_RPC_UNKNOWN,
+					},
+				},
+			},
+		},
+	}, nil
+}
