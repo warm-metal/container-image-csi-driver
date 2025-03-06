@@ -27,9 +27,9 @@ jobs:
           echo "HELM_NAME=wm-csi-integration-tests" >> "$GITHUB_ENV"
       - name: Setup tmate session for debugging
         uses: mxschmitt/action-tmate@v3
-        if: ${{ failure() || github.event_name == 'workflow_dispatch' }}
         with:
           limit-access-to-actor: true
+          detached: true
       - name: Install the CSI Driver
         run: |
           helm install ${HELM_NAME} charts/warm-metal-csi-driver -n kube-system \
