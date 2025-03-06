@@ -128,6 +128,10 @@ func NewCSIDriver(name string, v string, nodeID string) *CSIDriver {
 	return &driver
 }
 
+func (d *CSIDriver) GetNodeID() string {
+	return d.nodeID
+}
+
 func (d *CSIDriver) AddControllerServiceCapabilities(cl []csi.ControllerServiceCapability_RPC_Type) {
 	var csc []*csi.ControllerServiceCapability
 

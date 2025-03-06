@@ -235,3 +235,15 @@ func (n NodeServer) NodeUnstageVolume(ctx context.Context, _ *csi.NodeUnstageVol
 func (n NodeServer) NodeExpandVolume(ctx context.Context, _ *csi.NodeExpandVolumeRequest) (*csi.NodeExpandVolumeResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "")
 }
+
+func (n NodeServer) NodeGetInfo(ctx context.Context, req *csi.NodeGetInfoRequest) (*csi.NodeGetInfoResponse, error) {
+	nodeID := n.driver.GetNodeID()
+	return &csi.NodeGetInfoResponse{
+		NodeId: nodeID,
+		AccessibleTopology: &csi.Topology{
+			Segments: map[string]string{
+				"kubernetes.io/hostname": nodeID,
+			},
+		},
+	}, nil
+}
