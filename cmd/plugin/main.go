@@ -4,7 +4,7 @@ import (
 	"context"
 	goflag "flag"
 	"fmt"
-	"strings"
+	"net/url"
 	"time"
 
 	"github.com/container-storage-interface/spec/lib/go/csi"
@@ -84,37 +84,49 @@ func main() {
 
 	server := csicommon.NewNonBlockingGRPCServer()
 
-	// Set default value of runtime address if containerd socket is specified
-	if *runtimeAddr == "" && *containerdSock != "" {
-		*runtimeAddr = fmt.Sprintf("%s://%s", containerdScheme, *containerdSock)
-	}
-
 	switch *mode {
 	case nodeMode:
-		if *runtimeAddr == "" {
-			klog.Fatal("--runtime-addr must be specified")
-		}
+		if len(*runtimeAddr) == 0 {
+			if len(*containerdSock) == 0 {
+				klog.Fatalf("The unit socket of container runtime is required.")
+			}
 
-		if *nodeID == "" {
-			klog.Fatal("--node must be specified")
+			klog.Warning("--containerd-addr is deprecated. Use --runtime-addr instead.")
+			addr, err := url.Parse(*containerdSock)
+			if err != nil {
+				klog.Fatalf("invalid runtime address: %s", err)
+			}
+			addr.Scheme = containerdScheme
+			*runtimeAddr = addr.String()
 		}
-
-		criClient, err := cri.NewRemoteImageService(*runtimeAddr, 10*time.Second)
-		if err != nil {
-			klog.Fatalf(`unable to connect to cri daemon "%s": %s`, *runtimeAddr, err)
-		}
-
-		// Create the secret store with proper credential provider config
-		secretStore := secret.CreateStoreOrDie(*icpConf, *icpBin, *nodePluginSA, *enableCache)
 
 		var mounter backend.Mounter
-		if strings.HasPrefix(*runtimeAddr, containerdScheme+"://") {
-			socketPath := (*runtimeAddr)[len(containerdScheme+"://"):]
-			mounter = containerd.NewMounter(socketPath)
-		} else if strings.HasPrefix(*runtimeAddr, criOScheme+"://") {
-			socketPath := (*runtimeAddr)[len(criOScheme+"://"):]
-			mounter = crio.NewMounter(socketPath)
+		if len(*runtimeAddr) > 0 {
+			addr, err := url.Parse(*runtimeAddr)
+			if err != nil {
+				klog.Fatalf("invalid runtime address: %s", err)
+			}
+
+			klog.Infof("runtime %s at %q", addr.Scheme, addr.Path)
+			switch addr.Scheme {
+			case containerdScheme:
+				mounter = containerd.NewMounter(addr.Path)
+			case criOScheme:
+				mounter = crio.NewMounter(addr.Path)
+			default:
+				klog.Fatalf("unknown container runtime %q", addr.Scheme)
+			}
+
+			addr.Scheme = "unix"
+			*runtimeAddr = addr.String()
 		}
+
+		criClient, err := cri.NewRemoteImageService(*runtimeAddr, time.Second)
+		if err != nil {
+			klog.Fatalf(`unable to connect to cri daemon "%s": %s`, *endpoint, err)
+		}
+
+		secretStore := secret.CreateStoreOrDie(*icpConf, *icpBin, *nodePluginSA, *enableCache)
 
 		server.Start(*endpoint,
 			NewIdentityServer(driverVersion),
