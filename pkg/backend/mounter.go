@@ -6,7 +6,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/containerd/containerd/reference/docker"
+	"github.com/distribution/reference"
 	"k8s.io/klog/v2"
 	k8smount "k8s.io/utils/mount"
 )
@@ -69,7 +69,7 @@ func (s *SnapshotMounter) buildSnapshotCacheOrDie() {
 			// But the mountpoint checking become unavailable any more.
 			if notMount, err := mounter.IsLikelyNotMountPoint(string(target)); err != nil || notMount {
 				klog.Errorf("target %q is not a mountpoint yet. trying to release the ref of snapshot %q",
-					key)
+					target, key)
 				delete(targets, target)
 				continue
 			}
@@ -164,7 +164,7 @@ func (s *SnapshotMounter) unrefROSnapshot(ctx context.Context, target MountTarge
 }
 
 func (s *SnapshotMounter) Mount(
-	ctx context.Context, volumeId string, target MountTarget, image docker.Named, ro bool,
+	ctx context.Context, volumeId string, target MountTarget, image reference.Named, ro bool,
 ) (err error) {
 	var key SnapshotKey
 	imageID := s.runtime.GetImageIDOrDie(ctx, image)
@@ -225,10 +225,10 @@ func (s *SnapshotMounter) Unmount(ctx context.Context, volumeId string, target M
 	return s.runtime.DestroySnapshot(ctx, GenSnapshotKey(volumeId))
 }
 
-func (s *SnapshotMounter) ImageExists(ctx context.Context, image docker.Named) bool {
+func (s *SnapshotMounter) ImageExists(ctx context.Context, image reference.Named) bool {
 	return s.runtime.ImageExists(ctx, image)
 }
 
 func GenSnapshotKey(parent string) SnapshotKey {
-	return SnapshotKey(fmt.Sprintf("csi-image.warm-metal.tech-%s", parent))
+	return SnapshotKey(fmt.Sprintf("container-image.csi.k8s.io-%s", parent))
 }

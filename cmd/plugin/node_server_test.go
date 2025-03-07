@@ -18,13 +18,13 @@ import (
 	"github.com/warm-metal/container-image-csi-driver/pkg/backend"
 	"github.com/warm-metal/container-image-csi-driver/pkg/backend/containerd"
 	"github.com/warm-metal/container-image-csi-driver/pkg/cri"
+	csicommon "github.com/warm-metal/container-image-csi-driver/pkg/csi-common"
 	"github.com/warm-metal/container-image-csi-driver/pkg/metrics"
+	"github.com/warm-metal/container-image-csi-driver/pkg/secret"
 	"github.com/warm-metal/container-image-csi-driver/pkg/test/utils"
-	csicommon "github.com/warm-metal/csi-drivers/pkg/csi-common"
 	"google.golang.org/grpc"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/klog/v2"
-	"k8s.io/kubernetes/pkg/credentialprovider"
 )
 
 func TestNodePublishVolumeAsync(t *testing.T) {
@@ -453,6 +453,6 @@ func TestMetrics(t *testing.T) {
 
 type testSecretStore struct{}
 
-func (t *testSecretStore) GetDockerKeyring(ctx context.Context, secrets map[string]string) (credentialprovider.DockerKeyring, error) {
-	return credentialprovider.UnionDockerKeyring{credentialprovider.NewDockerKeyring()}, nil
+func (t *testSecretStore) GetDockerKeyring(ctx context.Context, secrets map[string]string) (secret.DockerKeyring, error) {
+	return secret.NewEmptyKeyring(), nil
 }

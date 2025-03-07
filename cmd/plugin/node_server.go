@@ -8,18 +8,17 @@ import (
 	"time"
 
 	"github.com/container-storage-interface/spec/lib/go/csi"
-	"github.com/containerd/containerd/reference/docker"
+	"github.com/distribution/reference"
 	"github.com/kubernetes-csi/csi-lib-utils/protosanitizer"
 	"github.com/warm-metal/container-image-csi-driver/pkg/backend"
+	csicommon "github.com/warm-metal/container-image-csi-driver/pkg/csi-common"
 	"github.com/warm-metal/container-image-csi-driver/pkg/metrics"
 	"github.com/warm-metal/container-image-csi-driver/pkg/remoteimage"
 	"github.com/warm-metal/container-image-csi-driver/pkg/remoteimageasync"
 	"github.com/warm-metal/container-image-csi-driver/pkg/secret"
-	csicommon "github.com/warm-metal/csi-drivers/pkg/csi-common"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 	cri "k8s.io/cri-api/pkg/apis/runtime/v1"
-
 	"k8s.io/klog/v2"
 	k8smount "k8s.io/mount-utils"
 )
@@ -33,9 +32,22 @@ const (
 
 type ImagePullStatus int
 
+type NodeServer struct {
+	driver                *csicommon.CSIDriver
+	mounter               backend.Mounter
+	imageSvc              cri.ImageServiceClient
+	secretStore           secret.Store
+	asyncImagePullTimeout time.Duration
+	asyncImagePuller      remoteimageasync.AsyncPuller
+	csi.UnimplementedNodeServer
+}
+
+// Remove exported method and keep only unexported one
+func (ns *NodeServer) mustEmbedUnimplementedNodeServer() {}
+
 func NewNodeServer(driver *csicommon.CSIDriver, mounter backend.Mounter, imageSvc cri.ImageServiceClient, secretStore secret.Store, asyncImagePullTimeout time.Duration) *NodeServer {
-	ns := NodeServer{
-		DefaultNodeServer:     csicommon.NewDefaultNodeServer(driver),
+	ns := &NodeServer{
+		driver:                driver,
 		mounter:               mounter,
 		imageSvc:              imageSvc,
 		secretStore:           secretStore,
@@ -49,16 +61,7 @@ func NewNodeServer(driver *csicommon.CSIDriver, mounter backend.Mounter, imageSv
 		klog.Info("Starting node server in Sync mode")
 		ns.asyncImagePullTimeout = 0 // set to default value
 	}
-	return &ns
-}
-
-type NodeServer struct {
-	*csicommon.DefaultNodeServer
-	mounter               backend.Mounter
-	imageSvc              cri.ImageServiceClient
-	secretStore           secret.Store
-	asyncImagePullTimeout time.Duration
-	asyncImagePuller      remoteimageasync.AsyncPuller
+	return ns
 }
 
 func (n NodeServer) NodePublishVolume(ctx context.Context, req *csi.NodePublishVolumeRequest) (resp *csi.NodePublishVolumeResponse, err error) {
@@ -132,7 +135,7 @@ func (n NodeServer) NodePublishVolume(ctx context.Context, req *csi.NodePublishV
 		return
 	}
 
-	namedRef, err := docker.ParseDockerRef(image)
+	namedRef, err := reference.ParseDockerRef(image)
 	if err != nil {
 		klog.Errorf("unable to normalize image %q: %s", image, err)
 		return
@@ -231,4 +234,30 @@ func (n NodeServer) NodeUnstageVolume(ctx context.Context, _ *csi.NodeUnstageVol
 
 func (n NodeServer) NodeExpandVolume(ctx context.Context, _ *csi.NodeExpandVolumeRequest) (*csi.NodeExpandVolumeResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "")
+}
+
+func (n NodeServer) NodeGetInfo(ctx context.Context, req *csi.NodeGetInfoRequest) (*csi.NodeGetInfoResponse, error) {
+	nodeID := n.driver.GetNodeID()
+	return &csi.NodeGetInfoResponse{
+		NodeId: nodeID,
+		AccessibleTopology: &csi.Topology{
+			Segments: map[string]string{
+				"kubernetes.io/hostname": nodeID,
+			},
+		},
+	}, nil
+}
+
+func (n NodeServer) NodeGetCapabilities(ctx context.Context, req *csi.NodeGetCapabilitiesRequest) (*csi.NodeGetCapabilitiesResponse, error) {
+	return &csi.NodeGetCapabilitiesResponse{
+		Capabilities: []*csi.NodeServiceCapability{
+			{
+				Type: &csi.NodeServiceCapability_Rpc{
+					Rpc: &csi.NodeServiceCapability_RPC{
+						Type: csi.NodeServiceCapability_RPC_UNKNOWN,
+					},
+				},
+			},
+		},
+	}, nil
 }

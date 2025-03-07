@@ -13,10 +13,10 @@ import (
 	"github.com/warm-metal/container-image-csi-driver/pkg/backend/containerd"
 	"github.com/warm-metal/container-image-csi-driver/pkg/backend/crio"
 	"github.com/warm-metal/container-image-csi-driver/pkg/cri"
+	"github.com/warm-metal/container-image-csi-driver/pkg/csi-common"
 	"github.com/warm-metal/container-image-csi-driver/pkg/metrics"
 	"github.com/warm-metal/container-image-csi-driver/pkg/secret"
 	"github.com/warm-metal/container-image-csi-driver/pkg/watcher"
-	csicommon "github.com/warm-metal/csi-drivers/pkg/csi-common"
 	"k8s.io/klog/v2"
 )
 
@@ -48,14 +48,16 @@ var (
 		"The path to the credential provider plugin config file.")
 	icpBin = flag.String("image-credential-provider-bin-dir", "",
 		"The path to the directory where credential provider plugin binaries are located.")
+	nodePluginSA = flag.String("node-plugin-sa", "container-image-csi-driver",
+		"The name of the ServiceAccount for pulling image.")
 	enableCache = flag.Bool("enable-daemon-image-credential-cache", true,
-		"Whether to save contents of imagepullsecrets of the daemon ServiceAccount in memory. "+
-			"If set to false, secrets will be fetched from the API server on every image pull.")
-	asyncImagePullTimeout = flag.Duration("async-pull-timeout", 0,
-		"If positive, specifies duration allotted for async image pulls as measured from pull start time. If zero, negative, less than 30s, or omitted, the caller's timeout (usually kubelet: 2m) is used instead of this value. (additional time helps prevent timeout for larger images or slower image pull conditions)")
-	watcherResyncPeriod = flag.Duration("watcher-resync-period", 30*time.Minute, "The resync period of the pvc watcher.")
-	mode                = flag.String("mode", "", "The mode of the driver. Valid values are: node, controller")
-	nodePluginSA        = flag.String("node-plugin-sa", "container-image-csi-driver", "The name of the ServiceAccount used by the node plugin.")
+		"Cache image pull secret from the daemon ServiceAccount.")
+	asyncImagePullTimeout = flag.Duration("async-pull-timeout", 10*time.Minute,
+		"Timeout for asynchronous image pulling. Only valid if --async-pull is enabled.")
+	mode = flag.String("mode", nodeMode,
+		fmt.Sprintf("Mode determines the role this instance plays. One of %q or %q.", nodeMode, controllerMode))
+	watcherResyncPeriod = flag.Duration("watcher-resync-period", 10*time.Minute,
+		"Resync period for the PVC watcher. Only valid in controller mode.")
 )
 
 func main() {
