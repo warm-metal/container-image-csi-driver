@@ -135,7 +135,7 @@ func (n NodeServer) NodePublishVolume(ctx context.Context, req *csi.NodePublishV
 		return
 	}
 
-	namedRef, err := docker.ParseDockerRef(image)
+	namedRef, err := reference.ParseDockerRef(image)
 	if err != nil {
 		klog.Errorf("unable to normalize image %q: %s", image, err)
 		return

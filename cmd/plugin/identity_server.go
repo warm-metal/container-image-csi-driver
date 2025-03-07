@@ -2,8 +2,8 @@ package main
 
 import (
 	"github.com/container-storage-interface/spec/lib/go/csi"
-	"github.com/golang/protobuf/ptypes/wrappers"
 	"golang.org/x/net/context"
+	"google.golang.org/protobuf/types/known/wrapperspb"
 )
 
 type IdentityServer struct {
@@ -26,7 +26,7 @@ func (ids *IdentityServer) GetPluginInfo(_ context.Context, _ *csi.GetPluginInfo
 
 func (ids *IdentityServer) Probe(_ context.Context, _ *csi.ProbeRequest) (*csi.ProbeResponse, error) {
 	return &csi.ProbeResponse{
-		Ready: &wrappers.BoolValue{Value: true},
+		Ready: &wrapperspb.BoolValue{Value: true},
 	}, nil
 }
 
