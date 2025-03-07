@@ -2,18 +2,19 @@ package main
 
 import (
 	"github.com/container-storage-interface/spec/lib/go/csi"
-	"github.com/golang/protobuf/ptypes/wrappers"
 	"golang.org/x/net/context"
+	"google.golang.org/protobuf/types/known/wrapperspb"
 )
+
+type IdentityServer struct {
+	version string
+	csi.UnimplementedIdentityServer
+}
 
 func NewIdentityServer(version string) *IdentityServer {
 	return &IdentityServer{
 		version: version,
 	}
-}
-
-type IdentityServer struct {
-	version string
 }
 
 func (ids *IdentityServer) GetPluginInfo(_ context.Context, _ *csi.GetPluginInfoRequest) (*csi.GetPluginInfoResponse, error) {
@@ -25,7 +26,7 @@ func (ids *IdentityServer) GetPluginInfo(_ context.Context, _ *csi.GetPluginInfo
 
 func (ids *IdentityServer) Probe(_ context.Context, _ *csi.ProbeRequest) (*csi.ProbeResponse, error) {
 	return &csi.ProbeResponse{
-		Ready: &wrappers.BoolValue{Value: true},
+		Ready: &wrapperspb.BoolValue{Value: true},
 	}, nil
 }
 
@@ -42,3 +43,6 @@ func (ids *IdentityServer) GetPluginCapabilities(_ context.Context, _ *csi.GetPl
 		},
 	}, nil
 }
+
+// Keep only unexported method
+func (is *IdentityServer) mustEmbedUnimplementedIdentityServer() {}

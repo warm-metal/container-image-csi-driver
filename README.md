@@ -28,6 +28,18 @@ git branch -u main main
 git remote set-head origin -a
 ```
 
+### Migration of CSI driver
+In release `v2.0.0`, we are updating the CSI driver name from `csi-image.warm-metal.tech` to `container-image.csi.k8s.io`. This change may cause disruptions to your existing workloads if the driver name is not updated.
+
+**To ensure a smooth transition:**
+1. **Install Both Versions**: To avoid any breaking changes, you can install both the old and new versions of the CSI driver simultaneously. Both versions are compatible and have been tested to work side-by-side, as verified in our integration tests.
+
+1. **Update Your Workloads**: Migrate your workloads to use the new driver name `container-image.csi.k8s.io`. This process will involve updating your storage class definitions and any other configurations that reference the old driver name.
+
+1. **Remove the Old Driver**: Once all workloads have been successfully migrated and verified with the new driver, you can safely remove the older version of the driver from your cluster.
+
+1. **Testing**: It is highly recommended to test the migration process in a staging environment before applying changes to production.
+
 We appreciate your cooperation and understanding as we work to improve our repository.
 
 # container-image-csi-driver (previously csi-driver-image)
@@ -54,6 +66,9 @@ Tested changes on below mentioned versions -
 | 0.7.x      | v1.25       | 1.6.8      | v1.20.9 |
 | 0.8.x      | v1.25       | 1.6.8      | v1.20.9 |
 | 1.0.x      | v1.25       | 1.6.8      | v1.25.2 |
+| 1.2.x      | v1.25       | 1.6.8      | v1.25.2 |
+| 2.x.x      | v1.25       | 1.6.8      | v1.25.2 |
+| 2.1.x      | v1.32       | 2.x        | v1.25.2 |
 
 #### References:
 * containerd [releases](https://containerd.io/releases/#kubernetes-support)

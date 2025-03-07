@@ -3,7 +3,7 @@ package backend
 import (
 	"context"
 
-	"github.com/containerd/containerd/reference/docker"
+	"github.com/distribution/reference"
 )
 
 type MountOptions struct {
@@ -19,11 +19,11 @@ type ContainerRuntimeMounter interface {
 	Unmount(ctx context.Context, target MountTarget) error
 
 	// Determines if a local image exists. A false should return if errors arise.
-	ImageExists(ctx context.Context, image docker.Named) bool
+	ImageExists(ctx context.Context, image reference.Named) bool
 
 	// Retrieves the image ID of a local image.
 	// It should crash on any failures including not local image found.
-	GetImageIDOrDie(ctx context.Context, image docker.Named) string
+	GetImageIDOrDie(ctx context.Context, image reference.Named) string
 
 	// Create a snapshot of the image using the given key and metadata.
 	// It should throw errors if any snapshot exists with the same key.
@@ -49,11 +49,11 @@ type ContainerRuntimeMounter interface {
 type Mounter interface {
 	// Mount mounts a specific image
 	Mount(
-		ctx context.Context, volumeId string, target MountTarget, image docker.Named, ro bool) (err error)
+		ctx context.Context, volumeId string, target MountTarget, image reference.Named, ro bool) (err error)
 
 	// Unmount unmounts a specific image
 	Unmount(ctx context.Context, volumeId string, target MountTarget) error
 
 	// ImageExists checks if the image already exists on the local machine
-	ImageExists(ctx context.Context, image docker.Named) bool
+	ImageExists(ctx context.Context, image reference.Named) bool
 }

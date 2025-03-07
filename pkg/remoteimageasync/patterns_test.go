@@ -5,7 +5,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/containerd/containerd/reference/docker"
+	"github.com/distribution/reference"
 	"github.com/stretchr/testify/assert"
 	"github.com/warm-metal/container-image-csi-driver/pkg/remoteimage"
 )
@@ -77,7 +77,7 @@ func TestChannelClose(t *testing.T) {
 }
 
 func TestNamedImageExtraction(t *testing.T) {
-	parsed, err := docker.ParseDockerRef(nonExistentImage)
+	parsed, err := reference.ParseDockerRef(nonExistentImage)
 	assert.Nil(t, err, "parsing image name should succeed")
 	puller := remoteimage.NewPuller(nil, parsed, nil)
 	assert.Equal(t, nonExistentImage, puller.ImageWithTag(), "extracted value should match exactly %v", puller)

@@ -10,8 +10,8 @@ import (
 
 	"github.com/containerd/containerd"
 	"github.com/containerd/containerd/mount"
-	"github.com/containerd/containerd/reference/docker"
 	"github.com/containerd/containerd/snapshots"
+	"github.com/distribution/reference"
 	"github.com/opencontainers/image-spec/identity"
 	"github.com/warm-metal/container-image-csi-driver/pkg/backend"
 	"k8s.io/klog/v2"
@@ -64,12 +64,12 @@ func (s snapshotMounter) Unmount(_ context.Context, target backend.MountTarget) 
 	return nil
 }
 
-func (s snapshotMounter) ImageExists(ctx context.Context, image docker.Named) bool {
+func (s snapshotMounter) ImageExists(ctx context.Context, image reference.Named) bool {
 	_, err := s.cli.GetImage(ctx, image.String())
 	return err == nil
 }
 
-func (s snapshotMounter) GetImageIDOrDie(ctx context.Context, image docker.Named) string {
+func (s snapshotMounter) GetImageIDOrDie(ctx context.Context, image reference.Named) string {
 	localImage, err := s.cli.GetImage(ctx, image.String())
 	if err != nil {
 		klog.Fatalf("unable to retrieve local image %q: %s", image, err)
@@ -214,7 +214,7 @@ func (s snapshotMounter) ListSnapshots(ctx context.Context) (ss []backend.Snapsh
 					break
 				}
 
-				if _, err := docker.ParseNamed(info.Name[len(labelPrefix)+1:]); err == nil {
+				if _, err := reference.ParseNamed(info.Name[len(labelPrefix)+1:]); err == nil {
 					klog.Warningf("snapshot %q with labels %#v is an old versioned snapshot used by a PV. "+
 						"It will be excluded from the ro snapshot cache, but it still can be unmounted normally.",
 						info.Name, info.Labels)

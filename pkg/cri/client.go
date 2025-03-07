@@ -5,9 +5,10 @@ import (
 	"time"
 
 	"google.golang.org/grpc"
+	"google.golang.org/grpc/credentials/insecure"
 	cri "k8s.io/cri-api/pkg/apis/runtime/v1"
+	util "k8s.io/cri-client/pkg/util"
 	"k8s.io/klog/v2"
-	"k8s.io/kubernetes/pkg/kubelet/util"
 )
 
 const maxMsgSize = 1024 * 1024 * 16
@@ -21,8 +22,9 @@ func NewRemoteImageService(endpoint string, connectionTimeout time.Duration) (cr
 	ctx, cancel := context.WithTimeout(context.Background(), connectionTimeout)
 	defer cancel()
 
-	conn, err := grpc.DialContext(
-		ctx, addr, grpc.WithInsecure(), grpc.WithContextDialer(dialer),
+	conn, err := grpc.DialContext(ctx, addr,
+		grpc.WithTransportCredentials(insecure.NewCredentials()),
+		grpc.WithContextDialer(dialer),
 		grpc.WithDefaultCallOptions(grpc.MaxCallRecvMsgSize(maxMsgSize)),
 		grpc.WithBlock(),
 	)
