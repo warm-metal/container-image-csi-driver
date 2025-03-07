@@ -140,12 +140,19 @@ func (k *BasicDockerKeyring) Lookup(image string) ([]credentialprovider.LazyAuth
 
 // matchImage checks if an image matches a registry pattern
 func matchImage(pattern, image string) bool {
+	// Exact match
 	if pattern == image {
 		return true
 	}
 
+	// If pattern ends with /, it should match the registry/repository prefix
 	if len(pattern) < len(image) && pattern[len(pattern)-1] == '/' {
 		return image[:len(pattern)] == pattern
+	}
+
+	// Handle cases where the pattern is just the registry (e.g., private-registry:5000)
+	if i := len(pattern); i < len(image) && image[i] == '/' {
+		return image[:i] == pattern
 	}
 
 	return false
