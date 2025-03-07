@@ -6,53 +6,66 @@ import (
 	"os"
 	"time"
 
+	"github.com/google/go-containerregistry/pkg/authn"
+	"github.com/google/go-containerregistry/pkg/name"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
 	"k8s.io/klog/v2"
-	credentialprovider "k8s.io/kubernetes/pkg/credentialprovider"
 )
 
+// LazyAuthConfiguration stores registry authentication info
+type LazyAuthConfiguration struct {
+	Username      string
+	Password      string
+	Auth          string
+	ServerAddress string
+	IdentityToken string
+	RegistryToken string
+}
+
 // DockerConfig represents credentials for different registries
-type DockerConfig map[string]credentialprovider.LazyAuthConfiguration
+type DockerConfig map[string]LazyAuthConfiguration
 
 // DockerKeyring interface represents a set of DockerConfig items
 type DockerKeyring interface {
-	Lookup(image string) ([]credentialprovider.LazyAuthConfiguration, bool)
+	Lookup(image string) ([]LazyAuthConfiguration, bool)
 }
 
 // BasicDockerKeyring is the default implementation of DockerKeyring
 type BasicDockerKeyring struct {
-	configs []DockerConfig
+	configs  []DockerConfig
+	keychain authn.Keychain
 }
 
 // Store interface for managing Docker credentials
 type Store interface {
-	GetDockerKeyring(ctx context.Context, secrets map[string]string) (credentialprovider.DockerKeyring, error)
+	GetDockerKeyring(ctx context.Context, secrets map[string]string) (DockerKeyring, error)
 }
 
-func makeDockerKeyringFromSecrets(secrets []corev1.Secret) (credentialprovider.DockerKeyring, error) {
-	keyring := &BasicDockerKeyring{}
+func makeDockerKeyringFromSecrets(secrets []corev1.Secret) (DockerKeyring, error) {
+	keyring := &BasicDockerKeyring{
+		keychain: authn.DefaultKeychain,
+	}
 	for _, secret := range secrets {
 		if len(secret.Data) == 0 {
 			continue
 		}
-
 		cred, err := parseDockerConfigFromSecretData(byteSecretData(secret.Data))
 		if err != nil {
 			klog.Errorf(`unable to parse secret %s, %#v`, err, secret)
 			return nil, err
 		}
-
 		keyring.configs = append(keyring.configs, cred)
 	}
-
 	return keyring, nil
 }
 
-func makeDockerKeyringFromMap(secretData map[string]string) (credentialprovider.DockerKeyring, error) {
-	keyring := &BasicDockerKeyring{}
+func makeDockerKeyringFromMap(secretData map[string]string) (DockerKeyring, error) {
+	keyring := &BasicDockerKeyring{
+		keychain: authn.DefaultKeychain,
+	}
 	if len(secretData) > 0 {
 		cred, err := parseDockerConfigFromSecretData(stringSecretData(secretData))
 		if err != nil {
@@ -124,9 +137,28 @@ func parseDockerConfigFromSecretData(data secretDataWrapper) (DockerConfig, erro
 }
 
 // Lookup implements DockerKeyring interface
-func (k *BasicDockerKeyring) Lookup(image string) ([]credentialprovider.LazyAuthConfiguration, bool) {
-	var matches []credentialprovider.LazyAuthConfiguration
+func (k *BasicDockerKeyring) Lookup(image string) ([]LazyAuthConfiguration, bool) {
+	// First try go-containerregistry keychain
+	ref, err := name.ParseReference(image)
+	if err == nil {
+		authenticator, err := k.keychain.Resolve(ref.Context())
+		if err == nil && authenticator != authn.Anonymous {
+			config, err := authenticator.Authorization()
+			if err == nil {
+				auth := LazyAuthConfiguration{
+					Username:      config.Username,
+					Password:      config.Password,
+					Auth:          config.Auth,
+					ServerAddress: ref.Context().RegistryStr(),
+					IdentityToken: config.IdentityToken,
+				}
+				return []LazyAuthConfiguration{auth}, true
+			}
+		}
+	}
 
+	// Fallback to configs from secrets
+	var matches []LazyAuthConfiguration
 	for _, config := range k.configs {
 		for registry, auth := range config {
 			if matchImage(registry, image) {
@@ -134,7 +166,6 @@ func (k *BasicDockerKeyring) Lookup(image string) ([]credentialprovider.LazyAuth
 			}
 		}
 	}
-
 	return matches, len(matches) > 0
 }
 
@@ -159,23 +190,35 @@ func matchImage(pattern, image string) bool {
 }
 
 // UnionDockerKeyring allows merging multiple keyrings
-type UnionDockerKeyring []credentialprovider.DockerKeyring
+type UnionDockerKeyring []DockerKeyring
+
+// Lookup implements DockerKeyring interface for UnionDockerKeyring
+func (uk UnionDockerKeyring) Lookup(image string) ([]LazyAuthConfiguration, bool) {
+	for _, keyring := range uk {
+		if auth, ok := keyring.Lookup(image); ok {
+			return auth, true
+		}
+	}
+	return nil, false
+}
 
 // NewEmptyKeyring returns an empty credential keyring
-func NewEmptyKeyring() credentialprovider.DockerKeyring {
-	return credentialprovider.NewDockerKeyring()
+func NewEmptyKeyring() DockerKeyring {
+	return &BasicDockerKeyring{
+		keychain: authn.DefaultKeychain,
+	}
 }
 
 type persistentKeyringGetter interface {
-	Get(context.Context) credentialprovider.DockerKeyring
+	Get(context.Context) DockerKeyring
 }
 
 type keyringStore struct {
 	persistentKeyringGetter
 }
 
-func (s keyringStore) GetDockerKeyring(ctx context.Context, secretData map[string]string) (keyring credentialprovider.DockerKeyring, err error) {
-	var preferredKeyring credentialprovider.DockerKeyring
+func (s keyringStore) GetDockerKeyring(ctx context.Context, secretData map[string]string) (keyring DockerKeyring, err error) {
+	var preferredKeyring DockerKeyring
 	if len(secretData) > 0 {
 		preferredKeyring, err = makeDockerKeyringFromMap(secretData)
 		if err != nil {
@@ -185,10 +228,10 @@ func (s keyringStore) GetDockerKeyring(ctx context.Context, secretData map[strin
 
 	daemonKeyring := s.Get(ctx)
 	if preferredKeyring != nil {
-		return credentialprovider.UnionDockerKeyring{preferredKeyring, daemonKeyring}, nil
+		return UnionDockerKeyring{preferredKeyring, daemonKeyring}, nil
 	}
 
-	return credentialprovider.UnionDockerKeyring{daemonKeyring, NewEmptyKeyring()}, err
+	return UnionDockerKeyring{daemonKeyring, NewEmptyKeyring()}, err
 }
 
 type secretFetcher struct {
@@ -223,7 +266,7 @@ func (f secretFetcher) Fetch(ctx context.Context) ([]corev1.Secret, error) {
 	return secrets, nil
 }
 
-func (s secretFetcher) Get(ctx context.Context) credentialprovider.DockerKeyring {
+func (s secretFetcher) Get(ctx context.Context) DockerKeyring {
 	secrets, _ := s.Fetch(ctx)
 	keyring, _ := makeDockerKeyringFromSecrets(secrets)
 	return keyring
@@ -259,10 +302,10 @@ func createFetcherOrDie(nodePluginSA string) Store {
 }
 
 type secretWOCache struct {
-	daemonKeyring credentialprovider.DockerKeyring
+	daemonKeyring DockerKeyring
 }
 
-func (s secretWOCache) Get(_ context.Context) credentialprovider.DockerKeyring {
+func (s secretWOCache) Get(_ context.Context) DockerKeyring {
 	return s.daemonKeyring
 }
 
@@ -271,7 +314,7 @@ func createCacheOrDie(nodePluginSA string) Store {
 	ctx, cancel := context.WithTimeout(context.TODO(), 10*time.Second)
 	defer cancel()
 
-	var keyring credentialprovider.DockerKeyring
+	var keyring DockerKeyring
 	secrets, _ := secretFetcher.Fetch(ctx)
 	keyring, _ = makeDockerKeyringFromSecrets(secrets)
 	return keyringStore{
@@ -285,7 +328,7 @@ func CreateStoreOrDie(pluginConfigFile, pluginBinDir, nodePluginSA string, enabl
 	if len(pluginConfigFile) > 0 && len(pluginBinDir) > 0 {
 		// The k8s.io/kubernetes/pkg/credentialprovider API is different
 		// We'll use the built-in keyring for now since plugin support changed
-		credentialprovider.SetPreferredDockercfgPath(pluginConfigFile)
+		// credentialprovider.SetPreferredDockercfgPath(pluginConfigFile)
 	}
 
 	if enableCache {

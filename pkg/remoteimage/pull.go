@@ -7,10 +7,10 @@ import (
 
 	"github.com/distribution/reference"
 	"github.com/warm-metal/container-image-csi-driver/pkg/metrics"
+	"github.com/warm-metal/container-image-csi-driver/pkg/secret"
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	cri "k8s.io/cri-api/pkg/apis/runtime/v1"
 	"k8s.io/klog/v2"
-	"k8s.io/kubernetes/pkg/credentialprovider"
 )
 
 type Puller interface {
@@ -21,7 +21,7 @@ type Puller interface {
 }
 
 func NewPuller(imageSvc cri.ImageServiceClient, image reference.Named,
-	keyring credentialprovider.DockerKeyring) Puller {
+	keyring secret.DockerKeyring) Puller {
 	return &puller{
 		imageSvc: imageSvc,
 		image:    image,
@@ -32,7 +32,7 @@ func NewPuller(imageSvc cri.ImageServiceClient, image reference.Named,
 type puller struct {
 	imageSvc cri.ImageServiceClient
 	image    reference.Named
-	keyring  credentialprovider.DockerKeyring
+	keyring  secret.DockerKeyring
 }
 
 func (p puller) ImageWithTag() string {

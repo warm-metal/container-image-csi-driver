@@ -1,15 +1,13 @@
 package cri
 
 import (
-	"context"
-	"net"
 	"time"
 
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
 	cri "k8s.io/cri-api/pkg/apis/runtime/v1"
+	util "k8s.io/cri-client/pkg/util"
 	"k8s.io/klog/v2"
-	"k8s.io/kubernetes/pkg/kubelet/util"
 )
 
 const maxMsgSize = 1024 * 1024 * 16
@@ -20,23 +18,14 @@ func NewRemoteImageService(endpoint string, connectionTimeout time.Duration) (cr
 		return nil, err
 	}
 
-	ctx, cancel := context.WithTimeout(context.Background(), connectionTimeout)
-	defer cancel()
-
-	// Wrap the dialer to match the expected context-aware signature
-	contextDialer := func(ctx context.Context, addr string) (net.Conn, error) {
-		return dialer(addr, connectionTimeout)
-	}
-
 	// Use grpc.Dial with insecure credentials
-	conn, err := grpc.DialContext(
-		ctx,
+	conn, err := grpc.NewClient(
 		addr,
 		grpc.WithTransportCredentials(insecure.NewCredentials()),
-		grpc.WithContextDialer(contextDialer),
+		grpc.WithContextDialer(dialer),
 		grpc.WithDefaultCallOptions(grpc.MaxCallRecvMsgSize(maxMsgSize)),
-		grpc.WithBlock(),
 	)
+
 	if err != nil {
 		klog.Errorf("Connect remote image service %s failed: %v", addr, err)
 		return nil, err
