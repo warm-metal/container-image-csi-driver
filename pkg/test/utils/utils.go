@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/containerd/containerd/reference/docker"
+	"github.com/distribution/reference"
 	"github.com/warm-metal/container-image-csi-driver/pkg/backend"
 	"google.golang.org/grpc"
 	criapi "k8s.io/cri-api/pkg/apis/runtime/v1"
@@ -24,7 +24,7 @@ type MockMounter struct {
 const hundredMB = 104857600
 
 func (m *MockMounter) Mount(
-	ctx context.Context, volumeId string, target backend.MountTarget, image docker.Named, ro bool) (err error) {
+	ctx context.Context, volumeId string, target backend.MountTarget, image reference.Named, ro bool) (err error) {
 	m.Mounted[volumeId] = true
 	return nil
 }
@@ -39,7 +39,7 @@ func (m *MockMounter) Unmount(ctx context.Context, volumeId string, target backe
 }
 
 // ImageExists checks if the image already exists on the local machine
-func (m *MockMounter) ImageExists(ctx context.Context, image docker.Named) bool {
+func (m *MockMounter) ImageExists(ctx context.Context, image reference.Named) bool {
 	return m.ImageSvcClient.PulledImages[image.Name()]
 }
 

@@ -10,9 +10,9 @@ import (
 	"time"
 
 	"github.com/BurntSushi/toml"
-	"github.com/containerd/containerd/reference/docker"
 	"github.com/containers/storage"
 	"github.com/containers/storage/types"
+	"github.com/distribution/reference"
 	"github.com/warm-metal/container-image-csi-driver/pkg/backend"
 	"k8s.io/klog/v2"
 	k8smount "k8s.io/utils/mount"
@@ -62,7 +62,7 @@ func (s snapshotMounter) Unmount(_ context.Context, target backend.MountTarget) 
 	return nil
 }
 
-func (s snapshotMounter) ImageExists(ctx context.Context, image docker.Named) bool {
+func (s snapshotMounter) ImageExists(ctx context.Context, image reference.Named) bool {
 	if _, err := s.imageStore.Image(image.String()); err != nil {
 		klog.Errorf("unable to retrieve the local image %q: %s", image, err)
 		return false
@@ -71,7 +71,7 @@ func (s snapshotMounter) ImageExists(ctx context.Context, image docker.Named) bo
 	return true
 }
 
-func (s snapshotMounter) GetImageIDOrDie(ctx context.Context, image docker.Named) string {
+func (s snapshotMounter) GetImageIDOrDie(ctx context.Context, image reference.Named) string {
 	img, err := s.imageStore.Image(image.String())
 	if err != nil {
 		klog.Fatalf("unable to retrieve local image %q: %s", image, err)

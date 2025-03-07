@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/containerd/containerd/reference/docker"
+	"github.com/distribution/reference"
 	"github.com/warm-metal/container-image-csi-driver/pkg/metrics"
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	cri "k8s.io/cri-api/pkg/apis/runtime/v1"
@@ -20,7 +20,7 @@ type Puller interface {
 	ImageSize(context.Context) (int, error)
 }
 
-func NewPuller(imageSvc cri.ImageServiceClient, image docker.Named,
+func NewPuller(imageSvc cri.ImageServiceClient, image reference.Named,
 	keyring credentialprovider.DockerKeyring) Puller {
 	return &puller{
 		imageSvc: imageSvc,
@@ -31,7 +31,7 @@ func NewPuller(imageSvc cri.ImageServiceClient, image docker.Named,
 
 type puller struct {
 	imageSvc cri.ImageServiceClient
-	image    docker.Named
+	image    reference.Named
 	keyring  credentialprovider.DockerKeyring
 }
 

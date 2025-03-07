@@ -8,7 +8,7 @@ import (
 	"time"
 
 	"github.com/container-storage-interface/spec/lib/go/csi"
-	"github.com/containerd/containerd/reference/docker"
+	"github.com/distribution/reference"
 	"github.com/kubernetes-csi/csi-lib-utils/protosanitizer"
 	"github.com/warm-metal/container-image-csi-driver/pkg/backend"
 	csicommon "github.com/warm-metal/container-image-csi-driver/pkg/csi-common"

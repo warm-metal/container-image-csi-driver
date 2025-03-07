@@ -8,16 +8,17 @@ require (
 	github.com/BurntSushi/toml v1.4.0
 	github.com/container-storage-interface/spec v1.11.0
 	github.com/containerd/containerd v1.7.23
-	github.com/containers/storage v1.57.1
+	github.com/containers/storage v1.57.2
+	github.com/distribution/reference v0.6.0
 	github.com/golang/protobuf v1.5.4
 	github.com/kubernetes-csi/csi-lib-utils v0.21.0
 	github.com/mitchellh/go-ps v1.0.0
-	github.com/opencontainers/image-spec v1.1.0
+	github.com/opencontainers/image-spec v1.1.1
 	github.com/pkg/errors v0.9.1
 	github.com/prometheus/client_golang v1.20.5
 	github.com/spf13/pflag v1.0.5
 	github.com/stretchr/testify v1.10.0
-	golang.org/x/net v0.32.0
+	golang.org/x/net v0.33.0
 	google.golang.org/grpc v1.69.0
 	k8s.io/api v0.32.0
 	k8s.io/apimachinery v0.32.0
@@ -25,7 +26,7 @@ require (
 	k8s.io/cri-api v0.29.2
 	k8s.io/klog/v2 v2.130.1
 	k8s.io/kubernetes v1.13.0
-	k8s.io/mount-utils v0.29.2
+	k8s.io/mount-utils v0.32.2
 	k8s.io/utils v0.0.0-20241210054802-24370beab758
 	sigs.k8s.io/yaml v1.4.0
 )
@@ -38,18 +39,17 @@ require (
 	github.com/beorn7/perks v1.0.1 // indirect
 	github.com/cespare/xxhash/v2 v2.3.0 // indirect
 	github.com/containerd/cgroups/v3 v3.0.3 // indirect
-	github.com/containerd/containerd/api v1.7.19 // indirect
-	github.com/containerd/continuity v0.4.2 // indirect
+	github.com/containerd/containerd/api v1.8.0 // indirect
+	github.com/containerd/continuity v0.4.4 // indirect
 	github.com/containerd/errdefs v0.3.0 // indirect
 	github.com/containerd/errdefs/pkg v0.3.0 // indirect
 	github.com/containerd/fifo v1.1.0 // indirect
 	github.com/containerd/log v0.1.0 // indirect
 	github.com/containerd/platforms v0.2.1 // indirect
-	github.com/containerd/ttrpc v1.2.5 // indirect
+	github.com/containerd/ttrpc v1.2.7 // indirect
 	github.com/containerd/typeurl/v2 v2.2.0 // indirect
 	github.com/cyphar/filepath-securejoin v0.3.6 // indirect
 	github.com/davecgh/go-spew v1.1.2-0.20180830191138-d8f796af33cc // indirect
-	github.com/distribution/reference v0.6.0 // indirect
 	github.com/docker/go-events v0.0.0-20190806004212-e31b211e4f1c // indirect
 	github.com/docker/go-units v0.5.0 // indirect
 	github.com/emicklei/go-restful/v3 v3.12.1 // indirect
