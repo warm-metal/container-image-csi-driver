@@ -1,6 +1,7 @@
 package cri
 
 import (
+	"context"
 	"time"
 
 	"google.golang.org/grpc"
@@ -18,12 +19,14 @@ func NewRemoteImageService(endpoint string, connectionTimeout time.Duration) (cr
 		return nil, err
 	}
 
-	// Use grpc.Dial with insecure credentials
-	conn, err := grpc.NewClient(
-		addr,
+	ctx, cancel := context.WithTimeout(context.Background(), connectionTimeout)
+	defer cancel()
+
+	conn, err := grpc.DialContext(ctx, addr,
 		grpc.WithTransportCredentials(insecure.NewCredentials()),
 		grpc.WithContextDialer(dialer),
 		grpc.WithDefaultCallOptions(grpc.MaxCallRecvMsgSize(maxMsgSize)),
+		grpc.WithBlock(),
 	)
 
 	if err != nil {
