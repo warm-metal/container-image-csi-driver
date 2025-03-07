@@ -15,28 +15,15 @@ import (
 	"k8s.io/klog/v2"
 )
 
-// LazyAuthConfiguration stores registry authentication info
-type LazyAuthConfiguration struct {
-	Username      string
-	Password      string
-	Auth          string
-	ServerAddress string
-	IdentityToken string
-	RegistryToken string
-}
-
-// DockerConfig represents credentials for different registries
-type DockerConfig map[string]LazyAuthConfiguration
-
-// DockerKeyring interface represents a set of DockerConfig items
+// DockerKeyring interface for registry authentication
 type DockerKeyring interface {
-	Lookup(image string) ([]LazyAuthConfiguration, bool)
+	Lookup(image string) ([]authn.AuthConfig, bool)
 }
 
-// BasicDockerKeyring is the default implementation of DockerKeyring
+// BasicDockerKeyring implements DockerKeyring using go-containerregistry's keychain
 type BasicDockerKeyring struct {
-	configs  []DockerConfig
 	keychain authn.Keychain
+	configs  []map[string]authn.AuthConfig
 }
 
 // Store interface for managing Docker credentials
@@ -48,17 +35,19 @@ func makeDockerKeyringFromSecrets(secrets []corev1.Secret) (DockerKeyring, error
 	keyring := &BasicDockerKeyring{
 		keychain: authn.DefaultKeychain,
 	}
+
 	for _, secret := range secrets {
 		if len(secret.Data) == 0 {
 			continue
 		}
-		cred, err := parseDockerConfigFromSecretData(byteSecretData(secret.Data))
+		config, err := parseDockerConfigFromSecretData(byteSecretData(secret.Data))
 		if err != nil {
-			klog.Errorf(`unable to parse secret %s, %#v`, err, secret)
-			return nil, err
+			klog.Errorf("unable to parse secret: %v, data: %#v", err, secret)
+			continue // Skip invalid secrets instead of failing
 		}
-		keyring.configs = append(keyring.configs, cred)
+		keyring.configs = append(keyring.configs, config)
 	}
+
 	return keyring, nil
 }
 
@@ -66,14 +55,13 @@ func makeDockerKeyringFromMap(secretData map[string]string) (DockerKeyring, erro
 	keyring := &BasicDockerKeyring{
 		keychain: authn.DefaultKeychain,
 	}
+
 	if len(secretData) > 0 {
-		cred, err := parseDockerConfigFromSecretData(stringSecretData(secretData))
+		config, err := parseDockerConfigFromSecretData(stringSecretData(secretData))
 		if err != nil {
-			klog.Errorf(`unable to parse secret data %s, %#v`, err, secretData)
 			return nil, err
 		}
-
-		keyring.configs = append(keyring.configs, cred)
+		keyring.configs = append(keyring.configs, config)
 	}
 
 	return keyring, nil
@@ -100,25 +88,25 @@ func (s stringSecretData) Get(key string) (data []byte, existed bool) {
 	return
 }
 
-func parseDockerConfigFromSecretData(data secretDataWrapper) (DockerConfig, error) {
+func parseDockerConfigFromSecretData(data secretDataWrapper) (map[string]authn.AuthConfig, error) {
 	dockerConfigKey := ""
 	if _, ok := data.Get(corev1.DockerConfigJsonKey); ok {
 		dockerConfigKey = corev1.DockerConfigJsonKey
 	} else if _, ok := data.Get(corev1.DockerConfigKey); ok {
 		dockerConfigKey = corev1.DockerConfigKey
 	} else {
-		return DockerConfig{}, nil
+		return map[string]authn.AuthConfig{}, nil
 	}
 
 	dockercfg, ok := data.Get(dockerConfigKey)
 	if !ok {
-		return DockerConfig{}, nil
+		return map[string]authn.AuthConfig{}, nil
 	}
 
-	var cfg DockerConfig
+	var cfg map[string]authn.AuthConfig
 	if dockerConfigKey == corev1.DockerConfigJsonKey {
 		var cfgV1 struct {
-			Auths DockerConfig `json:"auths"`
+			Auths map[string]authn.AuthConfig `json:"auths"`
 		}
 		if err := json.Unmarshal(dockercfg, &cfgV1); err == nil {
 			cfg = cfgV1.Auths
@@ -137,28 +125,21 @@ func parseDockerConfigFromSecretData(data secretDataWrapper) (DockerConfig, erro
 }
 
 // Lookup implements DockerKeyring interface
-func (k *BasicDockerKeyring) Lookup(image string) ([]LazyAuthConfiguration, bool) {
+func (k *BasicDockerKeyring) Lookup(image string) ([]authn.AuthConfig, bool) {
 	// First try go-containerregistry keychain
 	ref, err := name.ParseReference(image)
 	if err == nil {
 		authenticator, err := k.keychain.Resolve(ref.Context())
 		if err == nil && authenticator != authn.Anonymous {
-			config, err := authenticator.Authorization()
+			auth, err := authenticator.Authorization()
 			if err == nil {
-				auth := LazyAuthConfiguration{
-					Username:      config.Username,
-					Password:      config.Password,
-					Auth:          config.Auth,
-					ServerAddress: ref.Context().RegistryStr(),
-					IdentityToken: config.IdentityToken,
-				}
-				return []LazyAuthConfiguration{auth}, true
+				return []authn.AuthConfig{*auth}, true
 			}
 		}
 	}
 
 	// Fallback to configs from secrets
-	var matches []LazyAuthConfiguration
+	var matches []authn.AuthConfig
 	for _, config := range k.configs {
 		for registry, auth := range config {
 			if matchImage(registry, image) {
@@ -193,7 +174,7 @@ func matchImage(pattern, image string) bool {
 type UnionDockerKeyring []DockerKeyring
 
 // Lookup implements DockerKeyring interface for UnionDockerKeyring
-func (uk UnionDockerKeyring) Lookup(image string) ([]LazyAuthConfiguration, bool) {
+func (uk UnionDockerKeyring) Lookup(image string) ([]authn.AuthConfig, bool) {
 	for _, keyring := range uk {
 		if auth, ok := keyring.Lookup(image); ok {
 			return auth, true

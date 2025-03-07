@@ -105,27 +105,27 @@ func (p puller) Pull(ctx context.Context) (err error) {
 			}
 		}
 	}()
+
 	repo := p.ImageWithoutTag()
 	imageSpec := &cri.ImageSpec{Image: p.ImageWithTag()}
-	creds, withCredentials := p.keyring.Lookup(repo)
+	authConfigs, withCredentials := p.keyring.Lookup(repo)
 	if !withCredentials {
 		_, err = p.imageSvc.PullImage(ctx, &cri.PullImageRequest{
 			Image: imageSpec,
 		})
-
 		klog.V(2).Infof("remoteimage.Pull(no creds): pulling %s completed with err=%v", p.ImageWithTag(), err)
 		return
 	}
 
 	var pullErrs []error
-	for _, cred := range creds {
+	for _, authConfig := range authConfigs {
 		auth := &cri.AuthConfig{
-			Username:      cred.Username,
-			Password:      cred.Password,
-			Auth:          cred.Auth,
-			ServerAddress: cred.ServerAddress,
-			IdentityToken: cred.IdentityToken,
-			RegistryToken: cred.RegistryToken,
+			Username:      authConfig.Username,
+			Password:      authConfig.Password,
+			Auth:          authConfig.Auth,
+			ServerAddress: authConfig.RegistryToken, // Using RegistryToken as ServerAddress since authConfig doesn't have a dedicated field
+			IdentityToken: authConfig.Password,      // Using Password as IdentityToken if using token auth
+			RegistryToken: authConfig.RegistryToken,
 		}
 
 		_, err = p.imageSvc.PullImage(ctx, &cri.PullImageRequest{
@@ -137,7 +137,6 @@ func (p puller) Pull(ctx context.Context) (err error) {
 			klog.V(2).Infof("remoteimage.Pull(with creds): pulling %s completed with err==nil", p.ImageWithTag())
 			return
 		}
-
 		pullErrs = append(pullErrs, err)
 	}
 
