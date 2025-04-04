@@ -7,6 +7,8 @@ import (
 	"time"
 
 	"github.com/google/go-containerregistry/pkg/authn"
+	"github.com/google/go-containerregistry/pkg/authn/github"
+	"github.com/google/go-containerregistry/pkg/authn/k8schain"
 	"github.com/google/go-containerregistry/pkg/name"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -31,9 +33,9 @@ type Store interface {
 	GetDockerKeyring(ctx context.Context, secrets map[string]string) (DockerKeyring, error)
 }
 
-func makeDockerKeyringFromSecrets(secrets []corev1.Secret) (DockerKeyring, error) {
+func makeDockerKeyringFromSecrets(secrets []corev1.Secret, k8sClient *kubernetes.Clientset) (DockerKeyring, error) {
 	keyring := &BasicDockerKeyring{
-		keychain: authn.DefaultKeychain,
+		keychain: createMultiKeychain(k8sClient),
 	}
 
 	for _, secret := range secrets {
@@ -51,9 +53,9 @@ func makeDockerKeyringFromSecrets(secrets []corev1.Secret) (DockerKeyring, error
 	return keyring, nil
 }
 
-func makeDockerKeyringFromMap(secretData map[string]string) (DockerKeyring, error) {
+func makeDockerKeyringFromMap(secretData map[string]string, k8sClient *kubernetes.Clientset) (DockerKeyring, error) {
 	keyring := &BasicDockerKeyring{
-		keychain: authn.DefaultKeychain,
+		keychain: createMultiKeychain(k8sClient),
 	}
 
 	if len(secretData) > 0 {
@@ -65,6 +67,27 @@ func makeDockerKeyringFromMap(secretData map[string]string) (DockerKeyring, erro
 	}
 
 	return keyring, nil
+}
+
+// createMultiKeychain returns a keychain that combines multiple authentication methods
+func createMultiKeychain(k8sClient *kubernetes.Clientset) authn.Keychain {
+	// Use a list of keychains that will be tried in order
+	keychains := []authn.Keychain{
+		authn.DefaultKeychain,
+		github.Keychain,
+	}
+
+	// Try to add k8schain which is particularly good at cloud provider auth
+	if k8sClient != nil {
+		k8sKeychain, err := k8schain.New(context.Background(), k8sClient, k8schain.Options{})
+		if err == nil {
+			keychains = append(keychains, k8sKeychain)
+		} else {
+			klog.V(4).Infof("Failed to create k8schain keychain: %v", err)
+		}
+	}
+
+	return authn.NewMultiKeychain(keychains...)
 }
 
 type secretDataWrapper interface {
@@ -126,18 +149,32 @@ func parseDockerConfigFromSecretData(data secretDataWrapper) (map[string]authn.A
 
 // Lookup implements DockerKeyring interface
 func (k *BasicDockerKeyring) Lookup(image string) ([]authn.AuthConfig, bool) {
-	// First try go-containerregistry keychain
+	// First try to parse the image reference
 	ref, err := name.ParseReference(image)
-	if err == nil {
+	if err != nil {
+		klog.V(4).Infof("Failed to parse image reference %s: %v", image, err)
+		goto fallback // Skip to fallback if we can't parse the image reference
+	}
+
+	// Try the keychain-based approach first
+	{
+		registry := ref.Context().Registry.String()
 		authenticator, err := k.keychain.Resolve(ref.Context())
+
 		if err == nil && authenticator != authn.Anonymous {
 			auth, err := authenticator.Authorization()
-			if err == nil {
+			if err == nil && auth != nil && (auth.Username != "" || auth.Password != "" || auth.Auth != "") {
+				klog.V(4).Infof("Successfully resolved credentials for %s", registry)
 				return []authn.AuthConfig{*auth}, true
+			} else {
+				klog.V(4).Infof("Got authenticator for %s but couldn't get valid credentials: %v", registry, err)
 			}
+		} else {
+			klog.V(4).Infof("Failed to resolve credentials for %s: %v", registry, err)
 		}
 	}
 
+fallback:
 	// Fallback to configs from secrets
 	var matches []authn.AuthConfig
 	for _, config := range k.configs {
@@ -147,7 +184,14 @@ func (k *BasicDockerKeyring) Lookup(image string) ([]authn.AuthConfig, bool) {
 			}
 		}
 	}
-	return matches, len(matches) > 0
+
+	if len(matches) > 0 {
+		klog.V(4).Infof("Found %d credential matches in secrets for %s", len(matches), image)
+		return matches, true
+	}
+
+	klog.V(4).Infof("No credentials found for %s", image)
+	return nil, false
 }
 
 // matchImage checks if an image matches a registry pattern
@@ -186,7 +230,7 @@ func (uk UnionDockerKeyring) Lookup(image string) ([]authn.AuthConfig, bool) {
 // NewEmptyKeyring returns an empty credential keyring
 func NewEmptyKeyring() DockerKeyring {
 	return &BasicDockerKeyring{
-		keychain: authn.DefaultKeychain,
+		keychain: createMultiKeychain(nil),
 	}
 }
 
@@ -196,12 +240,13 @@ type persistentKeyringGetter interface {
 
 type keyringStore struct {
 	persistentKeyringGetter
+	client *kubernetes.Clientset
 }
 
 func (s keyringStore) GetDockerKeyring(ctx context.Context, secretData map[string]string) (keyring DockerKeyring, err error) {
 	var preferredKeyring DockerKeyring
 	if len(secretData) > 0 {
-		preferredKeyring, err = makeDockerKeyringFromMap(secretData)
+		preferredKeyring, err = makeDockerKeyringFromMap(secretData, s.client)
 		if err != nil {
 			return nil, err
 		}
@@ -249,7 +294,7 @@ func (f secretFetcher) Fetch(ctx context.Context) ([]corev1.Secret, error) {
 
 func (s secretFetcher) Get(ctx context.Context) DockerKeyring {
 	secrets, _ := s.Fetch(ctx)
-	keyring, _ := makeDockerKeyringFromSecrets(secrets)
+	keyring, _ := makeDockerKeyringFromSecrets(secrets, s.Client)
 	return keyring
 }
 
@@ -279,6 +324,7 @@ func createSecretFetcher(nodePluginSA string) *secretFetcher {
 func createFetcherOrDie(nodePluginSA string) Store {
 	return keyringStore{
 		persistentKeyringGetter: createSecretFetcher(nodePluginSA),
+		client:                  createSecretFetcher(nodePluginSA).Client,
 	}
 }
 
@@ -297,11 +343,12 @@ func createCacheOrDie(nodePluginSA string) Store {
 
 	var keyring DockerKeyring
 	secrets, _ := secretFetcher.Fetch(ctx)
-	keyring, _ = makeDockerKeyringFromSecrets(secrets)
+	keyring, _ = makeDockerKeyringFromSecrets(secrets, secretFetcher.Client)
 	return keyringStore{
 		persistentKeyringGetter: secretWOCache{
 			daemonKeyring: keyring,
 		},
+		client: secretFetcher.Client,
 	}
 }
 
