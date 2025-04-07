@@ -41,6 +41,7 @@ jobs:
       - name: Verify GitHub Token Permissions
         run: |
           echo "Checking GitHub Token Permissions..."
+          gh auth login
           gh auth status
           gh api user -H "Authorization: token ${{ secrets.GITHUB_TOKEN }}"
 
