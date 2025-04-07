@@ -38,12 +38,12 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Verify GitHub Token Permissions
-        run: |
-          echo "Checking GitHub Token Permissions..."
-          gh auth login
-          gh auth status
-          gh api user -H "Authorization: token ${{ secrets.GITHUB_TOKEN }}"
+      # - name: Verify GitHub Token Permissions
+      #   run: |
+      #     echo "Checking GitHub Token Permissions..."
+      #     gh auth login
+      #     gh auth status
+      #     gh api user -H "Authorization: token ${{ secrets.GITHUB_TOKEN }}"
 
       - name: Extract metadata (tags, labels) for Docker
         id: meta
