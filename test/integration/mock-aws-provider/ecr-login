@@ -1,0 +1,19 @@
+#!/bin/bash
+# Mock AWS ECR credential provider that returns credentials for testing
+# This simulates the AWS ECR credential helper behavior
+
+# Check if the server address is for ECR
+if [[ "$1" == *"ecr"*".amazonaws.com" ]]; then
+  # Return a mock credential in the format expected by the credential provider
+  cat <<EOF
+{
+  "ServerURL": "$1",
+  "Username": "AWS",
+  "Secret": "mockauthtoken"
+}
+EOF
+  exit 0
+else
+  echo "Not an ECR repository" >&2
+  exit 1
+fi

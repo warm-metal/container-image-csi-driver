@@ -1,0 +1,15 @@
+{
+  "kind": "CredentialProviderConfig",
+  "apiVersion": "kubelet.config.k8s.io/v1",
+  "providers": [
+    {
+      "name": "mock-ecr-cred-provider",
+      "matchImages": [
+        "*.dkr.ecr.*.amazonaws.com",
+        "*.dkr.ecr.*.amazonaws.com.cn"
+      ],
+      "defaultCacheDuration": "1h",
+      "apiVersion": "credentialprovider.kubelet.k8s.io/v1"
+    }
+  ]
+}

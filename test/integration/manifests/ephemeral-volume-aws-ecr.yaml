@@ -1,0 +1,28 @@
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: ephemeral-volume-aws-ecr
+spec:
+  template:
+    metadata:
+      name: ephemeral-volume-aws-ecr
+    spec:
+      containers:
+        - name: ephemeral-volume-aws-ecr
+          image: docker.io/warmmetal/container-image-csi-driver-test:check-fs
+          env:
+            - name: TARGET
+              value: /target
+          volumeMounts:
+            - mountPath: /target
+              name: target
+      restartPolicy: Never
+      volumes:
+        - name: target
+          csi:
+            driver: container-image.csi.k8s.io
+            volumeAttributes:
+              # This is a placeholder for an AWS ECR image reference
+              # The actual image doesn't need to exist since we'll mock the authentication
+              image: "111122223333.dkr.ecr.us-west-2.amazonaws.com/test-repo:latest"
+  backoffLimit: 0
