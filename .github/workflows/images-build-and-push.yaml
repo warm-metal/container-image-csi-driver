@@ -13,7 +13,9 @@ env:
   BASE_IMAGE_NAME: warmmetal/container-image-csi-driver
   FORK_IMAGE_NAME: ghcr.io/${{ github.repository }}
 
+# Top-level permissions (apply to all jobs)
 permissions:
+  contents: read
   packages: write
 
 jobs:
@@ -36,7 +38,7 @@ jobs:
         with:
           registry: ghcr.io
           username: ${{ github.actor }}
-          password: ${{ secrets.PACKAGE_PUSH }}
+          password: ${{ secrets.GITHUB_TOKEN }}
 
       # - name: Verify GitHub Token Permissions
       #   run: |
