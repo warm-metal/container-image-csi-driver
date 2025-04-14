@@ -131,6 +131,7 @@ spec:
               subPath: config.json
             - mountPath: {{ .Values.imageCredentialProvider.binDir }}
               name: credential-provider-bin
+            {{- end }}
       hostNetwork: {{.Values.csiPlugin.hostNetwork}}
       serviceAccountName: {{ include "warm-metal-csi-driver.fullname" . }}-nodeplugin
       volumes:
@@ -182,3 +183,4 @@ spec:
       tolerations:
         {{- toYaml . | nindent 8 }}
       {{- end }}
+---
