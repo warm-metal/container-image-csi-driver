@@ -66,6 +66,10 @@ spec:
             {{- if .Values.enableAsyncPull }}
             - --async-pull-timeout={{ .Values.asyncPullTimeout }}
             {{- end }}
+            {{- if .Values.imageCredentialProvider.enabled }}
+            - --image-credential-provider-config=$(IMAGE_CREDENTIAL_PROVIDER_CONFIG)
+            - --image-credential-provider-bin-dir=$(IMAGE_CREDENTIAL_PROVIDER_BIN_DIR)
+            {{- end }}
             - "-v={{ .Values.logLevel }}"
             - "--mode=node"
           env:
@@ -78,6 +82,12 @@ spec:
                 fieldRef:
                   apiVersion: v1
                   fieldPath: spec.nodeName
+            {{- if .Values.imageCredentialProvider.enabled }}
+            - name: IMAGE_CREDENTIAL_PROVIDER_CONFIG
+              value: {{ .Values.imageCredentialProvider.configPath }}
+            - name: IMAGE_CREDENTIAL_PROVIDER_BIN_DIR
+              value: {{ .Values.imageCredentialProvider.binDir }}
+            {{- end }}
           {{- with .Values.csiPlugin.resources }}
           resources:
           {{- toYaml . | nindent 12 }}
@@ -115,6 +125,12 @@ spec:
             - mountPath: {{ .Values.crioMountProgram }}
               name: crio-mount-program
             {{- end }}
+            {{- if .Values.imageCredentialProvider.enabled }}
+            - mountPath: {{ .Values.imageCredentialProvider.configPath }}
+              name: credential-provider-config
+              subPath: config.json
+            - mountPath: {{ .Values.imageCredentialProvider.binDir }}
+              name: credential-provider-bin
       hostNetwork: {{.Values.csiPlugin.hostNetwork}}
       serviceAccountName: {{ include "warm-metal-csi-driver.fullname" . }}-nodeplugin
       volumes:
@@ -150,6 +166,18 @@ spec:
             path: {{ .Values.snapshotRoot }}
             type: Directory
           name: snapshot-root-0
+        {{- if .Values.imageCredentialProvider.enabled }}
+        - name: credential-provider-config
+          configMap:
+            name: {{ include "warm-metal-csi-driver.fullname" . }}-credential-provider-config
+            items:
+            - key: config.json
+              path: config.json
+        - name: credential-provider-bin
+          hostPath:
+            path: {{ .Values.imageCredentialProvider.binDir }}
+            type: DirectoryOrCreate
+        {{- end }}
       {{- with .Values.tolerations }}
       tolerations:
         {{- toYaml . | nindent 8 }}

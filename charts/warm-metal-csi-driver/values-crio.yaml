@@ -9,6 +9,15 @@ logLevel: 4
 enableDaemonImageCredentialCache:
 pullImageSecretForDaemonset:
 
+# Image credential provider settings
+imageCredentialProvider:
+  # Enable the image credential provider
+  enabled: true
+  # Path to the credential provider plugin config file
+  configPath: "/etc/kubernetes/image-credential-providers/config.json"
+  # Path to the directory containing credential provider plugin binaries
+  binDir: "/etc/kubernetes/image-credential-providers"
+
 csiPlugin:
   resources: {}
   image:

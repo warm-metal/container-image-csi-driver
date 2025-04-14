@@ -454,5 +454,5 @@ func TestMetrics(t *testing.T) {
 type testSecretStore struct{}
 
 func (t *testSecretStore) GetDockerKeyring(ctx context.Context, secrets map[string]string) (secret.DockerKeyring, error) {
-	return secret.NewEmptyKeyring(), nil
+	return secret.NewDockerKeyring(), nil
 }
