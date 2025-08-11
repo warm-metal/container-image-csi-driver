@@ -60,6 +60,7 @@ spec:
             - --node=$(KUBE_NODE_NAME)
             - --runtime-addr=$(CRI_ADDR)
             - --node-plugin-sa={{ include "warm-metal-csi-driver.fullname" . }}-nodeplugin
+            - --metrics-port={{ .Values.csiPlugin.metricsPort }}
             {{- if .Values.enableDaemonImageCredentialCache }}
             - --enable-daemon-image-credential-cache
             {{- end }}
@@ -88,7 +89,7 @@ spec:
             - containerPort: 9809
               name: metrics
               protocol: TCP
-            - containerPort: 8080
+            - containerPort: {{ .Values.csiPlugin.metricsPort }}
               name: metrics2
               protocol: TCP
           livenessProbe:
