@@ -56,6 +56,7 @@ var (
 	watcherResyncPeriod = flag.Duration("watcher-resync-period", 30*time.Minute, "The resync period of the pvc watcher.")
 	mode                = flag.String("mode", "", "The mode of the driver. Valid values are: node, controller")
 	nodePluginSA        = flag.String("node-plugin-sa", "csi-image-warm-metal", "The name of the ServiceAccount used by the node plugin.")
+	metricsPort         = flag.Int("metrics-port", 8080, "Port for serving Prometheus metrics.")
 )
 
 func main() {
@@ -145,6 +146,6 @@ func main() {
 		)
 	}
 
-	metrics.StartMetricsServer(metrics.RegisterMetrics())
+	metrics.StartMetricsServer(metrics.RegisterMetrics(), *metricsPort)
 	server.Wait()
 }
