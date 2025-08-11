@@ -58,6 +58,8 @@ var (
 		fmt.Sprintf("Mode determines the role this instance plays. One of %q or %q.", nodeMode, controllerMode))
 	watcherResyncPeriod = flag.Duration("watcher-resync-period", 10*time.Minute,
 		"Resync period for the PVC watcher. Only valid in controller mode.")
+	metricsPort = flag.Int("metrics-port", 8080,
+		"Port for serving Prometheus metrics.")
 )
 
 func main() {
@@ -147,6 +149,6 @@ func main() {
 		)
 	}
 
-	metrics.StartMetricsServer(metrics.RegisterMetrics())
+	metrics.StartMetricsServer(metrics.RegisterMetrics(), *metricsPort)
 	server.Wait()
 }

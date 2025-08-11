@@ -1,6 +1,7 @@
 package metrics
 
 import (
+	"fmt"
 	"net/http"
 
 	"github.com/prometheus/client_golang/prometheus"
@@ -59,11 +60,11 @@ func RegisterMetrics() *prometheus.Registry {
 	return reg
 }
 
-func StartMetricsServer(reg *prometheus.Registry) {
+func StartMetricsServer(reg *prometheus.Registry, port int) {
 	go func() {
 		http.Handle("/metrics", promhttp.HandlerFor(reg, promhttp.HandlerOpts{Registry: reg}))
-		klog.Info("serving internal metrics at port 8080")
-		klog.Fatal(http.ListenAndServe(":8080", nil))
+		klog.Infof("serving internal metrics at port %d", port)
+		klog.Fatal(http.ListenAndServe(fmt.Sprintf(":%d", port), nil))
 	}()
 }
 

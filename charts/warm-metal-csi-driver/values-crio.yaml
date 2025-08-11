@@ -11,6 +11,7 @@ pullImageSecretForDaemonset:
 
 csiPlugin:
   resources: {}
+  metricsPort: 8080
   image:
     tag: ""
     repository: docker.io/warmmetal/csi-image

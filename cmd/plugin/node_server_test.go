@@ -322,7 +322,7 @@ func TestMetrics(t *testing.T) {
 	var wg sync.WaitGroup
 	wg.Add(1)
 	go func() {
-		metrics.StartMetricsServer(metrics.RegisterMetrics())
+		metrics.StartMetricsServer(metrics.RegisterMetrics(), 8080)
 
 		server.Start(*endpoint,
 			nil,
