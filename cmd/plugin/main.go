@@ -13,7 +13,7 @@ import (
 	"github.com/warm-metal/container-image-csi-driver/pkg/backend/containerd"
 	"github.com/warm-metal/container-image-csi-driver/pkg/backend/crio"
 	"github.com/warm-metal/container-image-csi-driver/pkg/cri"
-	"github.com/warm-metal/container-image-csi-driver/pkg/csi-common"
+	csicommon "github.com/warm-metal/container-image-csi-driver/pkg/csi-common"
 	"github.com/warm-metal/container-image-csi-driver/pkg/metrics"
 	"github.com/warm-metal/container-image-csi-driver/pkg/secret"
 	"github.com/warm-metal/container-image-csi-driver/pkg/watcher"
@@ -58,6 +58,8 @@ var (
 		fmt.Sprintf("Mode determines the role this instance plays. One of %q or %q.", nodeMode, controllerMode))
 	watcherResyncPeriod = flag.Duration("watcher-resync-period", 10*time.Minute,
 		"Resync period for the PVC watcher. Only valid in controller mode.")
+	metricsPort = flag.Int("metrics-port", 8080,
+		"Port for serving Prometheus metrics.")
 )
 
 func main() {
@@ -147,6 +149,6 @@ func main() {
 		)
 	}
 
-	metrics.StartMetricsServer(metrics.RegisterMetrics())
+	metrics.StartMetricsServer(metrics.RegisterMetrics(), *metricsPort)
 	server.Wait()
 }
