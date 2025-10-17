@@ -86,6 +86,19 @@ warm-metal-csi-image-install --pull-image-secret-for-daemonset=foo --enable-daem
 
 You can found some installation manifests as samples in [examples](https://github.com/warm-metal/container-image-csi-driver/tree/master/sample).
 
+## Container Images
+
+**Official images** are published to Docker Hub as multi-architecture builds (amd64/arm64):
+- `docker.io/warmmetal/container-image-csi-driver:latest` - Built from `main` branch
+- `docker.io/warmmetal/container-image-csi-driver:v*` - Released versions (tagged)
+- `docker.io/warmmetal/container-image-csi-driver:<branch>` - Branch builds
+
+**Fork repositories** automatically build and push images to GitHub Container Registry (GHCR):
+- `ghcr.io/<github-username>/container-image-csi-driver:<branch>` - Available for testing PRs
+- See [Contributor Guide](docs/contributors.md) for fork setup and best practices
+
+Images are built on every push to any branch and for all version tags.
+
 #### Notice for docker
 Until Docker migrates its [image and snapshot store](https://github.com/moby/moby/issues/38043) to containerd,
 I recommend you use containerd instead. Otherwise, the driver can't use images managed by Docker daemon.
