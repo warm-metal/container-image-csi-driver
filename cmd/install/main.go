@@ -282,7 +282,7 @@ spec:
       serviceAccountName: csi-image-warm-metal
       containers:
         - name: node-driver-registrar
-          image: quay.io/k8scsi/csi-node-driver-registrar:v1.1.0
+          image: registry.k8s.io/sig-storage/csi-node-driver-registrar:v2.8.0
           imagePullPolicy: IfNotPresent
           lifecycle:
             preStop:

@@ -27,3 +27,14 @@ jobs:
         run: ./hack/ci/build.sh
       - name: Test compatibility with versions prior to v0.4.2
         run: ./test/integration/backward-compatability.sh
+      - name: Debug on Failure
+        if: failure()
+        run: |
+          echo "=== Pod Status ==="
+          kubectl get pods -A -o wide
+          echo ""
+          echo "=== CSI Driver Logs ==="
+          kubectl logs -n kube-system -l app=container-image-csi-driver --all-containers --tail=200 || true
+          echo ""
+          echo "=== Events ==="
+          kubectl get events --sort-by='.lastTimestamp' -A
