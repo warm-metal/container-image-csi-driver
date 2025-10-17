@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"os"
+	"os/exec"
 	"strings"
 	"time"
 
@@ -35,6 +36,55 @@ func NewMounter(socketPath string) backend.Mounter {
 	})
 }
 
+// mountInHostNamespace mounts directly in the host mount namespace using nsenter
+func mountInHostNamespace(ctx context.Context, mounts []mount.Mount, target string) error {
+	// For each mount, execute it in the host namespace
+	for i, m := range mounts {
+		var args []string
+
+		// Only add -t flag if type is specified
+		if m.Type != "" {
+			args = append(args, "-t", m.Type)
+		}
+
+		if len(m.Options) > 0 {
+			args = append(args, "-o", strings.Join(m.Options, ","))
+		}
+
+		args = append(args, m.Source, target)
+
+		// Build the nsenter command
+		nsenterArgs := []string{"--mount=/host/proc/1/ns/mnt", "--", "mount"}
+		nsenterArgs = append(nsenterArgs, args...)
+
+		cmd := exec.CommandContext(ctx, "nsenter", nsenterArgs...)
+		output, err := cmd.CombinedOutput()
+		if err != nil {
+			klog.Errorf("nsenter mount failed (attempt %d/%d): %s, output: %s, command: %v",
+				i+1, len(mounts), err, string(output), cmd.Args)
+			return fmt.Errorf("mount failed: %w, output: %s", err, string(output))
+		}
+		klog.V(4).Infof("mounted %s to %s with type %s and options %v using nsenter (mount %d/%d)",
+			m.Source, target, m.Type, m.Options, i+1, len(mounts))
+	}
+	return nil
+}
+
+// unmountInHostNamespace unmounts directly in the host mount namespace using nsenter
+func unmountInHostNamespace(ctx context.Context, target string) error {
+	cmd := exec.CommandContext(ctx,
+		"nsenter", "--mount=/host/proc/1/ns/mnt", "--",
+		"umount", target)
+
+	output, err := cmd.CombinedOutput()
+	if err != nil {
+		klog.Errorf("nsenter unmount failed: %s, output: %s", err, string(output))
+		return fmt.Errorf("unmount failed: %w, output: %s", err, string(output))
+	}
+	klog.V(4).Infof("unmounted %s using nsenter", target)
+	return nil
+}
+
 func (s snapshotMounter) Mount(ctx context.Context, key backend.SnapshotKey, target backend.MountTarget, ro bool) error {
 	mounts, err := s.snapshotter.Mounts(ctx, string(key))
 	if err != nil {
@@ -42,7 +92,8 @@ func (s snapshotMounter) Mount(ctx context.Context, key backend.SnapshotKey, tar
 		return err
 	}
 
-	err = mount.All(mounts, string(target))
+	// Mount in host namespace using nsenter
+	err = mountInHostNamespace(ctx, mounts, string(target))
 	if err != nil {
 		mountsErr := describeMounts(mounts, string(target))
 		if len(mountsErr) > 0 {
@@ -55,8 +106,8 @@ func (s snapshotMounter) Mount(ctx context.Context, key backend.SnapshotKey, tar
 	return err
 }
 
-func (s snapshotMounter) Unmount(_ context.Context, target backend.MountTarget) error {
-	if err := mount.UnmountAll(string(target), 0); err != nil {
+func (s snapshotMounter) Unmount(ctx context.Context, target backend.MountTarget) error {
+	if err := unmountInHostNamespace(ctx, string(target)); err != nil {
 		klog.Errorf("fail to unmount %s: %s", target, err)
 		return err
 	}
