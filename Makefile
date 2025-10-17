@@ -1,4 +1,4 @@
-VERSION ?= v1.2.5-in-tree.1
+VERSION ?= v1.2.5-in-tree.2
 
 IMAGE_BUILDER ?= docker
 IMAGE_BUILD_CMD ?= buildx
