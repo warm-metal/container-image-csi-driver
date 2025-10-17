@@ -78,6 +78,20 @@ helm install my-csi charts/warm-metal-csi-driver \
    - Create new token with `write:packages` scope
    - Add to your fork: **Settings** → **Secrets** → Name: `GHCR_TOKEN`
 
+### Actions cannot push to package after first successful build
+
+**Cause:** After the first package is created, GitHub Actions may lose write access to the package.
+
+**Solution:**
+1. Go to your package settings: `https://github.com/users/<your-username>/packages/container/container-image-csi-driver/settings`
+2. Scroll to **"Manage Actions access"** section
+3. Click **"Add Repository"**
+4. Select your forked repository: `<your-username>/container-image-csi-driver`
+5. Set the role to **"Write"** or **"Admin"**
+6. Click **"Add repository"**
+
+This grants your fork's GitHub Actions workflow permission to push subsequent image builds.
+
 ### Build is very slow (>20 minutes)
 
 **Expected:** ARM64 builds use QEMU emulation on AMD64 runners.
