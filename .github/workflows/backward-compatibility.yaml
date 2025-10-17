@@ -16,6 +16,13 @@ jobs:
           cluster_name: kind-${{ github.run_id }}
           kubectl_version: "v1.32.2"
           config: ./hack/ci/containerd-cluster-conf.yaml
+      - name: Pre-pull and tag node-driver-registrar image for old manifest
+        run: |
+          # The old v0.4.2 manifest uses quay.io/k8scsi/csi-node-driver-registrar:v1.1.0 which no longer exists
+          # Pull the correct image from the new location and tag it with the old name
+          docker pull registry.k8s.io/sig-storage/csi-node-driver-registrar:v2.8.0
+          docker tag registry.k8s.io/sig-storage/csi-node-driver-registrar:v2.8.0 quay.io/k8scsi/csi-node-driver-registrar:v1.1.0
+          kind load docker-image quay.io/k8scsi/csi-node-driver-registrar:v1.1.0 -n kind-${{ github.run_id }}
       - name: Build image
         run: ./hack/ci/build.sh
       - name: Test compatibility with versions prior to v0.4.2
