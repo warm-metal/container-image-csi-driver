@@ -32,8 +32,47 @@ jobs:
             --set csiPlugin.image.tag=${IMAGE_TAG} \
             --wait \
             --debug
+      - name: Verify CSI Driver Pods
+        if: always()
+        run: |
+          echo "=== CSI Driver Pods Status ==="
+          kubectl get pods -n kube-system -l app=container-image-csi-driver -o wide
+          echo ""
+          echo "=== CSI Driver Pod Details ==="
+          kubectl describe pods -n kube-system -l app=container-image-csi-driver
+          echo ""
+          echo "=== CSI Driver Pod Logs ==="
+          for pod in $(kubectl get pods -n kube-system -l app=container-image-csi-driver -o name); do
+            echo "Logs for $pod:"
+            kubectl logs -n kube-system $pod --all-containers --tail=100 || true
+          done
       - name: Run integration Tests
         run: ./hack/ci/test.sh
+      - name: Debug Failed Jobs
+        if: failure()
+        run: |
+          echo "=== Failed Job Details ==="
+          kubectl get jobs -o wide
+          kubectl describe jobs
+          echo ""
+          echo "=== Pod Status ==="
+          kubectl get pods -o wide
+          echo ""
+          echo "=== Failed Pod Details ==="
+          for pod in $(kubectl get pods --field-selector=status.phase!=Succeeded,status.phase!=Running -o name); do
+            echo "Details for $pod:"
+            kubectl describe $pod
+            echo ""
+            echo "Logs for $pod:"
+            kubectl logs $pod --all-containers --tail=200 || true
+            echo ""
+          done
+          echo ""
+          echo "=== CSI Driver Logs ==="
+          kubectl logs -n kube-system -l app=container-image-csi-driver --all-containers --tail=200 || true
+          echo ""
+          echo "=== Events ==="
+          kubectl get events --sort-by='.lastTimestamp' -A
       - name: Uninstall the CSI Driver
         if: always()
         run: helm uninstall -n kube-system ${HELM_NAME} --wait

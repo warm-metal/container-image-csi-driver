@@ -95,18 +95,41 @@ spec:
           livenessProbe:
             {{- toYaml .Values.csiPlugin.livenessProbe | nindent 12}}
           securityContext:
+            {{- if .Values.crioRuntimeRoot }}
             privileged: true
+            {{- else }}
+            privileged: false
+            allowPrivilegeEscalation: true
+            capabilities:
+              add:
+                - SYS_ADMIN
+                - SYS_CHROOT
+                - SYS_PTRACE
+            {{- end }}
           volumeMounts:
             - mountPath: /csi
               name: socket-dir
             - mountPath: {{ .Values.kubeletRoot }}/pods
+              {{- if .Values.crioRuntimeRoot }}
               mountPropagation: Bidirectional
+              {{- else }}
+              mountPropagation: HostToContainer
+              {{- end }}
               name: mountpoint-dir
             - mountPath: {{ .Values.runtime.socketPath }}
               name: runtime-socket
             - mountPath: {{ .Values.snapshotRoot }}
+              {{- if .Values.crioRuntimeRoot }}
               mountPropagation: Bidirectional
+              {{- else }}
+              mountPropagation: HostToContainer
+              {{- end }}
               name: snapshot-root-0
+            {{- if not .Values.crioRuntimeRoot }}
+            - mountPath: /host/proc
+              name: host-proc
+              readOnly: true
+            {{- end }}
             {{- if .Values.crioRuntimeRoot }}
             - mountPath: {{ .Values.crioRuntimeRoot }}
               mountPropagation: Bidirectional
@@ -151,6 +174,12 @@ spec:
             path: {{ .Values.snapshotRoot }}
             type: Directory
           name: snapshot-root-0
+        {{- if not .Values.crioRuntimeRoot }}
+        - hostPath:
+            path: /proc
+            type: Directory
+          name: host-proc
+        {{- end }}
       {{- with .Values.tolerations }}
       tolerations:
         {{- toYaml . | nindent 8 }}
