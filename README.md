@@ -108,8 +108,9 @@ You can found some installation manifests as samples in [examples](https://githu
 - `docker.io/warmmetal/container-image-csi-driver:v*` - Released versions (tagged)
 - `docker.io/warmmetal/container-image-csi-driver:<branch>` - Branch builds
 
-**Fork repositories** automatically build and push images to GitHub Container Registry (GHCR) of your fork:
+**Fork repositories** automatically build and push images to GitHub Container Registry (GHCR):
 - `ghcr.io/<github-username>/container-image-csi-driver:<branch>` - Available for testing PRs
+- See [Contributor Guide](docs/contributors.md) for fork setup and best practices
 
 Images are built on every push to any branch and for all version tags.
 

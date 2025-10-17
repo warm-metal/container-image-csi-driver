@@ -14,7 +14,6 @@ env:
   FORK_IMAGE_NAME: ghcr.io/${{ github.repository }}
 
 permissions:
-  contents: read
   packages: write
 
 jobs:
