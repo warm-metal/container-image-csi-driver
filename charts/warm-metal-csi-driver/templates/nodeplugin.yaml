@@ -83,6 +83,8 @@ spec:
                 fieldRef:
                   apiVersion: v1
                   fieldPath: spec.nodeName
+            - name: CSI_SELINUX_CONTEXT
+              value: {{ .Values.selinuxContext | quote }}
             {{- if .Values.imageCredentialProvider.enabled }}
             - name: IMAGE_CREDENTIAL_PROVIDER_CONFIG
               value: {{ .Values.imageCredentialProvider.configPath }}
