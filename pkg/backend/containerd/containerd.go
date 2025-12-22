@@ -36,6 +36,8 @@ func NewMounter(socketPath string) backend.Mounter {
 	})
 }
 
+var SELinuxNoRelabel = true //TODO: set this in config
+
 // mountInHostNamespace mounts directly in the host mount namespace using nsenter
 func mountInHostNamespace(ctx context.Context, mounts []mount.Mount, target string) error {
 	// For each mount, execute it in the host namespace
@@ -47,8 +49,25 @@ func mountInHostNamespace(ctx context.Context, mounts []mount.Mount, target stri
 			args = append(args, "-t", m.Type)
 		}
 
-		if len(m.Options) > 0 {
-			args = append(args, "-o", strings.Join(m.Options, ","))
+		// Add SELinux context option if config enabled
+		mountOptions := m.Options
+		if SELinuxNoRelabel {
+			// Only add context option if not already there
+			contextOpt := `context="system_u:object_r:container_file_t:s0"`
+			alreadySet := false
+			for _, opt := range mountOptions {
+				if strings.HasPrefix(opt, "context=") {
+					alreadySet = true
+					break
+				}
+			}
+			if !alreadySet {
+				mountOptions = append(mountOptions, contextOpt)
+			}
+		}
+
+		if len(mountOptions) > 0 {
+			args = append(args, "-o", strings.Join(mountOptions, ","))
 		}
 
 		args = append(args, m.Source, target)
@@ -65,7 +84,7 @@ func mountInHostNamespace(ctx context.Context, mounts []mount.Mount, target stri
 			return fmt.Errorf("mount failed: %w, output: %s", err, string(output))
 		}
 		klog.V(4).Infof("mounted %s to %s with type %s and options %v using nsenter (mount %d/%d)",
-			m.Source, target, m.Type, m.Options, i+1, len(mounts))
+			m.Source, target, m.Type, mountOptions, i+1, len(mounts))
 	}
 	return nil
 }
