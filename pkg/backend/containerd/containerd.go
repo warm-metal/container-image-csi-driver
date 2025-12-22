@@ -36,8 +36,36 @@ func NewMounter(socketPath string) backend.Mounter {
 	})
 }
 
+// selinuxContext returns the configured SELinux mount context or a safe default.
+// Default: system_u:object_r:container_file_t:s0
+func selinuxContext() string {
+	if v := os.Getenv("CSI_SELINUX_CONTEXT"); v != "" {
+		return v
+	}
+	return "system_u:object_r:container_file_t:s0"
+}
+
+// isSELinuxEnforcing checks host kernel SELinux enforcing state via /sys/fs/selinux/enforce.
+// Returns true only when the file exists and contains "1".
+func isSELinuxEnforcing() bool {
+	b, err := os.ReadFile("/sys/fs/selinux/enforce")
+	if err != nil {
+		return false
+	}
+
+	s := strings.TrimSpace(string(b))
+	return s == "1"
+}
+
 // mountInHostNamespace mounts directly in the host mount namespace using nsenter
 func mountInHostNamespace(ctx context.Context, mounts []mount.Mount, target string) error {
+	// Compute SELinux enforcement once per mount operation
+	enforcing := isSELinuxEnforcing()
+	var contextOpt string
+	if enforcing {
+		contextOpt = fmt.Sprintf("context=\"%s\"", selinuxContext())
+	}
+
 	// For each mount, execute it in the host namespace
 	for i, m := range mounts {
 		var args []string
@@ -47,8 +75,23 @@ func mountInHostNamespace(ctx context.Context, mounts []mount.Mount, target stri
 			args = append(args, "-t", m.Type)
 		}
 
-		if len(m.Options) > 0 {
-			args = append(args, "-o", strings.Join(m.Options, ","))
+		// When SELinux is enforcing on host, add a context=... option.
+		mountOptions := m.Options
+		if enforcing {
+			alreadySet := false
+			for _, opt := range mountOptions {
+				if strings.HasPrefix(opt, "context=") {
+					alreadySet = true
+					break
+				}
+			}
+			if !alreadySet {
+				mountOptions = append(mountOptions, contextOpt)
+			}
+		}
+
+		if len(mountOptions) > 0 {
+			args = append(args, "-o", strings.Join(mountOptions, ","))
 		}
 
 		args = append(args, m.Source, target)
@@ -65,7 +108,7 @@ func mountInHostNamespace(ctx context.Context, mounts []mount.Mount, target stri
 			return fmt.Errorf("mount failed: %w, output: %s", err, string(output))
 		}
 		klog.V(4).Infof("mounted %s to %s with type %s and options %v using nsenter (mount %d/%d)",
-			m.Source, target, m.Type, m.Options, i+1, len(mounts))
+			m.Source, target, m.Type, mountOptions, i+1, len(mounts))
 	}
 	return nil
 }
