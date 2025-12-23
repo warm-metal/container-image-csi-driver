@@ -1,0 +1,91 @@
+# AWS ECR Credential Provider Configuration
+#
+# This example shows how to configure the CSI driver to use AWS ECR credential provider
+# for authenticating with private ECR registries.
+#
+# Prerequisites:
+# 1. Install ecr-credential-provider binary on your nodes
+# 2. Ensure nodes have IAM role with ecr:GetAuthorizationToken permission
+# 3. Create this configuration file on each node
+#
+# Usage:
+#   sudo mkdir -p /etc/kubernetes/image-credential-providers
+#   sudo cp ecr-config.yaml /etc/kubernetes/image-credential-providers/config.json
+
+apiVersion: kubelet.config.k8s.io/v1
+kind: CredentialProviderConfig
+providers:
+  - name: ecr-credential-provider
+    # Match all ECR registry patterns
+    matchImages:
+      # Standard AWS regions
+      - "*.dkr.ecr.*.amazonaws.com"
+      # AWS China regions
+      - "*.dkr.ecr.*.amazonaws.com.cn"
+      # FIPS endpoints
+      - "*.dkr.ecr-fips.*.amazonaws.com"
+      # Public ECR
+      - "public.ecr.aws"
+    # Cache credentials for 12 hours (ECR tokens are valid for 12 hours)
+    defaultCacheDuration: "12h"
+    # API version for the credential provider
+    apiVersion: "credentialprovider.kubelet.k8s.io/v1"
+
+---
+# Alternative: Using docker-credential-ecr-login
+#
+# If you prefer to use the Docker credential helper instead:
+#
+# apiVersion: kubelet.config.k8s.io/v1
+# kind: CredentialProviderConfig
+# providers:
+#   - name: docker-credential-ecr-login
+#     matchImages:
+#       - "*.dkr.ecr.*.amazonaws.com"
+#       - "public.ecr.aws"
+#     defaultCacheDuration: "12h"
+#     apiVersion: "credentialprovider.kubelet.k8s.io/v1"
+
+---
+# Installation Steps:
+#
+# 1. Download and install the ECR credential provider:
+#    ECR_PROVIDER_VERSION=v1.31.3  # Use the version matching your Kubernetes version
+#    ARCH=amd64  # or arm64
+#    sudo wget https://storage.googleapis.com/k8s-artifacts-prod/binaries/cloud-provider-aws/${ECR_PROVIDER_VERSION}/linux/${ARCH}/ecr-credential-provider-linux-${ARCH} \
+#      -O /etc/kubernetes/image-credential-providers/ecr-credential-provider
+#    sudo chmod +x /etc/kubernetes/image-credential-providers/ecr-credential-provider
+#
+# 2. Verify the binary works:
+#    echo '{"image": "123456789012.dkr.ecr.us-east-1.amazonaws.com/test"}' | \
+#      /etc/kubernetes/image-credential-providers/ecr-credential-provider get
+#
+# 3. Verify IAM role permissions:
+#    aws ecr get-login-password --region us-east-1
+#
+# 4. Deploy this config on all nodes (or use a DaemonSet):
+#    sudo mkdir -p /etc/kubernetes/image-credential-providers
+#    sudo cp ecr-config.yaml /etc/kubernetes/image-credential-providers/config.json
+#
+# 5. Enable credential provider in CSI driver:
+#    helm upgrade warm-metal-csi-driver ./charts/warm-metal-csi-driver \
+#      --set imageCredentialProvider.enabled=true \
+#      --namespace kube-system
+#
+# 6. Test with a private ECR image:
+#    kubectl apply -f - <<EOF
+#    apiVersion: v1
+#    kind: PersistentVolume
+#    metadata:
+#      name: test-ecr-image
+#    spec:
+#      capacity:
+#        storage: 1Gi
+#      accessModes:
+#        - ReadOnlyMany
+#      csi:
+#        driver: csi.warm-metal.tech
+#        volumeHandle: test-ecr-image
+#        volumeAttributes:
+#          image: "123456789012.dkr.ecr.us-east-1.amazonaws.com/my-app:latest"
+#    EOF

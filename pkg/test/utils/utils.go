@@ -51,7 +51,7 @@ func (c *MockImageServiceClient) ListImages(ctx context.Context, in *criapi.List
 		resp.Images = append(resp.Images, &criapi.Image{
 			Id: k,
 			// 100MB
-			Size_: hundredMB,
+			Size: hundredMB,
 			Spec: &criapi.ImageSpec{
 				Image: k,
 			},
@@ -64,8 +64,8 @@ func (c *MockImageServiceClient) ListImages(ctx context.Context, in *criapi.List
 func (c *MockImageServiceClient) ImageStatus(ctx context.Context, in *criapi.ImageStatusRequest, opts ...grpc.CallOption) (*criapi.ImageStatusResponse, error) {
 	resp := new(criapi.ImageStatusResponse)
 	resp.Image = &criapi.Image{
-		Id:    in.Image.Image,
-		Size_: hundredMB,
+		Id:   in.Image.Image,
+		Size: hundredMB,
 		Spec: &criapi.ImageSpec{
 			Image: in.Image.Image,
 		},

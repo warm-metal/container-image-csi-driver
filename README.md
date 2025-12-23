@@ -199,7 +199,10 @@ There are several ways to configure credentials for private image pulling.
 If your clusters are in cloud, the credential provider are enabled automatically.
 If your cloud provider provides a credential provider plugin instead, you can enable it by adding
 both `--image-credential-provider-config` and `--image-credential-provider-bin-dir` flags to the driver.
-See [credential provider plugin](https://kubernetes.io/docs/tasks/kubelet-credential-provider/kubelet-credential-provider/).
+
+**For detailed setup instructions for AWS ECR, Google GCR, and Azure ACR, see our [Credential Provider Plugin Guide](docs/credential-providers/README.md).**
+
+You can also refer to the [Kubernetes credential provider documentation](https://kubernetes.io/docs/tasks/kubelet-credential-provider/kubelet-credential-provider/).
 
 Otherwise, you need ImagePullSecrets to store your credential. The following links may help.
 - [https://kubernetes.io/docs/tasks/configure-pod-container/pull-image-private-registry/](https://kubernetes.io/docs/tasks/configure-pod-container/pull-image-private-registry/).

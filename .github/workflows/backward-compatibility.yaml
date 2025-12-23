@@ -27,14 +27,37 @@ jobs:
         run: ./hack/ci/build.sh
       - name: Test compatibility with versions prior to v0.4.2
         run: ./test/integration/backward-compatability.sh
-      - name: Debug on Failure
-        if: failure()
+      - name: Debug Driver and Test Status
+        if: always()
         run: |
-          echo "=== Pod Status ==="
-          kubectl get pods -A -o wide
+          echo "=== Failed Job Details ==="
+          kubectl get jobs -o wide || true
+          kubectl describe jobs || true
           echo ""
-          echo "=== CSI Driver Logs ==="
-          kubectl logs -n kube-system -l app=container-image-csi-driver --all-containers --tail=200 || true
+          echo "=== Pod Status ==="
+          kubectl get pods -o wide
+          echo ""
+          echo "=== Failed Pod Details ==="
+          for pod in $(kubectl get pods --field-selector=status.phase!=Succeeded,status.phase!=Running -o name); do
+            echo "Details for $pod:"
+            kubectl describe $pod
+            echo ""
+            echo "Logs for $pod:"
+            kubectl logs $pod --all-containers --tail=200 || true
+            echo ""
+          done
+          echo ""
+          echo "=== CSI Driver Pods Status ==="
+          kubectl get pods -n kube-system -l component=nodeplugin -o wide || true
+          kubectl get pods -n kube-system -l app=container-image-csi-driver -o wide || true
+          echo ""
+          echo "=== CSI Driver Nodeplugin Logs ==="
+          kubectl get pods -n kube-system -l component=nodeplugin -o name | while read pod; do
+            echo "Logs for $pod (csi-plugin container):"
+            kubectl logs -n kube-system $pod -c csi-plugin --tail=500 2>&1 || echo "Failed to get csi-plugin logs for $pod"
+            echo ""
+          done
+          kubectl logs -n kube-system -l app=container-image-csi-driver --all-containers --tail=500 2>&1 || true
           echo ""
           echo "=== Events ==="
           kubectl get events --sort-by='.lastTimestamp' -A

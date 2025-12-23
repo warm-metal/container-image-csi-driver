@@ -13,13 +13,19 @@ import (
 	"k8s.io/klog/v2"
 )
 
+// Puller defines the interface for pulling container images
 type Puller interface {
+	// Pull downloads the container image
 	Pull(context.Context) error
+	// ImageWithTag returns the full image name with tag
 	ImageWithTag() string
+	// ImageWithoutTag returns the image name without tag
 	ImageWithoutTag() string
+	// ImageSize returns the size of the image in bytes
 	ImageSize(context.Context) (int, error)
 }
 
+// NewPuller creates a new image puller instance
 func NewPuller(imageSvc cri.ImageServiceClient, image reference.Named,
 	keyring secret.DockerKeyring) Puller {
 	return &puller{
@@ -29,118 +35,188 @@ func NewPuller(imageSvc cri.ImageServiceClient, image reference.Named,
 	}
 }
 
+// puller implements the Puller interface
 type puller struct {
 	imageSvc cri.ImageServiceClient
 	image    reference.Named
 	keyring  secret.DockerKeyring
 }
 
+// ImageWithTag returns the full image name with tag
 func (p puller) ImageWithTag() string {
 	return p.image.String()
 }
 
+// ImageWithoutTag returns the image name without tag
 func (p puller) ImageWithoutTag() string {
 	return p.image.Name()
 }
 
 // Returns the compressed size of the image that was pulled in bytes
 // see https://github.com/containerd/containerd/issues/9261
-func (p puller) ImageSize(ctx context.Context) (size int, err error) {
-	defer func() {
-		if err != nil {
-			klog.Errorf("%s", err.Error())
-			metrics.OperationErrorsCount.WithLabelValues("size-error").Inc()
-		}
-	}()
+func (p puller) ImageSize(ctx context.Context) (int, error) {
 	imageSpec := &cri.ImageSpec{Image: p.ImageWithTag()}
-	if imageStatusResponse, err := p.imageSvc.ImageStatus(ctx, &cri.ImageStatusRequest{
+	imageStatusResponse, err := p.imageSvc.ImageStatus(ctx, &cri.ImageStatusRequest{
 		Image: imageSpec,
-	}); err != nil {
-		size = 0
-		err = fmt.Errorf("remoteimage.ImageSize(): call returned an error: %s", err.Error())
-		return size, err
-	} else if imageStatusResponse == nil {
-		size = 0
-		err = fmt.Errorf("remoteimage.ImageSize(): imageStatusResponse is nil")
-		return size, err
-	} else if imageStatusResponse.Image == nil {
-		size = 0
-		err = fmt.Errorf("remoteimage.ImageSize(): imageStatusResponse.Image is nil")
-		return size, err
-	} else {
-		size = imageStatusResponse.Image.Size()
-		err = nil
-		return size, err
+	})
+
+	if err != nil {
+		metrics.OperationErrorsCount.WithLabelValues("size-error").Inc()
+		return 0, fmt.Errorf("failed to get image status: %w", err)
+	}
+
+	if imageStatusResponse == nil {
+		metrics.OperationErrorsCount.WithLabelValues("size-error").Inc()
+		return 0, fmt.Errorf("image status response is nil")
+	}
+
+	if imageStatusResponse.Image == nil {
+		metrics.OperationErrorsCount.WithLabelValues("size-error").Inc()
+		return 0, fmt.Errorf("image info is nil in status response")
+	}
+
+	return int(imageStatusResponse.Image.Size), nil
+}
+
+// Pull downloads the container image
+func (p puller) Pull(ctx context.Context) (err error) {
+	startTime := time.Now()
+
+	// Setup deferred metrics collection
+	defer func() {
+		p.recordPullMetrics(startTime, err, ctx)
+	}()
+
+	// Create image spec for CRI API
+	imageSpec := &cri.ImageSpec{Image: p.ImageWithTag()}
+
+	// First try without credentials
+	if err = p.pullWithoutCredentials(ctx, imageSpec); err == nil {
+		return nil // Success without credentials
+	}
+
+	// If public pull failed, try with credentials
+	return p.pullWithCredentials(ctx, imageSpec, err)
+}
+
+// recordPullMetrics records metrics about the image pull operation
+func (p puller) recordPullMetrics(startTime time.Time, err error, ctx context.Context) {
+	elapsed := time.Since(startTime).Seconds()
+	imageTag := p.ImageWithTag()
+
+	// Record pull time metrics
+	klog.Infof("Pulled %s in %d milliseconds", imageTag, int(1000*elapsed))
+	metrics.ImagePullTimeHist.WithLabelValues(metrics.BoolToString(err != nil)).Observe(elapsed)
+	metrics.ImagePullTime.WithLabelValues(imageTag, metrics.BoolToString(err != nil)).Set(elapsed)
+
+	// Record errors if any
+	if err != nil {
+		metrics.OperationErrorsCount.WithLabelValues("pull-error").Inc()
+	}
+
+	// Schedule cleanup of metrics after 1 minute
+	go func() {
+		time.Sleep(1 * time.Minute)
+		metrics.ImagePullTime.DeleteLabelValues(imageTag, metrics.BoolToString(err != nil))
+	}()
+
+	// Record size metrics if pull was successful
+	if err == nil {
+		p.recordSizeMetrics(ctx, imageTag)
 	}
 }
 
-func (p puller) Pull(ctx context.Context) (err error) {
-	startTime := time.Now()
-	defer func() { // must capture final value of "err"
-		elapsed := time.Since(startTime).Seconds()
-		// pull time metrics and logs
-		klog.Infof("remoteimage.Pull(): pulled %s in %d milliseconds", p.ImageWithTag(), int(1000*elapsed))
-		metrics.ImagePullTimeHist.WithLabelValues(metrics.BoolToString(err != nil)).Observe(elapsed)
-		metrics.ImagePullTime.WithLabelValues(p.ImageWithTag(), metrics.BoolToString(err != nil)).Set(elapsed)
-		if err != nil {
-			metrics.OperationErrorsCount.WithLabelValues("pull-error").Inc()
-		}
-		go func() {
-			//TODO: this is a hack to ensure data is cleared in a reasonable time frame (after scrape) and does not build up.
-			time.Sleep(1 * time.Minute)
-			metrics.ImagePullTime.DeleteLabelValues(p.ImageWithTag(), metrics.BoolToString(err != nil))
-		}()
-		// pull size metrics and logs
-		if err == nil { // only size if pull was successful
-			if size, err2 := p.ImageSize(ctx); err2 != nil {
-				// log entries and error counts emitted inside ImageSize() method
-			} else { // success
-				klog.Infof("remoteimage.Pull(): pulled %s with size of %d bytes", p.ImageWithTag(), size)
-				metrics.ImagePullSizeBytes.WithLabelValues(p.ImageWithTag()).Set(float64(size))
-				go func() {
-					//TODO: this is a hack to ensure data is cleared in a reasonable time frame (after scrape) and does not build up.
-					time.Sleep(1 * time.Minute)
-					metrics.ImagePullSizeBytes.DeleteLabelValues(p.ImageWithTag())
-				}()
-			}
-		}
+// recordSizeMetrics records metrics about the image size
+func (p puller) recordSizeMetrics(ctx context.Context, imageTag string) {
+	size, err := p.ImageSize(ctx)
+	if err != nil {
+		return // Error already logged in ImageSize()
+	}
+
+	klog.Infof("Pulled %s with size of %d bytes", imageTag, size)
+	metrics.ImagePullSizeBytes.WithLabelValues(imageTag).Set(float64(size))
+
+	// Schedule cleanup of metrics after 1 minute
+	go func() {
+		time.Sleep(1 * time.Minute)
+		metrics.ImagePullSizeBytes.DeleteLabelValues(imageTag)
 	}()
+}
 
+// pullWithoutCredentials attempts to pull the image without authentication
+func (p puller) pullWithoutCredentials(ctx context.Context, imageSpec *cri.ImageSpec) error {
+	klog.V(2).Infof("Attempting to pull image %s without credentials", p.ImageWithTag())
+
+	_, err := p.imageSvc.PullImage(ctx, &cri.PullImageRequest{
+		Image: imageSpec,
+	})
+
+	if err == nil {
+		klog.V(2).Infof("Successfully pulled image %s without credentials", p.ImageWithTag())
+		return nil
+	}
+
+	klog.V(2).Infof("Pull without credentials failed for %s: %v", p.ImageWithTag(), err)
+	return err
+}
+
+// pullWithCredentials attempts to pull the image using credentials from the keyring
+func (p puller) pullWithCredentials(ctx context.Context, imageSpec *cri.ImageSpec, initialErr error) error {
+	// Look up credentials for this image repository
 	repo := p.ImageWithoutTag()
-	imageSpec := &cri.ImageSpec{Image: p.ImageWithTag()}
+	klog.V(2).Infof("Looking up credentials for repo=%s (full image=%s)", repo, p.ImageWithTag())
 	authConfigs, withCredentials := p.keyring.Lookup(repo)
-	if !withCredentials {
-		_, err = p.imageSvc.PullImage(ctx, &cri.PullImageRequest{
-			Image: imageSpec,
-		})
-		klog.V(2).Infof("remoteimage.Pull(no creds): pulling %s completed with err=%v", p.ImageWithTag(), err)
-		return
+
+	// If no credentials are available, return the original error
+	if !withCredentials || len(authConfigs) == 0 {
+		klog.V(2).Infof("No credentials found for %s", p.ImageWithTag())
+		return fmt.Errorf("failed to pull image without credentials and no credentials available: %w", initialErr)
 	}
 
+	klog.V(2).Infof("Found %d credential options for image %s", len(authConfigs), p.ImageWithTag())
+
+	// Try each credential option
+	return p.tryCredentials(ctx, imageSpec, authConfigs)
+}
+
+// tryCredentials attempts to pull the image with each credential option
+func (p puller) tryCredentials(ctx context.Context, imageSpec *cri.ImageSpec, authConfigs []*cri.AuthConfig) error {
 	var pullErrs []error
-	for _, authConfig := range authConfigs {
-		auth := &cri.AuthConfig{
-			Username:      authConfig.Username,
-			Password:      authConfig.Password,
-			Auth:          authConfig.Auth,
-			ServerAddress: authConfig.RegistryToken, // Using RegistryToken as ServerAddress since authConfig doesn't have a dedicated field
-			IdentityToken: authConfig.Password,      // Using Password as IdentityToken if using token auth
-			RegistryToken: authConfig.RegistryToken,
-		}
 
-		_, err = p.imageSvc.PullImage(ctx, &cri.PullImageRequest{
-			Image: imageSpec,
-			Auth:  auth,
-		})
+	// Try each credential until one succeeds
+	for i, authConfig := range authConfigs {
+		klog.V(2).Infof("Trying credential option %d for image %s", i+1, p.ImageWithTag())
 
-		if err == nil {
-			klog.V(2).Infof("remoteimage.Pull(with creds): pulling %s completed with err==nil", p.ImageWithTag())
-			return
+		// Try pulling with this credential
+		if err := p.pullWithAuth(ctx, imageSpec, authConfig, i+1); err == nil {
+			return nil // Success
+		} else {
+			pullErrs = append(pullErrs, err)
 		}
-		pullErrs = append(pullErrs, err)
 	}
 
-	err = utilerrors.NewAggregate(pullErrs)
-	klog.V(2).Infof("remoteimage.Pull(): completed with errors, len(pullErrs)=%d, aggErr=%s", len(pullErrs), err.Error())
-	return
+	// All credential options failed
+	err := utilerrors.NewAggregate(pullErrs)
+	klog.Warningf("All %d credential options failed for image %s",
+		len(authConfigs), p.ImageWithTag())
+	return err
+}
+
+// pullWithAuth attempts to pull using a specific credential
+func (p puller) pullWithAuth(ctx context.Context, imageSpec *cri.ImageSpec, auth *cri.AuthConfig, optionNum int) error {
+	klog.V(2).Infof("Attempting pull for %s with credential option %d (username: '%s')",
+		p.ImageWithTag(), optionNum, auth.Username)
+
+	_, err := p.imageSvc.PullImage(ctx, &cri.PullImageRequest{
+		Image: imageSpec,
+		Auth:  auth,
+	})
+
+	if err == nil {
+		klog.Infof("Successfully pulled image %s with credential option %d", p.ImageWithTag(), optionNum)
+		return nil
+	}
+
+	klog.V(2).Infof("Pull with credential option %d failed: %v", optionNum, err)
+	return fmt.Errorf("auth option %d: %w", optionNum, err)
 }

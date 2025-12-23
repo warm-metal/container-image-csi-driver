@@ -1,0 +1,178 @@
+# Multi-Cloud Credential Provider Configuration
+#
+# This example shows how to configure the CSI driver to use multiple credential
+# providers for authenticating with registries across different cloud providers.
+#
+# Prerequisites:
+# 1. Install all credential provider binaries on your nodes:
+#    - ecr-credential-provider (AWS)
+#    - gcp-credential-provider (Google)
+#    - acr-credential-provider (Azure)
+# 2. Ensure nodes have appropriate IAM permissions for each cloud
+# 3. Create this configuration file on each node
+#
+# Usage:
+#   sudo mkdir -p /etc/kubernetes/image-credential-providers
+#   sudo cp multi-cloud-config.yaml /etc/kubernetes/image-credential-providers/config.json
+
+apiVersion: kubelet.config.k8s.io/v1
+kind: CredentialProviderConfig
+providers:
+  # AWS ECR Configuration
+  - name: ecr-credential-provider
+    matchImages:
+      - "*.dkr.ecr.*.amazonaws.com"
+      - "*.dkr.ecr.*.amazonaws.com.cn"
+      - "*.dkr.ecr-fips.*.amazonaws.com"
+      - "public.ecr.aws"
+    defaultCacheDuration: "12h"
+    apiVersion: "credentialprovider.kubelet.k8s.io/v1"
+
+  # Google GCR Configuration
+  - name: gcp-credential-provider
+    matchImages:
+      - "gcr.io"
+      - "*.gcr.io"
+      - "*.pkg.dev"
+      - "container.cloud.google.com"
+    defaultCacheDuration: "12h"
+    apiVersion: "credentialprovider.kubelet.k8s.io/v1"
+
+  # Azure ACR Configuration
+  - name: acr-credential-provider
+    matchImages:
+      - "*.azurecr.io"
+      - "*.azurecr.cn"
+      - "*.azurecr.us"
+      - "*.azurecr.de"
+    defaultCacheDuration: "12h"
+    apiVersion: "credentialprovider.kubelet.k8s.io/v1"
+
+---
+# Installation Steps:
+#
+# 1. Install all credential provider binaries:
+#
+#    # Set version and architecture variables
+#    PROVIDER_VERSION=v1.31.3  # Use the version matching your Kubernetes version
+#    ARCH=amd64  # or arm64
+#
+#    # AWS ECR
+#    sudo wget https://storage.googleapis.com/k8s-artifacts-prod/binaries/cloud-provider-aws/${PROVIDER_VERSION}/linux/${ARCH}/ecr-credential-provider-linux-${ARCH} \
+#      -O /etc/kubernetes/image-credential-providers/ecr-credential-provider
+#    sudo chmod +x /etc/kubernetes/image-credential-providers/ecr-credential-provider
+#
+#    # Google GCR
+#    sudo wget https://storage.googleapis.com/k8s-artifacts-prod/binaries/cloud-provider-gcp/${PROVIDER_VERSION}/linux/${ARCH}/gcp-credential-provider-linux-${ARCH} \
+#      -O /etc/kubernetes/image-credential-providers/gcp-credential-provider
+#    sudo chmod +x /etc/kubernetes/image-credential-providers/gcp-credential-provider
+#
+#    # Azure ACR
+#    sudo wget https://storage.googleapis.com/k8s-artifacts-prod/binaries/cloud-provider-azure/${PROVIDER_VERSION}/linux/${ARCH}/acr-credential-provider-linux-${ARCH} \
+#      -O /etc/kubernetes/image-credential-providers/acr-credential-provider
+#    sudo chmod +x /etc/kubernetes/image-credential-providers/acr-credential-provider
+#
+# 2. Verify all binaries work:
+#
+#    # Test ECR
+#    echo '{"image": "123456789012.dkr.ecr.us-east-1.amazonaws.com/test"}' | \
+#      /etc/kubernetes/image-credential-providers/ecr-credential-provider get
+#
+#    # Test GCR
+#    echo '{"image": "gcr.io/my-project/test"}' | \
+#      /etc/kubernetes/image-credential-providers/gcp-credential-provider get
+#
+#    # Test ACR
+#    echo '{"image": "myregistry.azurecr.io/test"}' | \
+#      /etc/kubernetes/image-credential-providers/acr-credential-provider get
+#
+# 3. Deploy this config on all nodes:
+#    sudo mkdir -p /etc/kubernetes/image-credential-providers
+#    sudo cp multi-cloud-config.yaml /etc/kubernetes/image-credential-providers/config.json
+#
+# 4. Enable credential provider in CSI driver:
+#    helm upgrade warm-metal-csi-driver ./charts/warm-metal-csi-driver \
+#      --set imageCredentialProvider.enabled=true \
+#      --namespace kube-system
+#
+# 5. Test with images from different registries:
+#
+#    # AWS ECR image
+#    kubectl apply -f - <<EOF
+#    apiVersion: v1
+#    kind: PersistentVolume
+#    metadata:
+#      name: test-ecr-image
+#    spec:
+#      capacity:
+#        storage: 1Gi
+#      accessModes: [ReadOnlyMany]
+#      csi:
+#        driver: csi.warm-metal.tech
+#        volumeHandle: test-ecr-image
+#        volumeAttributes:
+#          image: "123456789012.dkr.ecr.us-east-1.amazonaws.com/my-app:latest"
+#    EOF
+#
+#    # Google GCR image
+#    kubectl apply -f - <<EOF
+#    apiVersion: v1
+#    kind: PersistentVolume
+#    metadata:
+#      name: test-gcr-image
+#    spec:
+#      capacity:
+#        storage: 1Gi
+#      accessModes: [ReadOnlyMany]
+#      csi:
+#        driver: csi.warm-metal.tech
+#        volumeHandle: test-gcr-image
+#        volumeAttributes:
+#          image: "gcr.io/my-project/my-app:latest"
+#    EOF
+#
+#    # Azure ACR image
+#    kubectl apply -f - <<EOF
+#    apiVersion: v1
+#    kind: PersistentVolume
+#    metadata:
+#      name: test-acr-image
+#    spec:
+#      capacity:
+#        storage: 1Gi
+#      accessModes: [ReadOnlyMany]
+#      csi:
+#        driver: csi.warm-metal.tech
+#        volumeHandle: test-acr-image
+#        volumeAttributes:
+#          image: "myregistry.azurecr.io/my-app:latest"
+#    EOF
+
+---
+# IAM Permissions Required:
+#
+# AWS:
+#   - IAM role with ecr:GetAuthorizationToken permission
+#   - Attached to node instance profile
+#
+# GCP:
+#   - Service account with artifactregistry.repositories.downloadArtifacts
+#   - Associated with node
+#
+# Azure:
+#   - Managed identity with acrpull role
+#   - Assigned to node VMSS
+#
+# See individual cloud provider examples for detailed permission setup instructions.
+
+---
+# Note on Provider Priority:
+#
+# Providers are evaluated in the order they appear in the configuration.
+# For images that match multiple patterns, the first matching provider will be used.
+# In this configuration:
+#   1. ECR patterns are checked first
+#   2. GCR patterns are checked second
+#   3. ACR patterns are checked third
+#
+# You can reorder the providers list to change priority if needed.

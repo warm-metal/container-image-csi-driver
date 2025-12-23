@@ -9,9 +9,9 @@ import (
 	"strings"
 	"time"
 
-	"github.com/containerd/containerd"
-	"github.com/containerd/containerd/mount"
-	"github.com/containerd/containerd/snapshots"
+	"github.com/containerd/containerd/v2/client"
+	"github.com/containerd/containerd/v2/core/mount"
+	"github.com/containerd/containerd/v2/core/snapshots"
 	"github.com/distribution/reference"
 	"github.com/opencontainers/image-spec/identity"
 	"github.com/warm-metal/container-image-csi-driver/pkg/backend"
@@ -20,11 +20,11 @@ import (
 
 type snapshotMounter struct {
 	snapshotter snapshots.Snapshotter
-	cli         *containerd.Client
+	cli         *client.Client
 }
 
 func NewMounter(socketPath string) backend.Mounter {
-	c, err := containerd.New(socketPath, containerd.WithDefaultNamespace("k8s.io"))
+	c, err := client.New(socketPath, client.WithDefaultNamespace("k8s.io"))
 	if err != nil {
 		klog.Fatalf("containerd connection is broken because the mounted unix socket somehow dose not work,"+
 			"recreate the container may fix: %s", err)

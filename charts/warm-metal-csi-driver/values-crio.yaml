@@ -9,6 +9,17 @@ logLevel: 4
 enableDaemonImageCredentialCache:
 pullImageSecretForDaemonset:
 
+# Image credential provider settings
+# NOTE: CRI-O test environment does not have credential providers configured
+# Standard Kubernetes secrets (imagePullSecrets) are used instead
+imageCredentialProvider:
+  # Disable credential provider for CRI-O (not available in test environment)
+  enabled: false
+  # Path to the credential provider plugin config file
+  configPath: "/etc/kubernetes/image-credential-providers/config.json"
+  # Path to the directory containing credential provider plugin binaries
+  binDir: "/etc/kubernetes/image-credential-providers"
+
 csiPlugin:
   resources: {}
   metricsPort: 8080

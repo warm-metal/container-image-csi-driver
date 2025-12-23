@@ -1,0 +1,96 @@
+# Azure Container Registry (ACR) Credential Provider Configuration
+#
+# This example shows how to configure the CSI driver to use Azure credential provider
+# for authenticating with private ACR registries.
+#
+# Prerequisites:
+# 1. Install acr-credential-provider binary on your nodes
+# 2. Ensure nodes have managed identity with acrpull role
+# 3. Create this configuration file on each node
+#
+# Usage:
+#   sudo mkdir -p /etc/kubernetes/image-credential-providers
+#   sudo cp acr-config.yaml /etc/kubernetes/image-credential-providers/config.json
+
+apiVersion: kubelet.config.k8s.io/v1
+kind: CredentialProviderConfig
+providers:
+  - name: acr-credential-provider
+    # Match all ACR registry patterns
+    matchImages:
+      # Azure Public Cloud
+      - "*.azurecr.io"
+      # Azure China Cloud
+      - "*.azurecr.cn"
+      # Azure US Government Cloud
+      - "*.azurecr.us"
+      # Azure Germany Cloud
+      - "*.azurecr.de"
+      # Custom domains (if configured)
+      - "*.azurecr.custom"
+    # Cache credentials for 12 hours
+    defaultCacheDuration: "12h"
+    # API version for the credential provider
+    apiVersion: "credentialprovider.kubelet.k8s.io/v1"
+
+---
+# Installation Steps:
+#
+# 1. Download and install the ACR credential provider:
+#    ACR_PROVIDER_VERSION=v1.31.3  # Use the version matching your Kubernetes version
+#    ARCH=amd64  # or arm64
+#    sudo wget https://storage.googleapis.com/k8s-artifacts-prod/binaries/cloud-provider-azure/${ACR_PROVIDER_VERSION}/linux/${ARCH}/acr-credential-provider-linux-${ARCH} \
+#      -O /etc/kubernetes/image-credential-providers/acr-credential-provider
+#    sudo chmod +x /etc/kubernetes/image-credential-providers/acr-credential-provider
+#
+# 2. Verify the binary works:
+#    echo '{"image": "myregistry.azurecr.io/my-image:latest"}' | \
+#      /etc/kubernetes/image-credential-providers/acr-credential-provider get
+#
+# 3. Verify managed identity is configured:
+#    az login --identity
+#    az acr login --name myregistry
+#
+# 4. Deploy this config on all nodes (or use a DaemonSet):
+#    sudo mkdir -p /etc/kubernetes/image-credential-providers
+#    sudo cp acr-config.yaml /etc/kubernetes/image-credential-providers/config.json
+#
+# 5. Enable credential provider in CSI driver:
+#    helm upgrade warm-metal-csi-driver ./charts/warm-metal-csi-driver \
+#      --set imageCredentialProvider.enabled=true \
+#      --namespace kube-system
+#
+# 6. Test with a private ACR image:
+#    kubectl apply -f - <<EOF
+#    apiVersion: v1
+#    kind: PersistentVolume
+#    metadata:
+#      name: test-acr-image
+#    spec:
+#      capacity:
+#        storage: 1Gi
+#      accessModes:
+#        - ReadOnlyMany
+#      csi:
+#        driver: csi.warm-metal.tech
+#        volumeHandle: test-acr-image
+#        volumeAttributes:
+#          image: "myregistry.azurecr.io/my-app:latest"
+#    EOF
+
+---
+# IAM Permissions Required:
+#
+# The node's managed identity needs the acrpull role on the ACR:
+#
+# Grant the role using Azure CLI:
+#   az role assignment create \
+#     --assignee <managed-identity-client-id> \
+#     --role acrpull \
+#     --scope /subscriptions/<subscription-id>/resourceGroups/<resource-group>/providers/Microsoft.ContainerRegistry/registries/<registry-name>
+#
+# Or grant at the resource group level for all ACRs:
+#   az role assignment create \
+#     --assignee <managed-identity-client-id> \
+#     --role acrpull \
+#     --scope /subscriptions/<subscription-id>/resourceGroups/<resource-group>

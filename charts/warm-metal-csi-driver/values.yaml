@@ -9,6 +9,28 @@ enableAsyncPull: false
 asyncPullTimeout: "10m"
 pullImageSecretForDaemonset:
 
+# Image credential provider settings
+# The CSI driver supports credential provider plugins for authenticating with
+# private registries (ECR, GCR, ACR, etc.).
+#
+# IMPORTANT: This feature requires you to:
+# 1. Install credential provider binaries on your nodes (e.g., ecr-credential-provider)
+# 2. Create a credential provider configuration file on your nodes
+# 3. Enable this feature by setting enabled: true
+#
+# See docs/credential-providers/ for detailed setup instructions and examples.
+imageCredentialProvider:
+  # Enable credential provider plugin support
+  # NOTE: You must have credential provider binaries installed and configured
+  # on your nodes before enabling this feature.
+  enabled: false
+  # Path to the credential provider plugin config file on the host
+  # This file should exist on your nodes (not created by this chart)
+  configPath: "/etc/kubernetes/image-credential-providers/config.json"
+  # Path to the directory containing credential provider plugin binaries on the host
+  # This directory should exist on your nodes and contain the provider binaries
+  binDir: "/etc/kubernetes/image-credential-providers"
+
 csiPlugin:
   hostNetwork: false
   resources: {}
