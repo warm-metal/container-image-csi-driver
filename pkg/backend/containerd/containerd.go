@@ -36,10 +36,36 @@ func NewMounter(socketPath string) backend.Mounter {
 	})
 }
 
-var SELinuxNoRelabel = true //TODO: set this in config
+// selinuxContext returns the configured SELinux mount context or a safe default.
+// Default: system_u:object_r:container_file_t:s0
+func selinuxContext() string {
+	if v := os.Getenv("CSI_SELINUX_CONTEXT"); v != "" {
+		return v
+	}
+	return "system_u:object_r:container_file_t:s0"
+}
+
+// isSELinuxEnforcing checks host kernel SELinux enforcing state via /sys/fs/selinux/enforce.
+// Returns true only when the file exists and contains "1".
+func isSELinuxEnforcing() bool {
+	b, err := os.ReadFile("/sys/fs/selinux/enforce")
+	if err != nil {
+		return false
+	}
+
+	s := strings.TrimSpace(string(b))
+	return s == "1"
+}
 
 // mountInHostNamespace mounts directly in the host mount namespace using nsenter
 func mountInHostNamespace(ctx context.Context, mounts []mount.Mount, target string) error {
+	// Compute SELinux enforcement once per mount operation
+	enforcing := isSELinuxEnforcing()
+	var contextOpt string
+	if enforcing {
+		contextOpt = fmt.Sprintf("context=\"%s\"", selinuxContext())
+	}
+
 	// For each mount, execute it in the host namespace
 	for i, m := range mounts {
 		var args []string
@@ -49,11 +75,9 @@ func mountInHostNamespace(ctx context.Context, mounts []mount.Mount, target stri
 			args = append(args, "-t", m.Type)
 		}
 
-		// Add SELinux context option if config enabled
+		// When SELinux is enforcing on host, add a context=... option.
 		mountOptions := m.Options
-		if SELinuxNoRelabel {
-			// Only add context option if not already there
-			contextOpt := `context="system_u:object_r:container_file_t:s0"`
+		if enforcing {
 			alreadySet := false
 			for _, opt := range mountOptions {
 				if strings.HasPrefix(opt, "context=") {
