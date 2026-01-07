@@ -13,3 +13,6 @@ spec:
   {{- if (ge (int .Capabilities.KubeVersion.Minor) 20) }}
   fsGroupPolicy: None
   {{- end}}
+  {{- if .Values.csiNodeDriverRegistrar.selinux }}
+  seLinuxMount: true
+  {{- end }}
