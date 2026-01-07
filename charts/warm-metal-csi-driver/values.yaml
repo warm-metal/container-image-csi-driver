@@ -59,6 +59,10 @@ csiNodeDriverRegistrar:
     repository: registry.k8s.io/sig-storage/csi-node-driver-registrar
     tag: v2.8.0
     pullPolicy: IfNotPresent
+  # Enable SELinux-aware mounting on nodes with SELinux enabled
+  # WARNING: Only set to true if ALL nodes in the cluster have SELinux enabled
+  # The driver will mount /sys/fs/selinux which only exists on SELinux-enabled systems
+  selinux: true
 csiExternalProvisioner:
   resources: {}
   image:
