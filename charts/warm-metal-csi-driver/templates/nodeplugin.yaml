@@ -157,6 +157,13 @@ spec:
               name: credential-provider-bin
               readOnly: true
             {{- end }}
+            {{- if .Values.csiNodeDriverRegistrar.selinux }}
+            - mountPath: /sys/fs/selinux
+              name: selinux-sysfs
+            - mountPath: /etc/selinux/config
+              name: selinux-config
+              readOnly: true
+            {{- end }}
       hostNetwork: {{.Values.csiPlugin.hostNetwork}}
       serviceAccountName: {{ include "warm-metal-csi-driver.fullname" . }}-nodeplugin
       volumes:
@@ -207,6 +214,16 @@ spec:
           hostPath:
             path: {{ .Values.imageCredentialProvider.binDir }}
             type: Directory
+        {{- end }}
+        {{- if .Values.csiNodeDriverRegistrar.selinux }}
+        - name: selinux-sysfs
+          hostPath:
+            path: /sys/fs/selinux
+            type: Directory
+        - name: selinux-config
+          hostPath:
+            path: /etc/selinux/config
+            type: File
         {{- end }}
       {{- with .Values.tolerations }}
       tolerations:
