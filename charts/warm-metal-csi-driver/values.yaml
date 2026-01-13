@@ -9,6 +9,13 @@ enableAsyncPull: false
 asyncPullTimeout: "10m"
 pullImageSecretForDaemonset:
 
+# SELinux mount context label to apply when mounting volumes.
+# Only set this if you're running on a system with SELinux enforcing and need
+# to customize the context label for mounted volumes. When set, the driver will
+# apply this context to volume mounts when SELinux is enforcing on the host.
+# Recommended value aligns with container files: system_u:object_r:container_file_t:s0
+# selinuxContext: "system_u:object_r:container_file_t:s0"
+
 # Image credential provider settings
 # The CSI driver supports credential provider plugins for authenticating with
 # private registries (ECR, GCR, ACR, etc.).
