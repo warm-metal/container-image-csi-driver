@@ -1,4 +1,4 @@
-FROM alpine:3.23.0
+FROM alpine:3.23.3
 # Ensure we have the latest packages including libssl and remove cache
 RUN apk update && \
     apk upgrade && \
