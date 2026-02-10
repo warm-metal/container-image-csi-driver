@@ -1,6 +1,9 @@
-FROM alpine:3.23.0
-# Ensure we have the latest packages and remove cache
-RUN apk update && apk upgrade && rm -rf /var/cache/apk/*
+FROM alpine:3.23.3
+# Ensure we have the latest packages including libssl and remove cache
+RUN apk update && \
+    apk upgrade && \
+    apk add --no-cache libssl3 libcrypto3 && \
+    rm -rf /var/cache/apk/*
 ENV TARGET1=""
 ENV TARGET2=""
 WORKDIR /
