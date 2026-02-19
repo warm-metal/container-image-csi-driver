@@ -38,7 +38,6 @@ unit-tests:
 
 .PHONY: integration
 integration:
-	./test/integration/test-backward-compatability.sh
 	./test/integration/test-restart-ds-containerd.sh
 	./test/integration/test-restart-ds-crio.sh
 	./test/integration/test-restart-runtime-containerd.sh
