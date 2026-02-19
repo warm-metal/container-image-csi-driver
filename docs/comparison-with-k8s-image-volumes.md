@@ -389,7 +389,6 @@ kubectl apply -f sample/install/
 - ✅ Sanity tests (CSI spec compliance)
 - ✅ End-to-end tests
 - ✅ Integration tests (containerd, CRI-O)
-- ✅ Backward compatibility tests
 - ✅ Driver restart tests
 - ✅ Runtime restart tests
 - ✅ Metrics validation tests
