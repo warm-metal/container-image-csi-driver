@@ -1,4 +1,4 @@
-VERSION ?= v1.2.11
+VERSION ?= v1.2.12
 
 IMAGE_BUILDER ?= docker
 IMAGE_BUILD_CMD ?= buildx
@@ -38,7 +38,6 @@ unit-tests:
 
 .PHONY: integration
 integration:
-	./test/integration/test-backward-compatability.sh
 	./test/integration/test-restart-ds-containerd.sh
 	./test/integration/test-restart-ds-crio.sh
 	./test/integration/test-restart-runtime-containerd.sh

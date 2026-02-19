@@ -9,7 +9,6 @@ There are a few [GitHub Workflows](https://docs.github.com/en/actions/using-work
 
 ## Tests
 
-- [![backward-compatibility-5mins](https://github.com/warm-metal/container-image-csi-driver/actions/workflows/backward-compatibility.yaml/badge.svg)](https://github.com/warm-metal/container-image-csi-driver/actions/workflows/backward-compatibility.yaml)
 - [![containerd-11mins](https://github.com/warm-metal/container-image-csi-driver/actions/workflows/containerd.yaml/badge.svg)](https://github.com/warm-metal/container-image-csi-driver/actions/workflows/containerd.yaml)
 - [![cri-o-10mins](https://github.com/warm-metal/container-image-csi-driver/actions/workflows/cri-o.yaml/badge.svg)](https://github.com/warm-metal/container-image-csi-driver/actions/workflows/cri-o.yaml)
 - [![restart-ds-containerd-5mins](https://github.com/warm-metal/container-image-csi-driver/actions/workflows/restart-ds-containerd.yaml/badge.svg)](https://github.com/warm-metal/container-image-csi-driver/actions/workflows/restart-ds-containerd.yaml)
