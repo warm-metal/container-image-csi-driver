@@ -1,4 +1,4 @@
-FROM docker.io/library/golang:1.25-alpine3.23 as builder
+FROM docker.io/library/golang:1.26.1-alpine3.23 as builder
 WORKDIR /go/src/container-image-csi-driver-test
 COPY write_check.go .
 RUN GO111MODULE=off go build -o write_check
