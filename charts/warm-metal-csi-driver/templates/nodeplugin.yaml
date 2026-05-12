@@ -17,6 +17,16 @@ spec:
       labels:
         {{- include "warm-metal-csi-driver.nodeplugin.labels" . | nindent 8 }}
     spec:
+      {{- if not .Values.crioRuntimeRoot }}
+      initContainers:
+        - name: mount-helper-install
+          image: "{{ .Values.csiPlugin.image.repository }}:{{ .Values.csiPlugin.image.tag | default .Chart.AppVersion }}"
+          imagePullPolicy: {{ .Values.csiPlugin.image.pullPolicy }}
+          command: ["/bin/cp", "/usr/bin/container-image-csi-driver", "/csi/mount-helper"]
+          volumeMounts:
+            - mountPath: /csi
+              name: socket-dir
+      {{- end }}
       containers:
         - name: node-driver-registrar
           args:

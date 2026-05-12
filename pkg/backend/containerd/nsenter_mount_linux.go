@@ -9,11 +9,14 @@ package containerd
 // colon-joined lowerdir string exceeds ~256 chars — triggered by images with 3+ layers.
 // The legacy mount(2) syscall is not affected. runc and containerd-shim already use it.
 //
-// Solution: use nsenter to enter the host mount namespace (nsenter handles this in a C
-// process before exec), then re-exec the driver binary with _CSI_NSENTER_MOUNT=1. The
-// child is already in the host mount namespace when it starts, so no setns is needed —
-// it calls unix.Mount directly and exits. This avoids the setns(CLONE_NEWNS) + Go
-// multi-threading incompatibility that makes in-process namespace switching unreliable.
+// Solution: use nsenter to enter the host mount namespace, then exec the mount-helper
+// binary from the CSI socket-dir hostPath volume. The helper detects _CSI_NSENTER_MOUNT=1,
+// calls unix.Mount directly, and exits.
+//
+// The mount-helper binary is a copy of the driver binary, placed on the hostPath by an
+// initContainer in the DaemonSet. After nsenter switches mount namespace, paths on the
+// container's overlay rootfs are not accessible, but hostPath volumes exist on the host
+// filesystem and remain accessible from both namespaces.
 
 import (
 	"bytes"
@@ -21,6 +24,7 @@ import (
 	"fmt"
 	"os"
 	"os/exec"
+	"path/filepath"
 	"strings"
 
 	"golang.org/x/sys/unix"
@@ -32,6 +36,8 @@ const (
 	envNsenterMount = "_CSI_NSENTER_MOUNT"
 	// hostMountNS is the bind-mounted host mount namespace inside the driver container.
 	hostMountNS = "/host/proc/1/ns/mnt"
+	// mountHelperName is the name of the helper binary on the hostPath volume.
+	mountHelperName = "mount-helper"
 )
 
 // nsenterMountRequest is the payload passed from parent to child via stdin (JSON).
@@ -47,8 +53,8 @@ func init() {
 		return
 	}
 
-	// We are the re-exec child. nsenter already placed us in the host mount namespace
-	// before exec'ing this binary, so no setns is required here.
+	// We are the re-exec child running in the host mount namespace.
+	// Decode the request from stdin and call unix.Mount directly.
 	if err := runNsenterMountChild(); err != nil {
 		fmt.Fprintf(os.Stderr, "nsenter-mount child failed: %v\n", err)
 		os.Exit(1)
@@ -56,17 +62,12 @@ func init() {
 	os.Exit(0)
 }
 
-// runNsenterMountChild is the logic executed by the re-exec child.
-// At this point the process is already in the host mount namespace (nsenter entered it).
-// Decode the request from stdin and call unix.Mount directly.
 func runNsenterMountChild() error {
 	var req nsenterMountRequest
 	if err := json.NewDecoder(os.Stdin).Decode(&req); err != nil {
 		return fmt.Errorf("decode mount request: %w", err)
 	}
 
-	// Join options into a single comma-separated data string for the legacy mount(2).
-	// This bypasses libmount's fsconfig path entirely.
 	data := strings.Join(req.Options, ",")
 
 	if err := unix.Mount(req.Source, req.Target, req.FSType, 0, data); err != nil {
@@ -77,19 +78,24 @@ func runNsenterMountChild() error {
 	return nil
 }
 
+// csiSocketDir returns the host-side path of the CSI socket directory.
+// This directory is a hostPath volume visible from both the container and host namespaces.
+// The initContainer copies the driver binary here as "mount-helper" before the main
+// container starts.
+func csiSocketDir() string {
+	if v := os.Getenv("CSI_SOCKET_DIR"); v != "" {
+		return v
+	}
+	// Default: matches the helm chart's socket-dir hostPath.
+	return "/var/lib/kubelet/plugins/container-image.csi.k8s.io"
+}
+
 // syscallMountInHostNamespace uses nsenter to enter the host mount namespace and then
-// re-execs the driver binary to call unix.Mount (legacy mount(2)) directly.
-//
-// Why nsenter + re-exec instead of nsenter + mount binary:
-//   The mount binary (util-linux 2.39+) uses the fd-based API (fsopen/fsconfig/fsmount)
-//   which returns EINVAL on kernel 6.12 when the overlay lowerdir string exceeds ~256
-//   chars. unix.Mount (legacy mount(2) syscall) has no such limit.
-//
-// Why nsenter for namespace entry instead of setns in-process:
-//   setns(CLONE_NEWNS) on a multi-threaded process returns EINVAL. Go programs are
-//   multi-threaded from startup. nsenter is a C program that calls setns before exec,
-//   so the target binary starts already in the correct namespace — no setns needed.
+// execs the mount-helper binary (placed on the socket-dir hostPath by the initContainer)
+// to call unix.Mount (legacy mount(2)) directly.
 func syscallMountInHostNamespace(source, target, fstype string, options []string) error {
+	hostHelper := filepath.Join(csiSocketDir(), mountHelperName)
+
 	req := nsenterMountRequest{
 		Source:  source,
 		Target:  target,
@@ -102,14 +108,9 @@ func syscallMountInHostNamespace(source, target, fstype string, options []string
 		return fmt.Errorf("marshal mount request: %w", err)
 	}
 
-	self, err := os.Executable()
-	if err != nil {
-		return fmt.Errorf("resolve driver executable path: %w", err)
-	}
-
-	// nsenter enters the host mount namespace (in C, before exec), then execs our binary.
-	// The child starts already in the host namespace and calls unix.Mount directly.
-	cmd := exec.Command("nsenter", "--mount="+hostMountNS, "--", self)
+	// nsenter enters the host mount namespace, then execs the helper binary from the
+	// hostPath volume (accessible from both container and host namespaces).
+	cmd := exec.Command("nsenter", "--mount="+hostMountNS, "--", hostHelper)
 	cmd.Env = []string{envNsenterMount + "=1"}
 	cmd.Stdin = bytes.NewReader(payload)
 
