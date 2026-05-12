@@ -68,6 +68,17 @@ func main() {
 	if err := flag.Set("logtostderr", "true"); err != nil {
 		panic(err)
 	}
+	// Since kubernetes/klog#432 the legacy behaviour of copying WARNING+
+	// to stderr when logtostderr=true is deprecated. Explicitly request
+	// all severities on stderr so that log output keeps working as before.
+	if err := flag.Set("stderrthreshold", "INFO"); err != nil {
+		panic(err)
+	}
+	// Disable the legacy stderr threshold behaviour so that our explicit
+	// stderrthreshold=INFO takes full effect regardless of klog version.
+	if err := flag.Set("legacy_stderr_threshold_behavior", "false"); err != nil {
+		panic(err)
+	}
 
 	flag.Parse()
 	defer klog.Flush()
