@@ -77,7 +77,7 @@ jobs:
   backport-release:
     runs-on: ubuntu-latest
     # Only run when a v2.x tag is pushed to the base repo
-    if: |
+    if: >-
       github.repository == 'warm-metal/container-image-csi-driver' &&
       startsWith(github.ref, 'refs/tags/v2.')
     steps:
@@ -168,10 +168,8 @@ jobs:
           SQUASH_BASE=$(git rev-parse origin/release-v1.2.x)
           COMMIT_MSG=$(git log --format="%s" "${PREV_V2_TAG}..${V2_TAG}" | head -1)
           git reset --soft "$SQUASH_BASE"
-          git commit -m "${COMMIT_MSG}
-
-Backported from ${V2_TAG} (commits: ${PREV_V2_TAG}..${V2_TAG})
-Version bumped to ${NEW_V1_TAG}."
+          FULL_MSG="${COMMIT_MSG}"$'\n\n'"Backported from ${V2_TAG} (commits: ${PREV_V2_TAG}..${V2_TAG})"$'\n'"Version bumped to ${NEW_V1_TAG}."
+          git commit -m "${FULL_MSG}"
 
       - name: Push release-v1.2.x branch
         run: |
@@ -192,10 +190,8 @@ Version bumped to ${NEW_V1_TAG}."
           # Collect commit subjects for release notes
           NOTES=$(git log --format="- %s" "${PREV_V2_TAG}..${V2_TAG}")
 
+          RELEASE_NOTES="Backported from ${V2_TAG}."$'\n\n'"## Changes"$'\n'"${NOTES}"
           gh release create "$NEW_V1_TAG" \
             --title "${NEW_V1_TAG}" \
-            --notes "Backported from ${V2_TAG}.
-
-## Changes
-${NOTES}" \
+            --notes "${RELEASE_NOTES}" \
             --target release-v1.2.x
