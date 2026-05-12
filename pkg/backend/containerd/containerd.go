@@ -57,25 +57,23 @@ func isSELinuxEnforcing() bool {
 	return s == "1"
 }
 
-// mountInHostNamespace mounts directly in the host mount namespace using nsenter
+// mountInHostNamespace mounts in the host mount namespace using a re-exec of the
+// driver binary that calls syscall.Mount (legacy mount(2)) directly.
+//
+// We use re-exec rather than "nsenter -- mount" because util-linux 2.39+ uses the
+// fd-based mount API (fsopen/fsconfig/fsmount) which returns EINVAL on kernel 6.12
+// (Bottlerocket 1.59) when the overlay lowerdir string exceeds ~256 chars. The legacy
+// mount(2) syscall is not affected. See docs/design/bottlerocket-1.59-overlay-regression.md.
 func mountInHostNamespace(ctx context.Context, mounts []mount.Mount, target string) error {
-	// Compute SELinux enforcement once per mount operation
+	// Compute SELinux enforcement once per mount operation.
 	enforcing := isSELinuxEnforcing()
 	var contextOpt string
 	if enforcing {
 		contextOpt = fmt.Sprintf("context=\"%s\"", selinuxContext())
 	}
 
-	// For each mount, execute it in the host namespace
 	for i, m := range mounts {
-		var args []string
-
-		// Only add -t flag if type is specified
-		if m.Type != "" {
-			args = append(args, "-t", m.Type)
-		}
-
-		// When SELinux is enforcing on host, add a context=... option.
+		// When SELinux is enforcing on the host, inject context=... into the options.
 		mountOptions := m.Options
 		if enforcing {
 			alreadySet := false
@@ -90,24 +88,13 @@ func mountInHostNamespace(ctx context.Context, mounts []mount.Mount, target stri
 			}
 		}
 
-		if len(mountOptions) > 0 {
-			args = append(args, "-o", strings.Join(mountOptions, ","))
+		if err := syscallMountInHostNamespace(m.Source, target, m.Type, mountOptions); err != nil {
+			klog.Errorf("mount failed (attempt %d/%d): source=%s target=%s type=%s opts=%v err=%s",
+				i+1, len(mounts), m.Source, target, m.Type, mountOptions, err)
+			return err
 		}
 
-		args = append(args, m.Source, target)
-
-		// Build the nsenter command
-		nsenterArgs := []string{"--mount=/host/proc/1/ns/mnt", "--", "mount"}
-		nsenterArgs = append(nsenterArgs, args...)
-
-		cmd := exec.CommandContext(ctx, "nsenter", nsenterArgs...)
-		output, err := cmd.CombinedOutput()
-		if err != nil {
-			klog.Errorf("nsenter mount failed (attempt %d/%d): %s, output: %s, command: %v",
-				i+1, len(mounts), err, string(output), cmd.Args)
-			return fmt.Errorf("mount failed: %w, output: %s", err, string(output))
-		}
-		klog.V(4).Infof("mounted %s to %s with type %s and options %v using nsenter (mount %d/%d)",
+		klog.V(4).Infof("mounted %s to %s with type %s and options %v (mount %d/%d)",
 			m.Source, target, m.Type, mountOptions, i+1, len(mounts))
 	}
 	return nil
