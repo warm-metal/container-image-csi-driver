@@ -6,7 +6,7 @@ RUN go mod download
 COPY cmd ./cmd
 COPY pkg ./pkg
 COPY Makefile ./
-RUN make build
+RUN CGO_ENABLED=0 make build
 RUN make install-util
 
 FROM scratch as install-util
