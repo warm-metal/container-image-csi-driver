@@ -85,7 +85,7 @@ jobs:
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
-          token: ${{ secrets.GITHUB_TOKEN }}
+          token: ${{ secrets.WORKFLOW_PAT }}
 
       - name: Compute backport version and commit range
         id: versions
@@ -177,7 +177,7 @@ jobs:
 
       - name: Tag and create GitHub Release
         env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_TOKEN: ${{ secrets.WORKFLOW_PAT }}
         run: |
           NEW_V1_TAG="${{ steps.versions.outputs.new_v1_tag }}"
           V2_TAG="${{ steps.versions.outputs.v2_tag }}"
