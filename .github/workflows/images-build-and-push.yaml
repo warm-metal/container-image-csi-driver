@@ -14,6 +14,7 @@ env:
   FORK_IMAGE_NAME: ghcr.io/${{ github.repository }}
 
 permissions:
+  contents: write
   packages: write
 
 jobs:
@@ -72,3 +73,129 @@ jobs:
           labels: ${{ steps.meta.outputs.labels }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
+
+  backport-release:
+    runs-on: ubuntu-latest
+    # Only run when a v2.x tag is pushed to the base repo
+    if: |
+      github.repository == 'warm-metal/container-image-csi-driver' &&
+      startsWith(github.ref, 'refs/tags/v2.')
+    steps:
+      - name: Checkout repository with full history
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Compute backport version and commit range
+        id: versions
+        run: |
+          V2_TAG="${GITHUB_REF_NAME}"
+          echo "v2_tag=${V2_TAG}" >> "$GITHUB_OUTPUT"
+
+          # Find the previous v2.x tag to define the cherry-pick range
+          PREV_V2_TAG=$(git tag --sort=-v:refname | grep -E '^v2\.' | grep -v "^${V2_TAG}$" | head -1)
+          if [ -z "$PREV_V2_TAG" ]; then
+            echo "No previous v2.x tag found — cannot determine commit range."
+            exit 1
+          fi
+          echo "prev_v2_tag=${PREV_V2_TAG}" >> "$GITHUB_OUTPUT"
+          echo "Commit range: ${PREV_V2_TAG}..${V2_TAG}"
+
+          # Determine the latest v1.2.x tag to compute next patch version
+          LATEST_V1_TAG=$(git tag --sort=-v:refname | grep -E '^v1\.2\.' | head -1)
+          if [ -z "$LATEST_V1_TAG" ]; then
+            echo "No existing v1.2.x tag found — cannot compute next version."
+            exit 1
+          fi
+          PATCH=$(echo "$LATEST_V1_TAG" | sed 's/v1\.2\.//')
+          NEXT_PATCH=$((PATCH + 1))
+          NEW_V1_TAG="v1.2.${NEXT_PATCH}"
+          echo "new_v1_tag=${NEW_V1_TAG}" >> "$GITHUB_OUTPUT"
+
+          echo "New backport tag: ${NEW_V1_TAG}"
+
+      - name: Set up git identity
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+
+      - name: Create or reset release-v1.2.x branch from upstream tip
+        run: |
+          # Fetch the upstream release-v1.2.x branch (this is the base repo, so origin IS upstream)
+          git fetch origin release-v1.2.x
+          git checkout -B release-v1.2.x origin/release-v1.2.x
+
+      - name: Squash cherry-pick commits from v2.x release range
+        id: cherrypick
+        run: |
+          PREV_V2_TAG="${{ steps.versions.outputs.prev_v2_tag }}"
+          V2_TAG="${{ steps.versions.outputs.v2_tag }}"
+          NEW_V1_TAG="${{ steps.versions.outputs.new_v1_tag }}"
+
+          # Collect commits introduced between prev v2 tag and new v2 tag, oldest-first
+          COMMITS=$(git log --reverse --format="%H" "${PREV_V2_TAG}..${V2_TAG}")
+          if [ -z "$COMMITS" ]; then
+            echo "No commits found in range ${PREV_V2_TAG}..${V2_TAG}. Nothing to backport."
+            exit 1
+          fi
+
+          echo "Commits to cherry-pick:"
+          echo "$COMMITS"
+
+          # Cherry-pick each commit. Use -X theirs to auto-resolve non-version conflicts
+          # in favour of the incoming change. Version conflicts are fixed unconditionally below.
+          for SHA in $COMMITS; do
+            git cherry-pick -X theirs "$SHA" || {
+              echo "Cherry-pick failed for ${SHA} — conflicts that could not be auto-resolved."
+              git cherry-pick --abort
+              exit 1
+            }
+          done
+
+          # Fix version strings unconditionally — these always conflict between v2.x and v1.2.x
+          # Strip leading 'v' for Chart.yaml version field
+          CHART_VERSION="${NEW_V1_TAG#v}"
+
+          sed -i "s/^VERSION ?= .*/VERSION ?= ${NEW_V1_TAG}/" Makefile
+          sed -i "s/^version: .*/version: ${CHART_VERSION}/" charts/warm-metal-csi-driver/Chart.yaml
+          sed -i "s/^appVersion: .*/appVersion: ${NEW_V1_TAG}/" charts/warm-metal-csi-driver/Chart.yaml
+
+          git add Makefile charts/warm-metal-csi-driver/Chart.yaml
+
+          # Amend the last cherry-pick commit to include the version fixups,
+          # then soft-reset all cherry-picked commits into one squash commit
+          SQUASH_BASE=$(git rev-parse origin/release-v1.2.x)
+          COMMIT_MSG=$(git log --format="%s" "${PREV_V2_TAG}..${V2_TAG}" | head -1)
+          git reset --soft "$SQUASH_BASE"
+          git commit -m "${COMMIT_MSG}
+
+Backported from ${V2_TAG} (commits: ${PREV_V2_TAG}..${V2_TAG})
+Version bumped to ${NEW_V1_TAG}."
+
+      - name: Push release-v1.2.x branch
+        run: |
+          git push origin release-v1.2.x --force-with-lease
+
+      - name: Tag and create GitHub Release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          NEW_V1_TAG="${{ steps.versions.outputs.new_v1_tag }}"
+          V2_TAG="${{ steps.versions.outputs.v2_tag }}"
+          PREV_V2_TAG="${{ steps.versions.outputs.prev_v2_tag }}"
+
+          # Create the tag on the current HEAD (tip of release-v1.2.x)
+          git tag "$NEW_V1_TAG"
+          git push origin "$NEW_V1_TAG"
+
+          # Collect commit subjects for release notes
+          NOTES=$(git log --format="- %s" "${PREV_V2_TAG}..${V2_TAG}")
+
+          gh release create "$NEW_V1_TAG" \
+            --title "${NEW_V1_TAG}" \
+            --notes "Backported from ${V2_TAG}.
+
+## Changes
+${NOTES}" \
+            --target release-v1.2.x
