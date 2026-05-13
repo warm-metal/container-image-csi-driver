@@ -8,3 +8,36 @@ updates:
     commit-message:
       prefix: "chore: [skip ci]"
       include: "scope"
+
+  # Go modules and Dockerfiles — single grouped PR
+  - package-ecosystem: "gomod"
+    directory: "/"
+    schedule:
+      interval: "daily"
+    commit-message:
+      prefix: "chore: [skip ci]"
+      include: "scope"
+    pull-request-branch-name:
+      separator: "/"
+    groups:
+      dependencies:
+        patterns:
+          - "*"
+    allow:
+      - dependency-type: "all"
+    rebase-strategy: "auto"
+
+  - package-ecosystem: "docker"
+    directory: "/"
+    schedule:
+      interval: "daily"
+    commit-message:
+      prefix: "chore: [skip ci]"
+      include: "scope"
+    pull-request-branch-name:
+      separator: "/"
+    groups:
+      dependencies:
+        patterns:
+          - "*"
+    rebase-strategy: "auto"
