@@ -34,6 +34,6 @@ require (
 	github.com/onsi/ginkgo v1.16.0
 	github.com/onsi/gomega v1.11.0
 	k8s.io/api v0.20.1
-	k8s.io/apimachinery v0.20.1
+	k8s.io/apimachinery v0.20.1 // indirect
 	k8s.io/kubernetes v1.20.5
 )
