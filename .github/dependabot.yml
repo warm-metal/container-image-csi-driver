@@ -22,7 +22,7 @@ updates:
     schedule:
       interval: "daily"
     commit-message:
-      prefix: "chore: [skip ci]"
+      prefix: "chore"
       include: "scope"
     pull-request-branch-name:
       separator: "/"
@@ -39,7 +39,7 @@ updates:
     schedule:
       interval: "daily"
     commit-message:
-      prefix: "chore: [skip ci]"
+      prefix: "chore"
       include: "scope"
     pull-request-branch-name:
       separator: "/"
