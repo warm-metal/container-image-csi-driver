@@ -1,4 +1,4 @@
-FROM docker.io/library/golang:1.25.7-alpine3.23 as builder
+FROM docker.io/library/golang:1.26.1-alpine3.23 as builder
 RUN apk add --no-cache btrfs-progs-dev lvm2-dev make build-base
 WORKDIR /go/src/container-image-csi-driver
 COPY go.mod go.sum ./
@@ -6,7 +6,7 @@ RUN go mod download
 COPY cmd ./cmd
 COPY pkg ./pkg
 COPY Makefile ./
-RUN make build
+RUN CGO_ENABLED=0 make build
 RUN make install-util
 
 FROM scratch as install-util
