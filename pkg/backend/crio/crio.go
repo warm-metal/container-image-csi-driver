@@ -10,10 +10,10 @@ import (
 	"time"
 
 	"github.com/BurntSushi/toml"
-	"github.com/containers/storage"
-	"github.com/containers/storage/types"
 	"github.com/distribution/reference"
 	"github.com/warm-metal/container-image-csi-driver/pkg/backend"
+	"go.podman.io/storage"
+	"go.podman.io/storage/types"
 	"k8s.io/klog/v2"
 	k8smount "k8s.io/utils/mount"
 )

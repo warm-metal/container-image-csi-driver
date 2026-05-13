@@ -19,7 +19,7 @@ jobs:
   stale:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/stale@v9
+      - uses: actions/stale@v10
         with:
           # Setting this variable to 'true' will cause the
           # action to run in a dry-run mode

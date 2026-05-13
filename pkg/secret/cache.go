@@ -3,70 +3,25 @@ package secret
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"os"
 	"time"
 
-	"github.com/google/go-containerregistry/pkg/authn"
-	"github.com/google/go-containerregistry/pkg/name"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
+	cri "k8s.io/cri-api/pkg/apis/runtime/v1"
 	"k8s.io/klog/v2"
 )
 
-// DockerKeyring interface for registry authentication
-type DockerKeyring interface {
-	Lookup(image string) ([]authn.AuthConfig, bool)
-}
-
-// BasicDockerKeyring implements DockerKeyring using go-containerregistry's keychain
-type BasicDockerKeyring struct {
-	keychain authn.Keychain
-	configs  []map[string]authn.AuthConfig
-}
-
-// Store interface for managing Docker credentials
+// Store provides access to container registry credentials
 type Store interface {
-	GetDockerKeyring(ctx context.Context, secrets map[string]string) (DockerKeyring, error)
+	// GetDockerKeyring returns a keyring with credentials from all available sources
+	GetDockerKeyring(ctx context.Context, secretData map[string]string) (DockerKeyring, error)
 }
 
-func makeDockerKeyringFromSecrets(secrets []corev1.Secret) (DockerKeyring, error) {
-	keyring := &BasicDockerKeyring{
-		keychain: authn.DefaultKeychain,
-	}
-
-	for _, secret := range secrets {
-		if len(secret.Data) == 0 {
-			continue
-		}
-		config, err := parseDockerConfigFromSecretData(byteSecretData(secret.Data))
-		if err != nil {
-			klog.Errorf("unable to parse secret: %v, data: %#v", err, secret)
-			continue // Skip invalid secrets instead of failing
-		}
-		keyring.configs = append(keyring.configs, config)
-	}
-
-	return keyring, nil
-}
-
-func makeDockerKeyringFromMap(secretData map[string]string) (DockerKeyring, error) {
-	keyring := &BasicDockerKeyring{
-		keychain: authn.DefaultKeychain,
-	}
-
-	if len(secretData) > 0 {
-		config, err := parseDockerConfigFromSecretData(stringSecretData(secretData))
-		if err != nil {
-			return nil, err
-		}
-		keyring.configs = append(keyring.configs, config)
-	}
-
-	return keyring, nil
-}
-
+// secretDataWrapper abstracts data access for both byte slices and strings
 type secretDataWrapper interface {
 	Get(key string) (data []byte, existed bool)
 }
@@ -81,163 +36,202 @@ func (b byteSecretData) Get(key string) (data []byte, existed bool) {
 type stringSecretData map[string]string
 
 func (s stringSecretData) Get(key string) (data []byte, existed bool) {
-	str, existed := s[key]
+	strings, existed := s[key]
 	if existed {
-		data = []byte(str)
+		data = []byte(strings)
 	}
 	return
 }
 
-func parseDockerConfigFromSecretData(data secretDataWrapper) (map[string]authn.AuthConfig, error) {
-	dockerConfigKey := ""
-	if _, ok := data.Get(corev1.DockerConfigJsonKey); ok {
-		dockerConfigKey = corev1.DockerConfigJsonKey
-	} else if _, ok := data.Get(corev1.DockerConfigKey); ok {
-		dockerConfigKey = corev1.DockerConfigKey
-	} else {
-		return map[string]authn.AuthConfig{}, nil
+// parseDockerConfigFromSecretData extracts Docker config from secret data
+func parseDockerConfigFromSecretData(data secretDataWrapper) (DockerConfig, error) {
+	// First check for the newer .dockerconfigjson format
+	if dockerConfigJSONBytes, existed := data.Get(corev1.DockerConfigJsonKey); existed && len(dockerConfigJSONBytes) > 0 {
+		klog.V(3).Infof("parseDockerConfigFromSecretData: using key=%s", corev1.DockerConfigJsonKey)
+		return parseDockerConfigJSON(dockerConfigJSONBytes)
 	}
 
-	dockercfg, ok := data.Get(dockerConfigKey)
-	if !ok {
-		return map[string]authn.AuthConfig{}, nil
+	// Then check for the legacy .dockercfg format
+	if dockercfgBytes, existed := data.Get(corev1.DockerConfigKey); existed && len(dockercfgBytes) > 0 {
+		klog.V(3).Infof("parseDockerConfigFromSecretData: using key=%s", corev1.DockerConfigKey)
+		return parseLegacyDockerConfig(dockercfgBytes)
 	}
 
-	var cfg map[string]authn.AuthConfig
-	if dockerConfigKey == corev1.DockerConfigJsonKey {
-		var cfgV1 struct {
-			Auths map[string]authn.AuthConfig `json:"auths"`
+	klog.V(3).Info("parseDockerConfigFromSecretData: no docker config key found in secret")
+	return nil, nil
+}
+
+// parseDockerConfigJSON parses the newer .dockerconfigjson format
+func parseDockerConfigJSON(data []byte) (DockerConfig, error) {
+	dockerConfigJSON := DockerConfigJSON{}
+	if err := json.Unmarshal(data, &dockerConfigJSON); err != nil {
+		return nil, fmt.Errorf("error parsing .dockerconfigjson: %w", err)
+	}
+
+	// Log credential sources found
+	if len(dockerConfigJSON.Auths) > 0 {
+		klog.V(3).Infof("Parsed credentials for %d registries from .dockerconfigjson", len(dockerConfigJSON.Auths))
+	}
+
+	return dockerConfigJSON.Auths, nil
+}
+
+// parseLegacyDockerConfig parses the legacy .dockercfg format
+func parseLegacyDockerConfig(data []byte) (DockerConfig, error) {
+	dockercfg := DockerConfig{}
+	if err := json.Unmarshal(data, &dockercfg); err != nil {
+		return nil, fmt.Errorf("error parsing .dockercfg: %w", err)
+	}
+	return dockercfg, nil
+}
+
+// makeDockerKeyringFromSecrets creates a keyring from a list of Kubernetes secrets
+func makeDockerKeyringFromSecrets(secrets []corev1.Secret) (DockerKeyring, error) {
+	keyring := &BasicDockerKeyring{}
+
+	for _, secret := range secrets {
+		if len(secret.Data) == 0 {
+			continue
 		}
-		if err := json.Unmarshal(dockercfg, &cfgV1); err == nil {
-			cfg = cfgV1.Auths
-		} else {
-			if err := json.Unmarshal(dockercfg, &cfg); err != nil {
-				return nil, err
-			}
-		}
-	} else {
-		if err := json.Unmarshal(dockercfg, &cfg); err != nil {
-			return nil, err
-		}
-	}
 
-	return cfg, nil
-}
-
-// Lookup implements DockerKeyring interface
-func (k *BasicDockerKeyring) Lookup(image string) ([]authn.AuthConfig, bool) {
-	// First try go-containerregistry keychain
-	ref, err := name.ParseReference(image)
-	if err == nil {
-		authenticator, err := k.keychain.Resolve(ref.Context())
-		if err == nil && authenticator != authn.Anonymous {
-			auth, err := authenticator.Authorization()
-			if err == nil {
-				return []authn.AuthConfig{*auth}, true
-			}
-		}
-	}
-
-	// Fallback to configs from secrets
-	var matches []authn.AuthConfig
-	for _, config := range k.configs {
-		for registry, auth := range config {
-			if matchImage(registry, image) {
-				matches = append(matches, auth)
-			}
-		}
-	}
-	return matches, len(matches) > 0
-}
-
-// matchImage checks if an image matches a registry pattern
-func matchImage(pattern, image string) bool {
-	// Exact match
-	if pattern == image {
-		return true
-	}
-
-	// If pattern ends with /, it should match the registry/repository prefix
-	if len(pattern) < len(image) && pattern[len(pattern)-1] == '/' {
-		return image[:len(pattern)] == pattern
-	}
-
-	// Handle cases where the pattern is just the registry (e.g., private-registry:5000)
-	if i := len(pattern); i < len(image) && image[i] == '/' {
-		return image[:i] == pattern
-	}
-
-	return false
-}
-
-// UnionDockerKeyring allows merging multiple keyrings
-type UnionDockerKeyring []DockerKeyring
-
-// Lookup implements DockerKeyring interface for UnionDockerKeyring
-func (uk UnionDockerKeyring) Lookup(image string) ([]authn.AuthConfig, bool) {
-	for _, keyring := range uk {
-		if auth, ok := keyring.Lookup(image); ok {
-			return auth, true
-		}
-	}
-	return nil, false
-}
-
-// NewEmptyKeyring returns an empty credential keyring
-func NewEmptyKeyring() DockerKeyring {
-	return &BasicDockerKeyring{
-		keychain: authn.DefaultKeychain,
-	}
-}
-
-type persistentKeyringGetter interface {
-	Get(context.Context) DockerKeyring
-}
-
-type keyringStore struct {
-	persistentKeyringGetter
-}
-
-func (s keyringStore) GetDockerKeyring(ctx context.Context, secretData map[string]string) (keyring DockerKeyring, err error) {
-	var preferredKeyring DockerKeyring
-	if len(secretData) > 0 {
-		preferredKeyring, err = makeDockerKeyringFromMap(secretData)
+		cred, err := parseDockerConfigFromSecretData(byteSecretData(secret.Data))
 		if err != nil {
+			klog.Errorf(`unable to parse secret %s/%s: %v`, secret.Namespace, secret.Name, err)
 			return nil, err
+		}
+
+		if cred != nil {
+			keyring.Add(cred)
 		}
 	}
 
-	daemonKeyring := s.Get(ctx)
-	if preferredKeyring != nil {
-		return UnionDockerKeyring{preferredKeyring, daemonKeyring}, nil
-	}
-
-	return UnionDockerKeyring{daemonKeyring, NewEmptyKeyring()}, err
+	return keyring, nil
 }
 
+// makeDockerKeyringFromMap creates a keyring from a map of strings (from CSI volume context)
+func makeDockerKeyringFromMap(secretData map[string]string) (DockerKeyring, error) {
+	keyring := &BasicDockerKeyring{}
+
+	if len(secretData) > 0 {
+		cred, err := parseDockerConfigFromSecretData(stringSecretData(secretData))
+		if err != nil {
+			klog.Errorf(`unable to parse secret data: %v`, err)
+			return nil, err
+		}
+
+		if cred != nil {
+			keyring.Add(cred)
+		}
+	}
+
+	return keyring, nil
+}
+
+// keyringProvider is an interface for anything that can provide a DockerKeyring
+type keyringProvider interface {
+	GetKeyring(ctx context.Context) (DockerKeyring, error)
+}
+
+// credentialStore is a unified credential store implementation
+type credentialStore struct {
+	secretsFetcher keyringProvider
+	pluginsEnabled bool
+	client         *kubernetes.Clientset
+}
+
+// GetDockerKeyring returns credentials from volume context, driver SA secrets, and plugins
+func (s credentialStore) GetDockerKeyring(ctx context.Context, secretData map[string]string) (DockerKeyring, error) {
+	keyrings := s.collectKeyrings(ctx, secretData)
+	return s.createUnionKeyring(keyrings), nil
+}
+
+// collectKeyrings gathers credentials from all available sources in priority order
+func (s credentialStore) collectKeyrings(ctx context.Context, secretData map[string]string) []DockerKeyring {
+	var keyrings []DockerKeyring
+
+	// 1. Volume context secrets (highest priority - pod-specific, inline)
+	if len(secretData) > 0 {
+		volumeKeyring, err := makeDockerKeyringFromMap(secretData)
+		if err != nil {
+			klog.V(3).Infof("Failed to create keyring from volume context: %v", err)
+		} else if volumeKeyring != nil {
+			keyrings = append(keyrings, volumeKeyring)
+			klog.V(3).Info("Added volume context credentials to keyring")
+		}
+	}
+
+	// 2. Driver's service account secrets (cluster-wide)
+	if s.secretsFetcher != nil {
+		secretKeyring, err := s.secretsFetcher.GetKeyring(ctx)
+		if err != nil {
+			klog.V(3).Infof("Failed to get driver SA credentials: %v", err)
+		} else if secretKeyring != nil {
+			keyrings = append(keyrings, secretKeyring)
+			klog.V(3).Info("Added driver SA credentials to keyring")
+		}
+	}
+
+	// 3. Credential provider plugins (if enabled)
+	if s.pluginsEnabled {
+		keyrings = append(keyrings, &pluginDockerKeyring{})
+		klog.V(3).Info("Added plugin credentials to keyring")
+	}
+
+	return keyrings
+}
+
+// createUnionKeyring combines multiple keyrings into a single keyring interface
+func (s credentialStore) createUnionKeyring(keyrings []DockerKeyring) DockerKeyring {
+	switch len(keyrings) {
+	case 0:
+		return NewDockerKeyring()
+	case 1:
+		return keyrings[0]
+	default:
+		return UnionDockerKeyring(keyrings)
+	}
+}
+
+// secretFetcher fetches Kubernetes secrets for authentication
 type secretFetcher struct {
 	Client       *kubernetes.Clientset
 	nodePluginSA string
 	Namespace    string
 }
 
+// Fetch gets secrets from the service account
 func (f secretFetcher) Fetch(ctx context.Context) ([]corev1.Secret, error) {
-	sa, err := f.Client.CoreV1().ServiceAccounts(f.Namespace).Get(ctx, f.nodePluginSA, metav1.GetOptions{})
+	sa, err := f.getServiceAccount(ctx)
 	if err != nil {
-		klog.Errorf(`unable to fetch service account of the daemon pod "%s/%s": %s`, f.Namespace, f.nodePluginSA, err)
 		return nil, err
 	}
 
-	secrets := make([]corev1.Secret, 0, len(sa.ImagePullSecrets))
 	klog.V(2).Infof(
-		`got %d imagePullSecrets from the service account %s/%s`, len(sa.ImagePullSecrets), f.Namespace, f.nodePluginSA,
+		`Found %d imagePullSecrets in service account %s/%s`,
+		len(sa.ImagePullSecrets), f.Namespace, f.nodePluginSA,
 	)
 
-	for i := range sa.ImagePullSecrets {
-		s := &sa.ImagePullSecrets[i]
-		secret, err := f.Client.CoreV1().Secrets(f.Namespace).Get(ctx, s.Name, metav1.GetOptions{})
+	return f.getSecrets(ctx, sa.ImagePullSecrets)
+}
+
+// getServiceAccount retrieves the ServiceAccount specified in the configuration
+func (f secretFetcher) getServiceAccount(ctx context.Context) (*corev1.ServiceAccount, error) {
+	sa, err := f.Client.CoreV1().ServiceAccounts(f.Namespace).Get(ctx, f.nodePluginSA, metav1.GetOptions{})
+	if err != nil {
+		klog.Errorf(`Unable to fetch service account "%s/%s": %s`, f.Namespace, f.nodePluginSA, err)
+		return nil, fmt.Errorf("failed to get service account %s/%s: %w", f.Namespace, f.nodePluginSA, err)
+	}
+	return sa, nil
+}
+
+// getSecrets retrieves all the secrets referenced by the service account
+func (f secretFetcher) getSecrets(ctx context.Context, secretRefs []corev1.LocalObjectReference) ([]corev1.Secret, error) {
+	secrets := make([]corev1.Secret, 0, len(secretRefs))
+
+	for _, ref := range secretRefs {
+		secret, err := f.Client.CoreV1().Secrets(f.Namespace).Get(ctx, ref.Name, metav1.GetOptions{})
 		if err != nil {
-			klog.Errorf(`unable to fetch secret "%s/%s": %s`, f.Namespace, s.Name, err)
+			klog.Errorf(`Unable to fetch secret "%s/%s": %s`, f.Namespace, ref.Name, err)
 			continue
 		}
 
@@ -247,74 +241,176 @@ func (f secretFetcher) Fetch(ctx context.Context) ([]corev1.Secret, error) {
 	return secrets, nil
 }
 
-func (s secretFetcher) Get(ctx context.Context) DockerKeyring {
-	secrets, _ := s.Fetch(ctx)
-	keyring, _ := makeDockerKeyringFromSecrets(secrets)
-	return keyring
+// GetKeyring gets a keyring from Kubernetes secrets
+func (f secretFetcher) GetKeyring(ctx context.Context) (DockerKeyring, error) {
+	secrets, err := f.Fetch(ctx)
+	if err != nil {
+		return NewDockerKeyring(), err
+	}
+
+	keyring, err := makeDockerKeyringFromSecrets(secrets)
+	if err != nil {
+		return NewDockerKeyring(), err
+	}
+
+	return keyring, nil
 }
 
-func createSecretFetcher(nodePluginSA string) *secretFetcher {
-	config, err := rest.InClusterConfig()
+// createSecretFetcher creates a new secretFetcher for Kubernetes secrets
+func createSecretFetcher(nodePluginSA string) (*secretFetcher, error) {
+	config, err := getKubernetesConfig()
 	if err != nil {
-		klog.Fatalf("unable to get cluster config: %s", err)
+		return nil, err
 	}
 
 	clientset, err := kubernetes.NewForConfig(config)
 	if err != nil {
-		klog.Fatalf("unable to get cluster client: %s", err)
+		return nil, fmt.Errorf("unable to create Kubernetes client: %w", err)
 	}
 
-	curNamespace, err := os.ReadFile("/var/run/secrets/kubernetes.io/serviceaccount/namespace")
+	namespace, err := getCurrentNamespace()
 	if err != nil {
-		klog.Fatalf("unable to fetch the current namespace from the sa volume: %q", err.Error())
+		return nil, err
 	}
 
 	return &secretFetcher{
 		Client:       clientset,
 		nodePluginSA: nodePluginSA,
-		Namespace:    string(curNamespace),
+		Namespace:    namespace,
+	}, nil
+}
+
+// getKubernetesConfig creates a Kubernetes client configuration
+func getKubernetesConfig() (*rest.Config, error) {
+	config, err := rest.InClusterConfig()
+	if err != nil {
+		return nil, fmt.Errorf("unable to get cluster config: %w", err)
+	}
+	return config, nil
+}
+
+// getCurrentNamespace determines the current namespace from the service account
+func getCurrentNamespace() (string, error) {
+	nsBytes, err := os.ReadFile("/var/run/secrets/kubernetes.io/serviceaccount/namespace")
+	if err != nil {
+		return "", fmt.Errorf("unable to fetch current namespace: %w", err)
+	}
+	return string(nsBytes), nil
+}
+
+// cachedSecretsFetcher caches secrets for improved performance
+type cachedSecretsFetcher struct {
+	cachedKeyring DockerKeyring
+}
+
+// GetKeyring returns the pre-cached keyring
+func (c cachedSecretsFetcher) GetKeyring(ctx context.Context) (DockerKeyring, error) {
+	return c.cachedKeyring, nil
+}
+
+// pluginDockerKeyring is a DockerKeyring implementation that uses credential provider plugins
+type pluginDockerKeyring struct{}
+
+// Lookup implements DockerKeyring for credential provider plugins
+func (dk *pluginDockerKeyring) Lookup(image string) ([]*cri.AuthConfig, bool) {
+	auth, err := GetCredentialFromPlugin(image)
+	if err != nil {
+		klog.Warningf("Error getting credentials from plugin for image %s: %v", image, err)
+		return nil, false
+	}
+
+	if auth != nil {
+		klog.V(2).Infof("Found credentials for image %s using credential provider plugin", image)
+		return []*cri.AuthConfig{auth}, true
+	}
+
+	return nil, false
+}
+
+// CreateStoreOrDie creates a credential store for container registry authentication
+func CreateStoreOrDie(pluginConfigFile, pluginBinDir, nodePluginSA string, enableCache bool) Store {
+	// Initialize components
+	fetcher := initializeSecretFetcher(nodePluginSA, enableCache)
+	pluginsEnabled := initializeCredentialPlugins(pluginConfigFile, pluginBinDir)
+
+	// Create Kubernetes client for fetching pod SA imagePullSecrets
+	config, err := getKubernetesConfig()
+	var client *kubernetes.Clientset
+	if err != nil {
+		klog.Warningf("unable to get Kubernetes config, pod SA imagePullSecrets will not be available: %v", err)
+	} else {
+		client, err = kubernetes.NewForConfig(config)
+		if err != nil {
+			klog.Warningf("unable to create Kubernetes client, pod SA imagePullSecrets will not be available: %v", err)
+			client = nil
+		}
+	}
+
+	// Create and return the credential store
+	return credentialStore{
+		secretsFetcher: fetcher,
+		pluginsEnabled: pluginsEnabled,
+		client:         client,
 	}
 }
 
-func createFetcherOrDie(nodePluginSA string) Store {
-	return keyringStore{
-		persistentKeyringGetter: createSecretFetcher(nodePluginSA),
+// initializeSecretFetcher sets up the Kubernetes secret fetcher with optional caching
+func initializeSecretFetcher(nodePluginSA string, enableCache bool) keyringProvider {
+	if nodePluginSA == "" {
+		return nil
 	}
+
+	// Create the basic secret fetcher
+	secretFetch, err := createSecretFetcher(nodePluginSA)
+	if err != nil {
+		klog.Fatalf("Unable to create secret fetcher: %v", err)
+		return nil
+	}
+
+	// Use caching if enabled
+	if enableCache {
+		return createCachedFetcher(secretFetch)
+	}
+
+	klog.Info("Created dynamic secret store")
+	return secretFetch
 }
 
-type secretWOCache struct {
-	daemonKeyring DockerKeyring
-}
-
-func (s secretWOCache) Get(_ context.Context) DockerKeyring {
-	return s.daemonKeyring
-}
-
-func createCacheOrDie(nodePluginSA string) Store {
-	secretFetcher := createSecretFetcher(nodePluginSA)
-	ctx, cancel := context.WithTimeout(context.TODO(), 10*time.Second)
+// createCachedFetcher creates a fetcher that caches secrets at startup
+func createCachedFetcher(fetcher *secretFetcher) keyringProvider {
+	// Pre-fetch secrets once at startup
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 
-	var keyring DockerKeyring
-	secrets, _ := secretFetcher.Fetch(ctx)
-	keyring, _ = makeDockerKeyringFromSecrets(secrets)
-	return keyringStore{
-		persistentKeyringGetter: secretWOCache{
-			daemonKeyring: keyring,
-		},
+	secrets, err := fetcher.Fetch(ctx)
+	if err != nil {
+		klog.Warningf("Unable to pre-fetch secrets: %v", err)
+		secrets = []corev1.Secret{}
 	}
+
+	keyring, err := makeDockerKeyringFromSecrets(secrets)
+	if err != nil {
+		klog.Warningf("Error creating keyring from pre-fetched secrets: %v", err)
+		keyring = NewDockerKeyring()
+	}
+
+	klog.Info("Created cached secret store")
+	return &cachedSecretsFetcher{cachedKeyring: keyring}
 }
 
-func CreateStoreOrDie(pluginConfigFile, pluginBinDir, nodePluginSA string, enableCache bool) Store {
-	if len(pluginConfigFile) > 0 && len(pluginBinDir) > 0 {
-		// The k8s.io/kubernetes/pkg/credentialprovider API is different
-		// We'll use the built-in keyring for now since plugin support changed
-		// credentialprovider.SetPreferredDockercfgPath(pluginConfigFile)
+// initializeCredentialPlugins sets up credential provider plugins
+func initializeCredentialPlugins(configFile, binDir string) bool {
+	if len(configFile) == 0 || len(binDir) == 0 {
+		return false
 	}
 
-	if enableCache {
-		return createCacheOrDie(nodePluginSA)
+	klog.Infof("Registering credential provider plugins using config %s and binary dir %s",
+		configFile, binDir)
+
+	if err := RegisterCredentialProviderPlugins(configFile, binDir); err != nil {
+		klog.Errorf("Failed to register credential provider plugins: %v", err)
+		return false
 	}
 
-	return createFetcherOrDie(nodePluginSA)
+	return true
 }

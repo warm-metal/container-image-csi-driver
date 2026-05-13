@@ -9,6 +9,35 @@ enableAsyncPull: false
 asyncPullTimeout: "10m"
 pullImageSecretForDaemonset:
 
+# SELinux mount context label to apply when mounting volumes.
+# Only set this if you're running on a system with SELinux enforcing and need
+# to customize the context label for mounted volumes. When set, the driver will
+# apply this context to volume mounts when SELinux is enforcing on the host.
+# Recommended value aligns with container files: system_u:object_r:container_file_t:s0
+# selinuxContext: "system_u:object_r:container_file_t:s0"
+
+# Image credential provider settings
+# The CSI driver supports credential provider plugins for authenticating with
+# private registries (ECR, GCR, ACR, etc.).
+#
+# IMPORTANT: This feature requires you to:
+# 1. Install credential provider binaries on your nodes (e.g., ecr-credential-provider)
+# 2. Create a credential provider configuration file on your nodes
+# 3. Enable this feature by setting enabled: true
+#
+# See docs/credential-providers/ for detailed setup instructions and examples.
+imageCredentialProvider:
+  # Enable credential provider plugin support
+  # NOTE: You must have credential provider binaries installed and configured
+  # on your nodes before enabling this feature.
+  enabled: false
+  # Path to the credential provider plugin config file on the host
+  # This file should exist on your nodes (not created by this chart)
+  configPath: "/etc/kubernetes/image-credential-providers/config.json"
+  # Path to the directory containing credential provider plugin binaries on the host
+  # This directory should exist on your nodes and contain the provider binaries
+  binDir: "/etc/kubernetes/image-credential-providers"
+
 csiPlugin:
   hostNetwork: false
   resources: {}
@@ -29,19 +58,19 @@ csiLivenessProbe:
   resources: {}
   image:
     repository: registry.k8s.io/sig-storage/livenessprobe
-    tag: v2.10.0
+    tag: v2.18.0
     pullPolicy: IfNotPresent
 csiNodeDriverRegistrar:
   resources: {}
   image:
     repository: registry.k8s.io/sig-storage/csi-node-driver-registrar
-    tag: v2.8.0
+    tag: v2.16.0
     pullPolicy: IfNotPresent
 csiExternalProvisioner:
   resources: {}
   image:
     repository: registry.k8s.io/sig-storage/csi-provisioner
-    tag: v3.5.0
+    tag: v6.2.0
     pullPolicy: IfNotPresent
 tolerations: {}
 affinity: {}

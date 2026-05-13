@@ -3,3 +3,4 @@
 id_rsa*
 .cache
 vendor
+.serena

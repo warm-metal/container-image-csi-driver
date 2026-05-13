@@ -1,0 +1,91 @@
+# Google Container Registry (GCR) Credential Provider Configuration
+#
+# This example shows how to configure the CSI driver to use GCP credential provider
+# for authenticating with private GCR and Artifact Registry.
+#
+# Prerequisites:
+# 1. Install gcp-credential-provider binary on your nodes
+# 2. Ensure nodes have service account with artifactregistry.repositories.downloadArtifacts permission
+# 3. Create this configuration file on each node
+#
+# Usage:
+#   sudo mkdir -p /etc/kubernetes/image-credential-providers
+#   sudo cp gcr-config.yaml /etc/kubernetes/image-credential-providers/config.json
+
+apiVersion: kubelet.config.k8s.io/v1
+kind: CredentialProviderConfig
+providers:
+  - name: gcp-credential-provider
+    # Match all GCR and Artifact Registry patterns
+    matchImages:
+      # Legacy GCR
+      - "gcr.io"
+      - "*.gcr.io"
+      # New Artifact Registry
+      - "*.pkg.dev"
+      # Container Registry on Google Cloud
+      - "container.cloud.google.com"
+    # Cache credentials for 12 hours
+    defaultCacheDuration: "12h"
+    # API version for the credential provider
+    apiVersion: "credentialprovider.kubelet.k8s.io/v1"
+
+---
+# Installation Steps:
+#
+# 1. Download and install the GCP credential provider:
+#    GCP_PROVIDER_VERSION=v1.31.3  # Use the version matching your Kubernetes version
+#    ARCH=amd64  # or arm64
+#    sudo wget https://storage.googleapis.com/k8s-artifacts-prod/binaries/cloud-provider-gcp/${GCP_PROVIDER_VERSION}/linux/${ARCH}/gcp-credential-provider-linux-${ARCH} \
+#      -O /etc/kubernetes/image-credential-providers/gcp-credential-provider
+#    sudo chmod +x /etc/kubernetes/image-credential-providers/gcp-credential-provider
+#
+# 2. Verify the binary works:
+#    echo '{"image": "gcr.io/my-project/my-image:latest"}' | \
+#      /etc/kubernetes/image-credential-providers/gcp-credential-provider get
+#
+# 3. Verify service account permissions:
+#    gcloud auth print-access-token
+#
+# 4. Deploy this config on all nodes (or use a DaemonSet):
+#    sudo mkdir -p /etc/kubernetes/image-credential-providers
+#    sudo cp gcr-config.yaml /etc/kubernetes/image-credential-providers/config.json
+#
+# 5. Enable credential provider in CSI driver:
+#    helm upgrade warm-metal-csi-driver ./charts/warm-metal-csi-driver \
+#      --set imageCredentialProvider.enabled=true \
+#      --namespace kube-system
+#
+# 6. Test with a private GCR image:
+#    kubectl apply -f - <<EOF
+#    apiVersion: v1
+#    kind: PersistentVolume
+#    metadata:
+#      name: test-gcr-image
+#    spec:
+#      capacity:
+#        storage: 1Gi
+#      accessModes:
+#        - ReadOnlyMany
+#      csi:
+#        driver: csi.warm-metal.tech
+#        volumeHandle: test-gcr-image
+#        volumeAttributes:
+#          image: "gcr.io/my-project/my-app:latest"
+#    EOF
+
+---
+# IAM Permissions Required:
+#
+# The node's service account needs the following permissions:
+#
+# For GCR (legacy):
+#   roles/storage.objectViewer
+#
+# For Artifact Registry (new):
+#   roles/artifactregistry.reader
+#
+# Example gcloud command to grant permissions:
+#   gcloud projects add-iam-policy-binding PROJECT_ID \
+#     --member=serviceAccount:SERVICE_ACCOUNT_EMAIL \
+#     --role=roles/artifactregistry.reader
