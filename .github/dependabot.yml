@@ -15,8 +15,10 @@ updates:
         patterns:
           - "*"
     rebase-strategy: "auto"
+    pull-request:
+      header: "⚙️ GitHub Actions"
 
-  # Go modules and Dockerfiles — single grouped PR
+  # Go modules — single grouped PR
   - package-ecosystem: "gomod"
     directory: "/"
     schedule:
@@ -33,7 +35,10 @@ updates:
     allow:
       - dependency-type: "all"
     rebase-strategy: "auto"
+    pull-request:
+      header: "📦 Go Dependencies"
 
+  # Dockerfiles — single grouped PR
   - package-ecosystem: "docker"
     directory: "/"
     schedule:
@@ -48,3 +53,5 @@ updates:
         patterns:
           - "*"
     rebase-strategy: "auto"
+    pull-request:
+      header: "🐳 Docker Base Images"
