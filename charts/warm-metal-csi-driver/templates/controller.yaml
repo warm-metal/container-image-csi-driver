@@ -14,6 +14,7 @@ spec:
       labels:
         {{- include "warm-metal-csi-driver.controllerplugin.labels" . | nindent 8 }}
     spec:
+      priorityClassName: {{ .Values.priorityClassName | default "system-cluster-critical" }}
       containers:
         - name: csi-provisioner
           image: "{{ .Values.csiExternalProvisioner.image.repository }}:{{ .Values.csiExternalProvisioner.image.tag }}"

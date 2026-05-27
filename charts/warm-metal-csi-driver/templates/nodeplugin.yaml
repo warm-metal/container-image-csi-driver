@@ -17,6 +17,7 @@ spec:
       labels:
         {{- include "warm-metal-csi-driver.nodeplugin.labels" . | nindent 8 }}
     spec:
+      priorityClassName: {{ .Values.priorityClassName | default "system-cluster-critical" }}
       {{- if not .Values.crioRuntimeRoot }}
       initContainers:
         - name: mount-helper-install

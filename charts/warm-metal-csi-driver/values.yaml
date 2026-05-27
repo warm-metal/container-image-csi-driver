@@ -75,6 +75,7 @@ csiExternalProvisioner:
 tolerations: {}
 affinity: {}
 nodeSelector: {}
+priorityClassName: system-cluster-critical
 
 fullnameOverride: ""
 
