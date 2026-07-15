@@ -109,3 +109,7 @@ func (c *MockImageServiceClient) ImageFsInfo(ctx context.Context, in *criapi.Ima
 
 	return resp, nil
 }
+
+func (c *MockImageServiceClient) StreamImages(ctx context.Context, in *criapi.StreamImagesRequest, opts ...grpc.CallOption) (grpc.ServerStreamingClient[criapi.StreamImagesResponse], error) {
+	return nil, fmt.Errorf("not implemented")
+}
