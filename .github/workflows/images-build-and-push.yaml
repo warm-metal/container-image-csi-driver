@@ -20,20 +20,85 @@ permissions:
   packages: write
 
 jobs:
-  build-and-push-image:
-    runs-on: ubuntu-latest
+  build:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          # Native runners per architecture — no QEMU emulation.
+          - platform: linux/amd64
+            runner: ubuntu-24.04
+          - platform: linux/arm64
+            runner: ubuntu-24.04-arm
+    runs-on: ${{ matrix.runner }}
     steps:
       - name: Checkout repository
         uses: actions/checkout@v7
-
-      - name: Set up QEMU
-        uses: docker/setup-qemu-action@v4
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v4
 
       - name: Login to Docker Hub
         if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository
+        uses: docker/login-action@v4
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+      - name: Compute a filesystem/artifact-safe platform pair (linux/amd64 -> linux-amd64)
+        run: |
+          platform="${{ matrix.platform }}"
+          echo "PLATFORM_PAIR=${platform//\//-}" >> "$GITHUB_ENV"
+
+      - name: Build image
+        id: build
+        uses: docker/build-push-action@v7
+        with:
+          context: .
+          platforms: ${{ matrix.platform }}
+          # Fork PRs: push=false -> build only, nothing to push (no registry
+          # credentials available). Same-repo pushes/PRs: push=true -> push an
+          # untagged, digest-addressed image; the merge job below stitches the
+          # per-arch digests into one tagged multi-arch manifest.
+          outputs: type=image,name=${{ env.BASE_IMAGE_NAME }},push-by-digest=true,name-canonical=true,push=${{ github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository }}
+          cache-from: type=gha,scope=build-${{ env.PLATFORM_PAIR }}
+          cache-to: type=gha,mode=max,scope=build-${{ env.PLATFORM_PAIR }}
+
+      - name: Export digest
+        if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository
+        run: |
+          mkdir -p /tmp/digests
+          digest="${{ steps.build.outputs.digest }}"
+          touch "/tmp/digests/${digest#sha256:}"
+
+      - name: Upload digest
+        if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository
+        uses: actions/upload-artifact@v7
+        with:
+          name: digests-${{ env.PLATFORM_PAIR }}
+          path: /tmp/digests/*
+          if-no-files-found: error
+          retention-days: 1
+
+  merge:
+    needs: build
+    runs-on: ubuntu-24.04
+    # Only for same-repo events: pushes, tags, and PRs opened from within the base
+    # repo. Fork PRs stop after the build job above — there is nothing to merge or
+    # push, and no registry credentials are available to fork PR runs.
+    if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository
+    steps:
+      - name: Download digests
+        uses: actions/download-artifact@v8
+        with:
+          path: /tmp/digests
+          pattern: digests-*
+          merge-multiple: true
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v4
+
+      - name: Login to Docker Hub
         uses: docker/login-action@v4
         with:
           username: ${{ secrets.DOCKERHUB_USERNAME }}
@@ -56,16 +121,18 @@ jobs:
           flavor: |
             latest=false
 
-      - name: Build and push Docker image
-        uses: docker/build-push-action@v7
-        with:
-          context: .
-          platforms: linux/amd64,linux/arm64
-          push: ${{ github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository }}
-          tags: ${{ steps.meta.outputs.tags }}
-          labels: ${{ steps.meta.outputs.labels }}
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
+      - name: Create multi-arch manifest list and push
+        working-directory: /tmp/digests
+        run: |
+          # shellcheck disable=SC2046  # intentional word-splitting: each "-t <tag>"
+          # and each "<image>@sha256:<digest>" must expand into a separate argument.
+          docker buildx imagetools create \
+            $(echo '${{ steps.meta.outputs.json }}' | jq -cr '.tags | map("-t " + .) | join(" ")') \
+            $(printf '${{ env.BASE_IMAGE_NAME }}@sha256:%s ' *)
+
+      - name: Inspect pushed image
+        run: |
+          docker buildx imagetools inspect ${{ env.BASE_IMAGE_NAME }}:${{ steps.meta.outputs.version }}
 
   backport-release:
     runs-on: ubuntu-latest
