@@ -1,5 +1,5 @@
 # bookworm is name of the latest debian release at the time of writing this
-FROM golang:1.19-bookworm
+FROM golang:1.26.5-bookworm
 
 # Based on https://docs.docker.com/engine/install/debian/
 
