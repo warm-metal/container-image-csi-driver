@@ -1,4 +1,4 @@
-FROM docker.io/library/golang:1.16
+FROM docker.io/library/golang:1.26.5-alpine3.24
 
 WORKDIR /go/src/container-image-csi-driver
 COPY go.mod go.sum ./

@@ -16,7 +16,7 @@
 
 	"features": {
 		"ghcr.io/devcontainers/features/go:1": {
-			"version": "1.19"
+			"version": "1.26"
 		},
 		"ghcr.io/devcontainers/features/kubectl-helm-minikube:1": {
 			"version": "latest",

@@ -1,7 +1,7 @@
 package main
 
 import (
-	"github.com/kubernetes-csi/csi-test/v4/pkg/sanity"
+	"github.com/kubernetes-csi/csi-test/v5/pkg/sanity"
 	"testing"
 )
 

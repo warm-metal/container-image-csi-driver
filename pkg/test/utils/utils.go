@@ -87,6 +87,10 @@ func (c *MockImageServiceClient) RemoveImage(ctx context.Context, in *criapi.Rem
 	return resp, nil
 }
 
+func (c *MockImageServiceClient) StreamImages(ctx context.Context, in *criapi.StreamImagesRequest, opts ...grpc.CallOption) (grpc.ServerStreamingClient[criapi.StreamImagesResponse], error) {
+	return nil, fmt.Errorf("StreamImages not implemented")
+}
+
 func (c *MockImageServiceClient) ImageFsInfo(ctx context.Context, in *criapi.ImageFsInfoRequest, opts ...grpc.CallOption) (*criapi.ImageFsInfoResponse, error) {
 	resp := new(criapi.ImageFsInfoResponse)
 	resp.ImageFilesystems = []*criapi.FilesystemUsage{}
@@ -110,6 +114,3 @@ func (c *MockImageServiceClient) ImageFsInfo(ctx context.Context, in *criapi.Ima
 	return resp, nil
 }
 
-func (c *MockImageServiceClient) StreamImages(ctx context.Context, in *criapi.StreamImagesRequest, opts ...grpc.CallOption) (grpc.ServerStreamingClient[criapi.StreamImagesResponse], error) {
-	return nil, fmt.Errorf("not implemented")
-}
