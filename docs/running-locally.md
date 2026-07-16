@@ -1,25 +1,8 @@
 # Running Locally
 
-You have two options:
-
-1. Use the [Dev Container](#development-container). This is the recommended approach. This can be used with VSCode, the `devcontainer` CLI, or GitHub Codespaces.
-1. Install the [requirements](#requirements) on your computer manually.
-
-## Development Container
-
-The [development container](https://containers.dev) contains all the tools necessary to work with container-image-csi-driver.
-
-You can use the development container in a few different ways:
-
-1. [Visual Studio Code](https://code.visualstudio.com/) with [Dev Containers extension](https://marketplace.visualstudio.com/items?itemName=ms-vscode-remote.remote-containers). Open the local clone of `container-image-csi-driver` folder in VSCode and it should offer to use the development container automatically.
-1. [`devcontainer` CLI](https://github.com/devcontainers/cli). Once installed, the local clone of `container-image-csi-driver` folder and run `devcontainer up --workspace-folder .` followed by `devcontainer exec --workspace-folder . /bin/bash` to get a shell where you can build the code. You can use any editor outside the container to edit code; any changes will be mirrored inside the container.
-1. [GitHub Codespaces](https://github.com/codespaces). You can start editing as soon as VSCode is open.
-
-Once you have entered the container, continue to [Developing Locally](#developing-locally).
-
 ## Requirements
 
-To build on your own machine without using the Dev Container you will need:
+To build on your own machine you will need:
 
 * A local clone of this repository.
 * [Go](https://golang.org/dl/)

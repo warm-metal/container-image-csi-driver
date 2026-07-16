@@ -8,3 +8,50 @@ updates:
     commit-message:
       prefix: "chore: [skip ci]"
       include: "scope"
+    pull-request-branch-name:
+      separator: "/"
+    groups:
+      dependencies:
+        patterns:
+          - "*"
+    rebase-strategy: "auto"
+    pull-request:
+      header: "⚙️ GitHub Actions"
+
+  # Go modules — single grouped PR
+  - package-ecosystem: "gomod"
+    directory: "/"
+    schedule:
+      interval: "daily"
+    commit-message:
+      prefix: "chore"
+      include: "scope"
+    pull-request-branch-name:
+      separator: "/"
+    groups:
+      dependencies:
+        patterns:
+          - "*"
+    allow:
+      - dependency-type: "all"
+    rebase-strategy: "auto"
+    pull-request:
+      header: "📦 Go Dependencies"
+
+  # Dockerfiles — single grouped PR
+  - package-ecosystem: "docker"
+    directory: "/"
+    schedule:
+      interval: "daily"
+    commit-message:
+      prefix: "chore"
+      include: "scope"
+    pull-request-branch-name:
+      separator: "/"
+    groups:
+      dependencies:
+        patterns:
+          - "*"
+    rebase-strategy: "auto"
+    pull-request:
+      header: "🐳 Docker Base Images"
