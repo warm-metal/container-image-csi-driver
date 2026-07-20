@@ -13,7 +13,7 @@ on:
 env:
   BASE_REPOSITORY: warm-metal/container-image-csi-driver
   BASE_DEFAULT_BRANCH: main
-  BASE_IMAGE_NAME: warmmetal/container-image-csi-driver
+  BASE_IMAGE_NAME: ${{ (startsWith(github.ref, 'refs/tags/v1.') || github.ref == 'refs/heads/release-v1.2.x') && 'warmmetal/csi-image' || 'warmmetal/container-image-csi-driver' }}
 
 permissions:
   contents: write
