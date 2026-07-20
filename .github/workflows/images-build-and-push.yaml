@@ -254,4 +254,5 @@ jobs:
           gh release create "$NEW_V1_TAG" \
             --title "${NEW_V1_TAG}" \
             --notes "${RELEASE_NOTES}" \
-            --target release-v1.2.x
+            --target release-v1.2.x \
+            --latest=false
