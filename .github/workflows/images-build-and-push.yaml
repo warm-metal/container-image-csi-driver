@@ -221,7 +221,18 @@ jobs:
           sed -i "s/^version: .*/version: ${CHART_VERSION}/" charts/warm-metal-csi-driver/Chart.yaml
           sed -i "s/^appVersion: .*/appVersion: ${NEW_V1_TAG}/" charts/warm-metal-csi-driver/Chart.yaml
 
-          git add Makefile charts/warm-metal-csi-driver/Chart.yaml
+          # Fix workflow-level branch-specific divergences unconditionally. These lines
+          # often conflict because v2.x and v1.2.x intentionally differ.
+          BASE_IMAGE_NAME_COND="${{ (startsWith(github.ref, 'refs/tags/v1.') || github.ref == 'refs/heads/release-v1.2.x') && 'warmmetal/csi-image' || 'warmmetal/container-image-csi-driver' }}"
+          sed -i "s|^  BASE_IMAGE_NAME:.*|  BASE_IMAGE_NAME: ${BASE_IMAGE_NAME_COND}|" .github/workflows/images-build-and-push.yaml
+
+          # Ensure the backported release is never promoted to GitHub's "Latest".
+          # If the line already ends with --latest=false, leave it unchanged.
+          if ! grep -q '^            --latest=false$' .github/workflows/images-build-and-push.yaml; then
+            sed -i '/^            --target release-v1\.2\.x$/a\\            --latest=false' .github/workflows/images-build-and-push.yaml
+          fi
+
+          git add Makefile charts/warm-metal-csi-driver/Chart.yaml .github/workflows/images-build-and-push.yaml
 
           # Amend the last cherry-pick commit to include the version fixups,
           # then soft-reset all cherry-picked commits into one squash commit
