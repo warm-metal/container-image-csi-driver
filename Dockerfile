@@ -1,4 +1,4 @@
-FROM docker.io/library/golang:1.26.5-alpine3.24 as builder
+FROM docker.io/library/golang:1.27rc2-alpine3.24 as builder
 RUN apk add --no-cache btrfs-progs-dev lvm2-dev make build-base
 WORKDIR /go/src/container-image-csi-driver
 COPY go.mod go.sum ./
