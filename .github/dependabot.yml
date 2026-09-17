@@ -18,9 +18,13 @@ updates:
     pull-request:
       header: "⚙️ GitHub Actions"
 
-  # Go modules — single grouped PR
+  # Go modules — single grouped PR per directory
+  # Covers all go.mod files in the repo (root module + test-only modules).
   - package-ecosystem: "gomod"
-    directory: "/"
+    directories:
+      - "/"
+      - "/test/sanity"
+      - "/test/e2e"
     schedule:
       interval: "daily"
     commit-message:
@@ -38,9 +42,20 @@ updates:
     pull-request:
       header: "📦 Go Dependencies"
 
-  # Dockerfiles — single grouped PR
+  # Dockerfiles & Helm chart image tags — single grouped PR per directory
+  # Covers every Dockerfile in the repo plus the Helm chart's values*.yaml
+  # image tag pins (Dependabot's docker ecosystem also updates image
+  # references in Helm "values" files, not just Dockerfiles).
   - package-ecosystem: "docker"
-    directory: "/"
+    directories:
+      - "/"
+      - "/test/node-server"
+      - "/test/sanity"
+      - "/test/e2e"
+      - "/test/unit"
+      - "/hack/integration-test-image"
+      - "/hack/integration-test-image/kind-node-image"
+      - "/charts/warm-metal-csi-driver"
     schedule:
       interval: "daily"
     commit-message:
