@@ -11,7 +11,7 @@ jobs:
     steps:
       - uses: actions/checkout@v7
       - name: Start a kind cluster with crio
-        uses: helm/kind-action@v1.14.0
+        uses: helm/kind-action@v1.15.0
         with:
           cluster_name: kind-${{ github.run_id }}
           kubectl_version: "v1.36.2"
