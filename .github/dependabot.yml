@@ -25,12 +25,21 @@ updates:
       - "*"
     multi-ecosystem-group: "all-deps"
 
-  # Go modules — covers all go.mod files in the repo (root module + test-only modules)
+  # Go modules — covers all *maintained* go.mod files in the repo.
+  # /test/e2e is intentionally excluded: its go.mod requires
+  # k8s.io/kubernetes@v1.20.5, which pulls in k8s.io/legacy-cloud-providers
+  # at an unresolvable pseudo-version. Dependabot cannot resolve this
+  # module (dependency_file_not_resolvable) and the resulting error
+  # currently crashes dependabot-core's PR message builder outright
+  # ("Error while generating commit message: Cannot detect VCS"),
+  # which appears to have blocked the whole multi-ecosystem group PR
+  # from being created for ANY ecosystem, not just gomod. See the
+  # module's own comment: it needs a full rewrite onto
+  # sigs.k8s.io/e2e-framework before it can be scanned safely.
   - package-ecosystem: "gomod"
     directories:
       - "/"
       - "/test/sanity"
-      - "/test/e2e"
     patterns:
       - "*"
     allow:
