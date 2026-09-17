@@ -1,30 +1,14 @@
 version: 2
-updates:
-  # Maintain dependencies for GitHub Actions
-  - package-ecosystem: "github-actions"
-    directory: "/"
-    schedule:
-      interval: "daily"
-    commit-message:
-      prefix: "chore: [skip ci]"
-      include: "scope"
-    pull-request-branch-name:
-      separator: "/"
-    groups:
-      dependencies:
-        patterns:
-          - "*"
-    rebase-strategy: "auto"
-    pull-request:
-      header: "⚙️ GitHub Actions"
 
-  # Go modules — single grouped PR per directory
-  # Covers all go.mod files in the repo (root module + test-only modules).
-  - package-ecosystem: "gomod"
-    directories:
-      - "/"
-      - "/test/sanity"
-      - "/test/e2e"
+# All version-update PRs (Go modules, Docker base images, GitHub Actions)
+# are consolidated into a single daily pull request via the "all-deps"
+# multi-ecosystem group below. Note: multi-ecosystem grouping does not
+# prevent Dependabot from closing and replacing this PR with a new one
+# if the set of updatable dependencies changes between scheduled runs
+# (see https://github.com/dependabot/dependabot-core/issues/10019) —
+# that behavior is not configurable via dependabot.yml.
+multi-ecosystem-groups:
+  all-deps:
     schedule:
       interval: "daily"
     commit-message:
@@ -32,20 +16,31 @@ updates:
       include: "scope"
     pull-request-branch-name:
       separator: "/"
-    groups:
-      dependencies:
-        patterns:
-          - "*"
+
+updates:
+  # Maintain dependencies for GitHub Actions
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    patterns:
+      - "*"
+    multi-ecosystem-group: "all-deps"
+
+  # Go modules — covers all go.mod files in the repo (root module + test-only modules)
+  - package-ecosystem: "gomod"
+    directories:
+      - "/"
+      - "/test/sanity"
+      - "/test/e2e"
+    patterns:
+      - "*"
     allow:
       - dependency-type: "all"
-    rebase-strategy: "auto"
-    pull-request:
-      header: "📦 Go Dependencies"
+    multi-ecosystem-group: "all-deps"
 
-  # Dockerfiles & Helm chart image tags — single grouped PR per directory
-  # Covers every Dockerfile in the repo plus the Helm chart's values*.yaml
-  # image tag pins (Dependabot's docker ecosystem also updates image
-  # references in Helm "values" files, not just Dockerfiles).
+  # Dockerfiles & Helm chart image tags — covers every Dockerfile in the
+  # repo plus the Helm chart's values*.yaml image tag pins (Dependabot's
+  # docker ecosystem also updates image references in Helm "values"
+  # files, not just Dockerfiles).
   - package-ecosystem: "docker"
     directories:
       - "/"
@@ -56,17 +51,6 @@ updates:
       - "/hack/integration-test-image"
       - "/hack/integration-test-image/kind-node-image"
       - "/charts/warm-metal-csi-driver"
-    schedule:
-      interval: "daily"
-    commit-message:
-      prefix: "chore"
-      include: "scope"
-    pull-request-branch-name:
-      separator: "/"
-    groups:
-      dependencies:
-        patterns:
-          - "*"
-    rebase-strategy: "auto"
-    pull-request:
-      header: "🐳 Docker Base Images"
+    patterns:
+      - "*"
+    multi-ecosystem-group: "all-deps"
