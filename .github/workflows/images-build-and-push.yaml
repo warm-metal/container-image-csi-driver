@@ -180,6 +180,11 @@ jobs:
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
 
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+
       - name: Create or reset release-v1.2.x branch from upstream tip
         run: |
           # Fetch the upstream release-v1.2.x branch (this is the base repo, so origin IS upstream)
@@ -203,14 +208,103 @@ jobs:
           echo "Commits to cherry-pick:"
           echo "$COMMITS"
 
-          # Cherry-pick each commit. Use -X theirs to auto-resolve non-version conflicts
-          # in favour of the incoming change. Version conflicts are fixed unconditionally below.
+          # Files where release-v1.2.x is KNOWN to intentionally diverge from main
+          # (v2.x): the image name env var and the --latest flag in this same
+          # workflow file, the version strings in Makefile/Chart.yaml, and the
+          # Go module files (release-v1.2.x intentionally pins older dependency
+          # versions than main). If a cherry-pick conflicts ONLY within these
+          # files, we resolve it by taking the incoming (v2.x) side — the
+          # deterministic fixups further below then overwrite the version
+          # strings and workflow values with the correct v1.2.x-specific ones
+          # unconditionally, and go.mod/go.sum are re-tidied, so the temporary
+          # "wrong" resolution never survives as-is.
+          #
+          # NOTE: for go.mod/go.sum specifically, resolving in favour of main
+          # means release-v1.2.x's older pinned dependency versions are bumped
+          # to whatever main currently has, every time a dependency-bump commit
+          # is in the backport range. This is an intentional, accepted trade-off
+          # to keep the backport job unattended for routine Dependabot bumps —
+          # NOT a claim that the two branches no longer diverge on purpose.
+          #
+          # Any conflict touching a file NOT in this list is NOT auto-resolved.
+          # We abort without pushing or committing anything and report exactly
+          # which commit and files need a human to manually cherry-pick and
+          # resolve. Silently guessing here is how v1.2.16 shipped under the
+          # wrong Docker Hub image name — a real conflict on a divergent line
+          # (BASE_IMAGE_NAME, at the time not yet in this safe list) was
+          # auto-resolved in favour of main's value with no fixup and no
+          # failure to catch it.
+          SAFE_CONFLICT_FILES=(
+            "Makefile"
+            "charts/warm-metal-csi-driver/Chart.yaml"
+            ".github/workflows/images-build-and-push.yaml"
+            "go.mod"
+            "go.sum"
+          )
+
+          is_safe_conflict_file() {
+            local f="$1"
+            for safe in "${SAFE_CONFLICT_FILES[@]}"; do
+              [ "$f" = "$safe" ] && return 0
+            done
+            return 1
+          }
+
           for SHA in $COMMITS; do
-            git cherry-pick -X theirs "$SHA" || {
-              echo "Cherry-pick failed for ${SHA} — conflicts that could not be auto-resolved."
+            SUBJECT=$(git log -1 --format="%s" "$SHA")
+            echo "--- Cherry-picking ${SHA} (${SUBJECT}) ---"
+
+            if git cherry-pick "$SHA" > /tmp/cherry-pick-output.log 2>&1; then
+              cat /tmp/cherry-pick-output.log
+              continue
+            fi
+
+            cat /tmp/cherry-pick-output.log
+            UNMERGED=$(git diff --name-only --diff-filter=U)
+
+            if [ -z "$UNMERGED" ]; then
+              # No conflict markers were left behind, so this wasn't a content
+              # conflict at all — the commit's change is already present on
+              # release-v1.2.x (e.g. hand-applied during a prior manual backport,
+              # as happened for a781471 before v2.1.13). Safe to skip as a no-op.
+              if grep -qi "The previous cherry-pick is now empty" /tmp/cherry-pick-output.log; then
+                echo "Commit ${SHA} introduces no change vs. release-v1.2.x tip (already applied). Skipping as a no-op."
+                git cherry-pick --skip
+                continue
+              fi
+
+              echo "::error::Backport failed on commit ${SHA} (${SUBJECT}) for an unrecognized reason — no merge conflict was reported, but the cherry-pick did not succeed. Aborting without making any changes; this needs manual investigation."
               git cherry-pick --abort
               exit 1
-            }
+            fi
+
+            UNSAFE_FILES=""
+            for f in $UNMERGED; do
+              if ! is_safe_conflict_file "$f"; then
+                UNSAFE_FILES="${UNSAFE_FILES}${f}, "
+              fi
+            done
+
+            if [ -n "$UNSAFE_FILES" ]; then
+              UNSAFE_FILES="${UNSAFE_FILES%, }"
+              echo "::error::Backport cherry-pick hit a merge conflict this job cannot safely auto-resolve."
+              echo "::error::Commit ${SHA} (${SUBJECT}) conflicts in: ${UNSAFE_FILES}"
+              echo "This job only auto-resolves known branch-specific divergences in: ${SAFE_CONFLICT_FILES[*]}"
+              echo "No changes have been made to release-v1.2.x — nothing was committed or pushed."
+              echo "Resolve this manually:"
+              echo "  git fetch origin release-v1.2.x && git checkout -B release-v1.2.x origin/release-v1.2.x"
+              echo "  git cherry-pick ${SHA}"
+              echo "  # resolve conflicts in: ${UNSAFE_FILES}"
+              git cherry-pick --abort
+              exit 1
+            fi
+
+            echo "Conflict confined to known-divergent file(s) [${UNMERGED}] — resolving in favour of the incoming (v2.x) change; the deterministic fixups below restore the v1.2.x-specific values."
+            for f in $UNMERGED; do
+              git checkout --theirs -- "$f"
+              git add "$f"
+            done
+            git cherry-pick --continue --no-edit
           done
 
           # Fix version strings unconditionally — these always conflict between v2.x and v1.2.x
@@ -231,6 +325,14 @@ jobs:
           if ! grep -q '^            --latest=false$' .github/workflows/images-build-and-push.yaml; then
             sed -i '/^            --target release-v1\.2\.x$/a\\            --latest=false' .github/workflows/images-build-and-push.yaml
           fi
+
+          # If any commit touched go.mod/go.sum, a conflict there was resolved in
+          # favour of main's (newer) dependency versions above. Re-tidy so the
+          # module graph is internally consistent rather than a raw, possibly
+          # mismatched merge of two module files. Safe to run unconditionally —
+          # a no-op when go.mod/go.sum weren't touched.
+          go mod tidy
+          git add go.mod go.sum
 
           git add Makefile charts/warm-metal-csi-driver/Chart.yaml .github/workflows/images-build-and-push.yaml
 
