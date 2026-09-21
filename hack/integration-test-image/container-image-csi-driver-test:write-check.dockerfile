@@ -3,7 +3,7 @@ WORKDIR /go/src/container-image-csi-driver-test
 COPY write_check.go .
 RUN GO111MODULE=off go build -o write_check
 
-FROM alpine:3.24.1
+FROM alpine:3.24.2
 # Ensure we have the latest packages including libssl and remove cache
 RUN apk update && \
     apk upgrade && \
