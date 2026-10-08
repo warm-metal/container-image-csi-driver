@@ -56,6 +56,8 @@ spec:
           args:
             - "--csi-address=/csi/csi.sock"
             - "--http-endpoint=:9809"
+            # Probe checks the container runtime with a 3s timeout (cmd/plugin/identity_server.go).
+            - "--probe-timeout=5s"
             - "-v={{ .Values.logLevel }}"
           {{- with .Values.csiLivenessProbe.resources }}
           resources:
@@ -140,6 +142,9 @@ spec:
               mountPropagation: HostToContainer
               {{- end }}
               name: mountpoint-dir
+            # A file bind mount pins the socket's inode: after a runtime restart every call is
+            # "connection refused". Probe then fails (it checks the runtime), the liveness probe
+            # restarts this container, and the restart mounts the new socket.
             - mountPath: {{ .Values.runtime.socketPath }}
               name: runtime-socket
             - mountPath: {{ .Values.snapshotRoot }}

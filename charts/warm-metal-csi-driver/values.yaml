@@ -46,14 +46,16 @@ csiPlugin:
     tag: ""
     repository: docker.io/warmmetal/container-image-csi-driver
     pullPolicy: IfNotPresent
+  # The probe fails while the container runtime is unreachable (stale runtime socket after a
+  # runtime restart); 3 x 20s restarts the plugin within about a minute.
   livenessProbe:
     httpGet:
       path: /healthz
       port: metrics
-    failureThreshold: 5
+    failureThreshold: 3
     initialDelaySeconds: 10
     timeoutSeconds: 10
-    periodSeconds: 60
+    periodSeconds: 20
 csiLivenessProbe:
   resources: {}
   image:
