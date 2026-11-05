@@ -1,4 +1,4 @@
-FROM alpine:3.24.1
+FROM alpine:3.24.2
 ENV TARGET=""
 WORKDIR /
 # Ensure we have the latest packages including libssl and remove cache
