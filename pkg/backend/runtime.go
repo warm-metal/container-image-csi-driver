@@ -21,9 +21,14 @@ type ContainerRuntimeMounter interface {
 	// Determines if a local image exists. A false should return if errors arise.
 	ImageExists(ctx context.Context, image reference.Named) bool
 
-	// Retrieves the image ID of a local image.
-	// It should crash on any failures including not local image found.
-	GetImageIDOrDie(ctx context.Context, image reference.Named) string
+	// Retrieves the image ID of a local image, unpacking it onto the
+	// snapshotter if needed. Returns an error instead of crashing the
+	// process on failure (e.g. image not found, or the unpack was
+	// cancelled/timed-out by the caller) so that a single failed/cancelled
+	// request cannot take down unrelated in-flight requests on the same
+	// node. Callers are responsible for translating the returned error
+	// into an appropriate (ideally retryable) CSI/gRPC status.
+	GetImageID(ctx context.Context, image reference.Named) (string, error)
 
 	// Create a snapshot of the image using the given key and metadata.
 	// It should throw errors if any snapshot exists with the same key.
