@@ -174,6 +174,16 @@ func (n NodeServer) NodePublishVolume(ctx context.Context, req *csi.NodePublishV
 		req.VolumeCapability.AccessMode.Mode == csi.VolumeCapability_AccessMode_SINGLE_NODE_READER_ONLY ||
 		req.VolumeCapability.AccessMode.Mode == csi.VolumeCapability_AccessMode_MULTI_NODE_READER_ONLY
 	if err = n.mounter.Mount(ctx, req.VolumeId, backend.MountTarget(req.TargetPath), namedRef, ro); err != nil {
+		// A mount cancelled/timed-out mid-pull (e.g. kubelet cancelled this
+		// RPC's context while the image was still unpacking) is retryable:
+		// report it as such so kubelet/CSI retry instead of treating it as a
+		// permanent Internal error. See KCS-2831.
+		if backend.IsCancelled(err) {
+			err = status.Errorf(codes.DeadlineExceeded, "mount of image %q was cancelled, retry: %s", image, err)
+			metrics.OperationErrorsCount.WithLabelValues("mount-cancelled").Inc()
+			return
+		}
+
 		err = status.Error(codes.Internal, err.Error())
 		metrics.OperationErrorsCount.WithLabelValues("mount").Inc()
 		return

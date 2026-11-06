@@ -15,6 +15,7 @@ import (
 	"github.com/distribution/reference"
 	"github.com/opencontainers/image-spec/identity"
 	"github.com/warm-metal/container-image-csi-driver/pkg/backend"
+	"github.com/warm-metal/container-image-csi-driver/pkg/metrics"
 	"k8s.io/klog/v2"
 )
 
@@ -150,23 +151,41 @@ func (s snapshotMounter) ImageExists(ctx context.Context, image reference.Named)
 	return err == nil
 }
 
-func (s snapshotMounter) GetImageIDOrDie(ctx context.Context, image reference.Named) string {
+func (s snapshotMounter) GetImageID(ctx context.Context, image reference.Named) (string, error) {
 	localImage, err := s.cli.GetImage(ctx, image.String())
 	if err != nil {
-		klog.Fatalf("unable to retrieve local image %q: %s", image, err)
+		klog.Errorf("unable to retrieve local image %q: %s", image, err)
+		return "", fmt.Errorf("unable to retrieve local image %q: %w", image, err)
 	}
 
 	if err = localImage.Unpack(ctx, ""); err != nil {
-		klog.Fatalf("unable to unpack image %q: %s", image, err)
+		// A cancelled/timed-out unpack (e.g. kubelet cancelled the mount RPC's
+		// context because a slow ECR pull exceeded its deadline) is an
+		// expected, per-request, retryable condition - not a process-fatal
+		// error. Previously this called klog.Fatalf, which terminated the
+		// entire nodeplugin process and aborted every other in-flight
+		// NodePublishVolume/NodeUnpublishVolume request on the node along
+		// with it. Return the error to the caller instead so only this one
+		// request fails/retries; the rest of the node plugin keeps serving
+		// concurrent mount requests unaffected. See KCS-2831.
+		if backend.IsCancelled(err) {
+			klog.Warningf("image pull/unpack cancelled for %q, mount will be retried by kubelet: %s", image, err)
+			metrics.OperationErrorsCount.WithLabelValues("unpack-cancelled").Inc()
+		} else {
+			klog.Errorf("unable to unpack image %q: %s", image, err)
+		}
+
+		return "", fmt.Errorf("unable to unpack image %q: %w", image, err)
 	}
 
 	klog.Infof("image %q unpacked", image)
 	diffIDs, err := localImage.RootFS(ctx)
 	if err != nil {
-		klog.Fatalf("unable to fetch rootfs of image %q: %s", image, err)
+		klog.Errorf("unable to fetch rootfs of image %q: %s", image, err)
+		return "", fmt.Errorf("unable to fetch rootfs of image %q: %w", image, err)
 	}
 
-	return identity.ChainID(diffIDs).String()
+	return identity.ChainID(diffIDs).String(), nil
 }
 
 func (s snapshotMounter) PrepareReadOnlySnapshot(
