@@ -12,7 +12,7 @@ RUN make install-util
 FROM scratch as install-util
 COPY --from=builder /go/src/container-image-csi-driver/_output/container-image-csi-driver-install /
 
-FROM alpine:3.24.2
+FROM alpine:3.24.3
 RUN apk add --no-cache btrfs-progs-dev lvm2-dev util-linux
 WORKDIR /
 COPY --from=builder /go/src/container-image-csi-driver/_output/container-image-csi-driver /usr/bin/
