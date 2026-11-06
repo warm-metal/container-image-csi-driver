@@ -142,7 +142,7 @@ func main() {
 		secretStore := secret.CreateStoreOrDie(*icpConf, *icpBin, *nodePluginSA, *enableCache)
 
 		server.Start(*endpoint,
-			NewIdentityServer(driverVersion),
+			NewNodeIdentityServer(driverVersion, criClient),
 			nil,
 			NewNodeServer(driver, mounter, criClient, secretStore, *asyncImagePullTimeout))
 	case controllerMode:
