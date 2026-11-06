@@ -167,7 +167,11 @@ func (s *SnapshotMounter) Mount(
 	ctx context.Context, volumeId string, target MountTarget, image reference.Named, ro bool,
 ) (err error) {
 	var key SnapshotKey
-	imageID := s.runtime.GetImageIDOrDie(ctx, image)
+	imageID, err := s.runtime.GetImageID(ctx, image)
+	if err != nil {
+		klog.Errorf("unable to get image id of %q: %s", image, err)
+		return err
+	}
 	if ro {
 		// Use the image ID as the key of the read-only snapshot
 		if imageID == "" {

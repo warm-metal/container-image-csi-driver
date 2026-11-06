@@ -71,13 +71,14 @@ func (s snapshotMounter) ImageExists(ctx context.Context, image reference.Named)
 	return true
 }
 
-func (s snapshotMounter) GetImageIDOrDie(ctx context.Context, image reference.Named) string {
+func (s snapshotMounter) GetImageID(_ context.Context, image reference.Named) (string, error) {
 	img, err := s.imageStore.Image(image.String())
 	if err != nil {
-		klog.Fatalf("unable to retrieve local image %q: %s", image, err)
+		klog.Errorf("unable to retrieve local image %q: %s", image, err)
+		return "", fmt.Errorf("unable to retrieve local image %q: %w", image, err)
 	}
 
-	return img.ID
+	return img.ID, nil
 }
 
 func (s snapshotMounter) PrepareReadOnlySnapshot(
