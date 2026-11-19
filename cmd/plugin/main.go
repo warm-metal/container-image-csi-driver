@@ -54,6 +54,11 @@ var (
 		"Cache image pull secret from the daemon ServiceAccount.")
 	asyncImagePullTimeout = flag.Duration("async-pull-timeout", 10*time.Minute,
 		"Timeout for asynchronous image pulling. Only valid if --async-pull is enabled.")
+	maxConcurrentImagePulls = flag.Int("max-concurrent-image-pulls", 0,
+		"Maximum number of image pulls that may run concurrently on this node. "+
+			"Pulls beyond this limit wait for a free slot instead of all running "+
+			"at once and competing for the node's bandwidth/disk I/O. "+
+			"0 (default) means unbounded, preserving prior behavior.")
 	mode = flag.String("mode", nodeMode,
 		fmt.Sprintf("Mode determines the role this instance plays. One of %q or %q.", nodeMode, controllerMode))
 	watcherResyncPeriod = flag.Duration("watcher-resync-period", 10*time.Minute,
@@ -144,7 +149,7 @@ func main() {
 		server.Start(*endpoint,
 			NewNodeIdentityServer(driverVersion, criClient),
 			nil,
-			NewNodeServer(driver, mounter, criClient, secretStore, *asyncImagePullTimeout))
+			NewNodeServer(driver, mounter, criClient, secretStore, *asyncImagePullTimeout, *maxConcurrentImagePulls))
 	case controllerMode:
 		watcher, err := watcher.New(context.Background(), *watcherResyncPeriod)
 		if err != nil {
