@@ -7,6 +7,12 @@ logLevel: 4
 enableDaemonImageCredentialCache:
 enableAsyncPull: false
 asyncPullTimeout: "10m"
+# Maximum number of images pulled in parallel on a single node. Pulls beyond
+# this limit wait for a free slot instead of all running at once and
+# competing for the node's network bandwidth/disk I/O, which can otherwise
+# cause every concurrent pull to slow down and miss kubelet's mount timeout
+# together. 0 (default) means unbounded, preserving prior behavior.
+maxConcurrentImagePulls: 0
 pullImageSecretForDaemonset:
 
 # SELinux mount context label to apply when mounting volumes.

@@ -79,6 +79,9 @@ spec:
             {{- if .Values.enableAsyncPull }}
             - --async-pull-timeout={{ .Values.asyncPullTimeout }}
             {{- end }}
+            {{- if gt (.Values.maxConcurrentImagePulls | int) 0 }}
+            - --max-concurrent-image-pulls={{ .Values.maxConcurrentImagePulls }}
+            {{- end }}
             {{- if .Values.imageCredentialProvider.enabled }}
             - --image-credential-provider-config=$(IMAGE_CREDENTIAL_PROVIDER_CONFIG)
             - --image-credential-provider-bin-dir=$(IMAGE_CREDENTIAL_PROVIDER_BIN_DIR)

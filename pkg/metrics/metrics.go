@@ -13,6 +13,8 @@ const ImagePullTimeKey = "pull_duration_seconds"
 const ImagePullTimeHistKey = "pull_duration_seconds_hist"
 const ImagePullSizeKey = "pull_size_bytes"
 const OperationErrorsCountKey = "operation_errors_total"
+const ImagePullInFlightKey = "image_pull_inflight"
+const ImagePullQueuedKey = "image_pull_queued"
 
 var ImagePullTimeHist = prometheus.NewHistogramVec(
 	prometheus.HistogramOpts{
@@ -50,12 +52,38 @@ var OperationErrorsCount = prometheus.NewCounterVec(
 	[]string{"operation_type"},
 )
 
+// ImagePullInFlight reports the number of image pulls currently holding a
+// concurrency slot (i.e. actively calling the container runtime's PullImage),
+// when --max-concurrent-image-pulls is set to a value > 0. It stays at 0 when
+// bounded parallelism is disabled (the default), since no slot bookkeeping
+// occurs in that case.
+var ImagePullInFlight = prometheus.NewGauge(
+	prometheus.GaugeOpts{
+		Subsystem: "warm_metal",
+		Name:      ImagePullInFlightKey,
+		Help:      "Number of image pulls currently holding a concurrency slot (actively pulling). Only meaningful when --max-concurrent-image-pulls > 0.",
+	},
+)
+
+// ImagePullQueued reports the number of image pulls currently waiting for a
+// free concurrency slot before they can start pulling, when
+// --max-concurrent-image-pulls is set to a value > 0.
+var ImagePullQueued = prometheus.NewGauge(
+	prometheus.GaugeOpts{
+		Subsystem: "warm_metal",
+		Name:      ImagePullQueuedKey,
+		Help:      "Number of image pulls currently queued, waiting for a free concurrency slot. Only meaningful when --max-concurrent-image-pulls > 0.",
+	},
+)
+
 func RegisterMetrics() *prometheus.Registry {
 	reg := prometheus.NewRegistry()
 	reg.MustRegister(ImagePullTime)
 	reg.MustRegister(ImagePullTimeHist)
 	reg.MustRegister(ImagePullSizeBytes)
 	reg.MustRegister(OperationErrorsCount)
+	reg.MustRegister(ImagePullInFlight)
+	reg.MustRegister(ImagePullQueued)
 
 	return reg
 }

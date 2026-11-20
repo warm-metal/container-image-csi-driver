@@ -16,6 +16,7 @@ import (
 	"github.com/warm-metal/container-image-csi-driver/pkg/remoteimage"
 	"github.com/warm-metal/container-image-csi-driver/pkg/remoteimageasync"
 	"github.com/warm-metal/container-image-csi-driver/pkg/secret"
+	"golang.org/x/sync/semaphore"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 	cri "k8s.io/cri-api/pkg/apis/runtime/v1"
@@ -39,13 +40,19 @@ type NodeServer struct {
 	secretStore           secret.Store
 	asyncImagePullTimeout time.Duration
 	asyncImagePuller      remoteimageasync.AsyncPuller
+	// pullSemaphore bounds how many image pulls (sync or async) run
+	// concurrently on this node, when --max-concurrent-image-pulls > 0.
+	// It is nil when bounded parallelism is disabled, in which case
+	// newPuller returns the unwrapped Puller and behavior is unchanged
+	// from before this field existed.
+	pullSemaphore *semaphore.Weighted
 	csi.UnimplementedNodeServer
 }
 
 // Remove exported method and keep only unexported one
 func (ns *NodeServer) mustEmbedUnimplementedNodeServer() {}
 
-func NewNodeServer(driver *csicommon.CSIDriver, mounter backend.Mounter, imageSvc cri.ImageServiceClient, secretStore secret.Store, asyncImagePullTimeout time.Duration) *NodeServer {
+func NewNodeServer(driver *csicommon.CSIDriver, mounter backend.Mounter, imageSvc cri.ImageServiceClient, secretStore secret.Store, asyncImagePullTimeout time.Duration, maxConcurrentImagePulls int) *NodeServer {
 	ns := &NodeServer{
 		driver:                driver,
 		mounter:               mounter,
@@ -61,7 +68,24 @@ func NewNodeServer(driver *csicommon.CSIDriver, mounter backend.Mounter, imageSv
 		klog.Info("Starting node server in Sync mode")
 		ns.asyncImagePullTimeout = 0 // set to default value
 	}
+	if maxConcurrentImagePulls > 0 {
+		klog.Infof("Bounding concurrent image pulls on this node to %d", maxConcurrentImagePulls)
+		ns.pullSemaphore = semaphore.NewWeighted(int64(maxConcurrentImagePulls))
+	}
 	return ns
+}
+
+// newPuller wraps the given Puller with concurrency bounding when
+// --max-concurrent-image-pulls is enabled (pullSemaphore != nil), and
+// returns it unwrapped otherwise. This is the single point through which
+// both the sync and async pull paths obtain their Puller, so one flag
+// bounds both.
+func (n NodeServer) newPuller(namedRef reference.Named, keyring secret.DockerKeyring) remoteimage.Puller {
+	puller := remoteimage.NewPuller(n.imageSvc, namedRef, keyring)
+	if n.pullSemaphore == nil {
+		return puller
+	}
+	return remoteimage.NewBoundedPuller(puller, n.pullSemaphore)
 }
 
 func (n NodeServer) NodePublishVolume(ctx context.Context, req *csi.NodePublishVolumeRequest) (resp *csi.NodePublishVolumeResponse, err error) {
@@ -146,7 +170,7 @@ func (n NodeServer) NodePublishVolume(ctx context.Context, req *csi.NodePublishV
 	//      correct. should test this.
 	if pullAlways || !n.mounter.ImageExists(ctx, namedRef) {
 		klog.Errorf("pull image %q", image)
-		puller := remoteimage.NewPuller(n.imageSvc, namedRef, keyring)
+		puller := n.newPuller(namedRef, keyring)
 
 		if n.asyncImagePuller != nil {
 			var session *remoteimageasync.PullSession

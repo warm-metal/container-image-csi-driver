@@ -42,7 +42,7 @@ func TestNodePublishVolumeAsync(t *testing.T) {
 	assert.NotNil(t, driver)
 
 	asyncImagePulls := 15 * time.Minute //TODO: determine intended value for this in the context of this test
-	ns := NewNodeServer(driver, mounter, criClient, &testSecretStore{}, asyncImagePulls)
+	ns := NewNodeServer(driver, mounter, criClient, &testSecretStore{}, asyncImagePulls, 0)
 
 	// based on kubelet's csi mounter plugin code
 	// check https://github.com/kubernetes/kubernetes/blob/b06a31b87235784bad2858be62115049b6eb6bcd/pkg/volume/csi/csi_mounter.go#L111-L112
@@ -169,7 +169,7 @@ func TestNodePublishVolumeSync(t *testing.T) {
 	assert.NotNil(t, driver)
 
 	asyncImagePulls := 0 * time.Minute //TODO: determine intended value for this in the context of this test
-	ns := NewNodeServer(driver, mounter, criClient, &testSecretStore{}, asyncImagePulls)
+	ns := NewNodeServer(driver, mounter, criClient, &testSecretStore{}, asyncImagePulls, 0)
 
 	// based on kubelet's csi mounter plugin code
 	// check https://github.com/kubernetes/kubernetes/blob/b06a31b87235784bad2858be62115049b6eb6bcd/pkg/volume/csi/csi_mounter.go#L111-L112
@@ -301,7 +301,7 @@ func TestMetrics(t *testing.T) {
 	assert.NotNil(t, driver)
 
 	asyncImagePulls := 15 * time.Minute //TODO: determine intended value for this in the context of this test
-	ns := NewNodeServer(driver, mounter, criClient, &testSecretStore{}, asyncImagePulls)
+	ns := NewNodeServer(driver, mounter, criClient, &testSecretStore{}, asyncImagePulls, 0)
 
 	// based on kubelet's csi mounter plugin code
 	// check https://github.com/kubernetes/kubernetes/blob/b06a31b87235784bad2858be62115049b6eb6bcd/pkg/volume/csi/csi_mounter.go#L111-L112
